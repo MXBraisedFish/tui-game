@@ -162,6 +162,19 @@ impl LuaObjectPool {
             height: *height,
           },
         ),
+        LuaDrawCommand::Progressbar { id, x, y, .. } => {
+          let Some(binding) = self.progressbars.get(id) else {
+            continue;
+          };
+          (
+            *x,
+            *y,
+            Size {
+              width: binding.width,
+              height: 1,
+            },
+          )
+        }
         LuaDrawCommand::Hitbox { id, x, y, .. } => {
           let Some(binding) = self.hitboxes.get(id) else {
             continue;
@@ -397,6 +410,9 @@ impl LuaObjectPool {
   ) {
     match command {
       LuaDrawCommand::Surface { .. } => {}
+      LuaDrawCommand::Progressbar { id, target, x, y } => {
+        self.draw_progressbar(id, target, (x, y), canvas)
+      }
       LuaDrawCommand::Link { id, target, x, y } => self.draw_link(id, target, (x, y), canvas),
       LuaDrawCommand::Input { id, target, x, y } => self.draw_input(id, target, (x, y), canvas),
       LuaDrawCommand::Hitbox { id, target, x, y } => self.draw_hitbox(id, target, (x, y), canvas),
@@ -463,7 +479,8 @@ impl LuaObjectPool {
 
 fn command_target(command: &LuaDrawCommand) -> LuaDrawTarget {
   match command {
-    LuaDrawCommand::Surface { target, .. }
+    LuaDrawCommand::Progressbar { target, .. }
+    | LuaDrawCommand::Surface { target, .. }
     | LuaDrawCommand::Link { target, .. }
     | LuaDrawCommand::Input { target, .. }
     | LuaDrawCommand::Hitbox { target, .. }

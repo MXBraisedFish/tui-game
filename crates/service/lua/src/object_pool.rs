@@ -7,7 +7,9 @@ use std::rc::{Rc, Weak};
 mod input;
 mod link;
 mod markdown;
+mod progressbar;
 pub(crate) use markdown::LuaMarkdownBinding;
+pub(crate) use progressbar::LuaProgressbarBinding;
 mod scene;
 mod scrollbox;
 pub(crate) use input::LuaInputBinding;
@@ -101,6 +103,7 @@ pub struct LuaObjectPool {
   pub(crate) inputs: BTreeMap<u64, LuaInputBinding>,
   /// The script links indexed by their pool-local native identities.
   pub(crate) links: BTreeMap<u64, LuaLinkBinding>,
+  pub(crate) progressbars: BTreeMap<u64, LuaProgressbarBinding>,
   pub(crate) scrollboxes: BTreeMap<u64, LuaScrollboxBinding>,
   pub(crate) next_scrollbox_id: u64,
   pub(crate) markdowns: BTreeMap<u64, LuaMarkdownBinding>,
@@ -122,6 +125,7 @@ impl LuaObjectPool {
       hitboxes: BTreeMap::new(),
       inputs: BTreeMap::new(),
       links: BTreeMap::new(),
+      progressbars: BTreeMap::new(),
       scrollboxes: BTreeMap::new(),
       next_scrollbox_id: 0,
       markdowns: BTreeMap::new(),

@@ -163,10 +163,7 @@ impl EngineServices {
         io::Error::new(error.kind(), format!("configure package log path: {error}"))
       })?;
     let image_cache_dir = storage.path("data/cache/images");
-    let ffmpeg = FfmpegService::new(
-      storage.root_dir().to_path_buf(),
-      storage.cache_dir_path().join("ffmpeg"),
-    );
+    let ffmpeg = FfmpegService::new(storage.root_dir().to_path_buf(), storage.system_dir_path());
     let async_runtime = AsyncRuntime::new();
     let audio = AudioService::new(tg_service_async::EventSink::new(
       async_runtime.event_sender(),
@@ -344,6 +341,7 @@ mod tests {
         .is_file()
     );
     assert!(deployment.join("data/log").is_dir());
+    assert!(deployment.join("system").is_dir());
     assert!(deployment.join("data/cache/images").is_dir());
     std::fs::remove_dir_all(base).unwrap();
   }
@@ -363,6 +361,11 @@ mod tests {
 
     assert_eq!(services.storage.root_dir(), current_root);
     assert!(services.storage.data_dir_path().is_dir());
+    assert_eq!(
+      services.storage.system_dir_path(),
+      current_root.join("system")
+    );
+    assert!(services.storage.system_dir_path().is_dir());
     assert_eq!(directory_entries(&caller), before);
     assert!(!caller.join("data").exists());
   }

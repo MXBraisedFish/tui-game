@@ -64,6 +64,48 @@ impl StorageService {
     &self.root_dir
   }
 
+  /// Return the runtime configuration directory under the explicit deployment root.
+  pub fn system_dir_path(&self) -> PathBuf {
+    self.path(layout::SYSTEM_DIR)
+  }
+
+  /// Resolve an existing runtime file within the deployment's system directory.
+  ///
+  /// Follow a linked system directory while rejecting files that escape its resolved root.
+  ///
+  /// # Errors
+  ///
+  /// Return InvalidInput for empty, absolute or traversing paths; propagate filesystem errors;
+  /// return PermissionDenied for links outside the resolved system root and InvalidInput for
+  /// paths that do not identify a regular file.
+  pub fn resolve_system_file(&self, relative: &Path) -> io::Result<PathBuf> {
+    if relative.as_os_str().is_empty()
+      || !relative
+        .components()
+        .all(|part| matches!(part, std::path::Component::Normal(_)))
+    {
+      return Err(io::Error::new(
+        io::ErrorKind::InvalidInput,
+        "system file path must be a nonempty relative path without traversal",
+      ));
+    }
+    let root = self.system_dir_path().canonicalize()?;
+    let file = self.system_dir_path().join(relative).canonicalize()?;
+    if !file.starts_with(&root) {
+      return Err(io::Error::new(
+        io::ErrorKind::PermissionDenied,
+        "system file link escapes the system directory",
+      ));
+    }
+    if !file.is_file() {
+      return Err(io::Error::new(
+        io::ErrorKind::InvalidInput,
+        "system path is not a regular file",
+      ));
+    }
+    Ok(file)
+  }
+
   /// Return the current data dir path.
   pub fn data_dir_path(&self) -> PathBuf {
     self.path(layout::DATA_DIR)
@@ -441,6 +483,8 @@ mod tests {
 
     assert_eq!(storage.root_dir(), root);
     assert!(storage.data_dir_path().is_dir());
+    assert_eq!(storage.system_dir_path(), root.join("system"));
+    assert!(storage.system_dir_path().is_dir());
     assert!(storage.tui_log_path().starts_with(&root));
 
     std::fs::remove_dir_all(root).unwrap();
@@ -473,5 +517,123 @@ mod tests {
     assert!(error.to_string().contains("data"));
 
     std::fs::remove_dir_all(root).unwrap();
+  }
+
+  #[test]
+  fn system_files_resolve_within_the_deployment_directory() {
+    let nonce = SystemTime::now()
+      .duration_since(UNIX_EPOCH)
+      .unwrap()
+      .as_nanos();
+    let root = std::env::temp_dir().join(format!("tui system 中文 空格-{nonce}"));
+    std::fs::create_dir_all(root.join("system/config")).unwrap();
+    std::fs::write(root.join("system/config/runtime.json"), b"{}").unwrap();
+    let storage = StorageService::from_root_for_test(root.clone());
+    assert_eq!(
+      storage
+        .resolve_system_file(Path::new("config/runtime.json"))
+        .unwrap(),
+      root
+        .join("system/config/runtime.json")
+        .canonicalize()
+        .unwrap()
+    );
+    for invalid in [
+      Path::new(""),
+      Path::new("../outside"),
+      Path::new("config/../../outside"),
+      root.as_path(),
+    ] {
+      assert_eq!(
+        storage.resolve_system_file(invalid).unwrap_err().kind(),
+        io::ErrorKind::InvalidInput
+      );
+    }
+    assert_eq!(
+      storage
+        .resolve_system_file(Path::new("config"))
+        .unwrap_err()
+        .kind(),
+      io::ErrorKind::InvalidInput
+    );
+    assert_eq!(
+      storage
+        .resolve_system_file(Path::new("missing.json"))
+        .unwrap_err()
+        .kind(),
+      io::ErrorKind::NotFound
+    );
+    std::fs::remove_dir_all(root).unwrap();
+  }
+
+  #[cfg(any(unix, windows))]
+  #[test]
+  fn linked_system_root_is_supported_but_nested_escape_is_rejected() {
+    let nonce = SystemTime::now()
+      .duration_since(UNIX_EPOCH)
+      .unwrap()
+      .as_nanos();
+    let root = std::env::temp_dir().join(format!("tui system links-{nonce}"));
+    let target = root.join("runtime files");
+    let deployment = root.join("deployment");
+    let outside = root.join("outside");
+    std::fs::create_dir_all(&deployment).unwrap();
+    std::fs::create_dir_all(target.join("config")).unwrap();
+    std::fs::create_dir_all(&outside).unwrap();
+    std::fs::write(target.join("config/runtime.json"), b"{}").unwrap();
+    std::fs::write(outside.join("secret.json"), b"private").unwrap();
+    link_directory(&target, &deployment.join("system"));
+    link_directory(&outside, &target.join("escape"));
+    let mut log = LogService::new();
+    let storage = StorageService::new(deployment.clone(), &mut log).unwrap();
+    assert_eq!(
+      storage
+        .resolve_system_file(Path::new("config/runtime.json"))
+        .unwrap(),
+      target.join("config/runtime.json").canonicalize().unwrap()
+    );
+    assert_eq!(
+      storage
+        .resolve_system_file(Path::new("escape/secret.json"))
+        .unwrap_err()
+        .kind(),
+      io::ErrorKind::PermissionDenied
+    );
+    #[cfg(windows)]
+    {
+      std::fs::remove_dir(target.join("escape")).unwrap();
+      std::fs::remove_dir(deployment.join("system")).unwrap();
+    }
+    #[cfg(unix)]
+    {
+      std::fs::remove_file(target.join("escape")).unwrap();
+      std::fs::remove_file(deployment.join("system")).unwrap();
+    }
+    assert_eq!(
+      std::fs::read(outside.join("secret.json")).unwrap(),
+      b"private"
+    );
+    std::fs::remove_dir_all(root).unwrap();
+  }
+
+  #[cfg(unix)]
+  fn link_directory(target: &Path, link: &Path) {
+    std::os::unix::fs::symlink(target, link).unwrap();
+  }
+
+  #[cfg(windows)]
+  fn link_directory(target: &Path, link: &Path) {
+    // Junctions work without the elevated privilege required by Windows symlinks.
+    let output = std::process::Command::new("powershell.exe")
+      .args(["-NoProfile", "-NonInteractive", "-Command",
+        "$ErrorActionPreference='Stop'; New-Item -ItemType Junction -Path $env:TG_TEST_LINK -Target $env:TG_TEST_TARGET | Out-Null"])
+      .env("TG_TEST_LINK", link)
+      .env("TG_TEST_TARGET", target)
+      .output().unwrap();
+    assert!(
+      output.status.success(),
+      "create directory junction: {}",
+      String::from_utf8_lossy(&output.stderr)
+    );
   }
 }

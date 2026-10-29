@@ -1,0 +1,4 @@
+# OpenH264's cc build otherwise adds a dynamic libstdc++ dependency. The video
+# crate supplies the matching compiler's static runtime explicitly in build.rs.
+[env]
+CXXSTDLIB_x86_64_pc_windows_gnu = { value = "", force = true }

@@ -56,6 +56,84 @@ impl ProgressBarService {
     pool.progress_bars.bars.contains_key(&id)
   }
 
+  /// Replace the segment styles and fill origin when all characters occupy one cell.
+  ///
+  /// Return false if the object is missing or a configured character has an invalid width.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The owning widget pool.
+  /// * `id` - The progress bar identity.
+  /// * `options` - The replacement configuration.
+  pub fn set_options(
+    &self,
+    pool: &mut UiObjectPool,
+    id: ProgressBarId,
+    options: ProgressBarOptions,
+  ) -> bool {
+    if !valid_options(&options) {
+      return false;
+    }
+    let Some(state) = pool.progress_bars.bars.get_mut(&id) else {
+      return false;
+    };
+    state.options = options;
+    true
+  }
+
+  /// Render a single-row progress bar at a signed parent-local position.
+  ///
+  /// Clip the output without changing the logical width used to compute completed cells.
+  /// Return false if the object or destination is unavailable, or no cells remain visible.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The owning widget pool.
+  /// * `id` - The progress bar identity.
+  /// * `target` - The prepared parent slice, or None for the base.
+  /// * `position` - The original signed column and row.
+  /// * `width` - The complete logical width in terminal cells.
+  /// * `canvas` - The destination canvas.
+  pub fn render_at(
+    &self,
+    pool: &UiObjectPool,
+    id: ProgressBarId,
+    target: Option<SliceId>,
+    position: (i32, i32),
+    width: u16,
+    canvas: &mut CanvasService,
+  ) -> bool {
+    let Some((parent_clip, parent_origin, _)) = canvas.surface_geometry(target) else {
+      return false;
+    };
+    let origin = (
+      i64::from(parent_origin.0) + i64::from(position.0),
+      i64::from(parent_origin.1) + i64::from(position.1),
+    );
+    let clip = crate::clip_rect(
+      origin,
+      tg_service_layout::Size { width, height: 1 },
+      parent_clip,
+    );
+    if clip.width == 0 || clip.height == 0 {
+      return false;
+    }
+    let start = (i64::from(clip.x) - origin.0) as u16;
+    let Some(segments) = self.segments_for(pool, id, width, start..start + clip.width) else {
+      return false;
+    };
+    for (column, character, style) in segments {
+      let x = (i64::from(position.0) + i64::from(column)) as i32;
+      match target {
+        None => canvas.styled_text(x, position.1, &character.to_string(), style),
+        Some(slice) => {
+          canvas.styled_text_on(slice, x, position.1, &character.to_string(), style);
+        }
+      }
+    }
+    true
+  }
+
   /// Return the committed progress amount of the identified progress bar.
   pub fn completed(&self, pool: &UiObjectPool, id: ProgressBarId) -> Option<f32> {
     Some(pool.progress_bars.bars.get(&id)?.completed)
@@ -229,42 +307,47 @@ impl ProgressBarService {
     if rect.width == 0 || rect.height == 0 {
       return None;
     }
+    self.segments_for(pool, id, rect.width, 0..rect.width)
+  }
+
+  fn segments_for(
+    &self,
+    pool: &UiObjectPool,
+    id: ProgressBarId,
+    width: u16,
+    columns: std::ops::Range<u16>,
+  ) -> Option<Vec<(u16, char, TextStyle)>> {
     let state = pool.progress_bars.bars.get(&id)?;
-    let mut cells = vec![SegmentKind::Remaining; rect.width as usize];
-    fill_cells(
-      &mut cells,
+    let completed = filled_range(
       state.options.origin,
-      cells_for(rect.width, state.preview),
-      SegmentKind::Preview,
+      width,
+      cells_for(width, state.completed),
     );
-    fill_cells(
-      &mut cells,
-      state.options.origin,
-      cells_for(rect.width, state.completed),
-      SegmentKind::Completed,
-    );
+    let preview = filled_range(state.options.origin, width, cells_for(width, state.preview));
     Some(
-      cells
-        .into_iter()
-        .enumerate()
-        .map(|(x, kind)| {
-          let segment = match kind {
-            SegmentKind::Completed => &state.options.completed,
-            SegmentKind::Preview => &state.options.preview,
-            SegmentKind::Remaining => &state.options.remaining,
+      columns
+        .map(|column| {
+          let segment = if completed.contains(&column) {
+            &state.options.completed
+          } else if preview.contains(&column) {
+            &state.options.preview
+          } else {
+            &state.options.remaining
           };
-          (x as u16, segment.ch, segment.style.clone())
+          (column, segment.ch, segment.style.clone())
         })
         .collect(),
     )
   }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum SegmentKind {
-  Completed,
-  Preview,
-  Remaining,
+fn filled_range(origin: ProgressBarFillOrigin, width: u16, count: u16) -> std::ops::Range<u16> {
+  let start = match origin {
+    ProgressBarFillOrigin::Left => 0,
+    ProgressBarFillOrigin::Right => width - count,
+    ProgressBarFillOrigin::Center => (width - count) / 2,
+  };
+  start..start + count
 }
 
 fn valid_options(options: &ProgressBarOptions) -> bool {
@@ -289,51 +372,6 @@ fn cells_for(width: u16, value: f32) -> u16 {
   ((width as f32) * percent(value))
     .floor()
     .clamp(0.0, width as f32) as u16
-}
-
-fn fill_cells(
-  cells: &mut [SegmentKind],
-  origin: ProgressBarFillOrigin,
-  count: u16,
-  kind: SegmentKind,
-) {
-  let width = cells.len();
-  match origin {
-    ProgressBarFillOrigin::Left => {
-      for cell in cells.iter_mut().take(count as usize) {
-        *cell = kind;
-      }
-    }
-    ProgressBarFillOrigin::Right => {
-      for cell in cells.iter_mut().rev().take(count as usize) {
-        *cell = kind;
-      }
-    }
-    ProgressBarFillOrigin::Center => {
-      for index in center_indices(width).into_iter().take(count as usize) {
-        cells[index] = kind;
-      }
-    }
-  }
-}
-
-fn center_indices(width: usize) -> Vec<usize> {
-  let mut indices = Vec::with_capacity(width);
-  if width == 0 {
-    return indices;
-  }
-  let left_end = (width - 1) / 2;
-  let right_start = width / 2;
-  for step in 0..=left_end.max(width.saturating_sub(right_start + 1)) {
-    if left_end >= step {
-      indices.push(left_end - step);
-    }
-    let right = right_start + step;
-    if right != left_end.saturating_sub(step) && right < width {
-      indices.push(right);
-    }
-  }
-  indices
 }
 
 #[cfg(test)]

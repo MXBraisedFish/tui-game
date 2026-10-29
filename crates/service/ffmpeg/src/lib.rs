@@ -3,10 +3,11 @@
 //! # Examples
 //!
 //! ```rust
-//! use std::path::PathBuf;
 //! use tg_service_ffmpeg::FfmpegService;
 //!
-//! let mut ffmpeg = FfmpegService::new(PathBuf::from("."), PathBuf::from("data/cache/ffmpeg"));
+//! let executable = std::env::current_exe().unwrap();
+//! let root = executable.parent().unwrap();
+//! let mut ffmpeg = FfmpegService::new(root, root.join("system"));
 //! let found = ffmpeg.refresh();
 //! assert_eq!(found, ffmpeg.installation().is_some());
 //! ```
@@ -45,7 +46,7 @@ pub struct FfmpegService {
 }
 
 impl FfmpegService {
-  /// Create the FFmpeg service and immediately search deployment, managed, and system locations.
+  /// Search deployment/system first, followed by compatible bundle and system locations.
   pub fn new(deployment_root: impl Into<PathBuf>, managed_directory: impl Into<PathBuf>) -> Self {
     let mut service = Self {
       deployment_root: deployment_root.into(),
@@ -154,6 +155,11 @@ fn build_candidates(
   let file_name = platform.file_name();
   let mut candidates = Vec::new();
 
+  push_unique(
+    &mut candidates,
+    deployment_root.join("system").join(file_name),
+  );
+
   if let Some(executable_directory) = current_executable.and_then(Path::parent) {
     push_unique(&mut candidates, executable_directory.join(file_name));
     push_unique(
@@ -173,6 +179,11 @@ fn build_candidates(
   push_unique(&mut candidates, deployment_root.join(file_name));
   push_unique(&mut candidates, deployment_root.join("bin").join(file_name));
   push_unique(&mut candidates, managed_directory.join(file_name));
+  // Keep tools installed by earlier releases discoverable after moving the managed location.
+  push_unique(
+    &mut candidates,
+    deployment_root.join("data/cache/ffmpeg").join(file_name),
+  );
 
   if let Some(path) = path {
     for directory in std::env::split_paths(path) {
@@ -303,9 +314,15 @@ mod tests {
       Platform::Linux,
     );
 
+    assert_eq!(
+      candidates.first(),
+      Some(&PathBuf::from("deployment/system/ffmpeg"))
+    );
+
     for expected in [
       PathBuf::from("application/bin/ffmpeg"),
       PathBuf::from("deployment/ffmpeg"),
+      PathBuf::from("deployment/data/cache/ffmpeg/ffmpeg"),
       PathBuf::from("cache/ffmpeg/ffmpeg"),
       PathBuf::from("path-a/ffmpeg"),
       PathBuf::from("path-b/ffmpeg"),

@@ -54,7 +54,12 @@ color.GRAY
 
 - 参数 `fg`
 - 参数 `bg`
-- 富文本标签。
+- 参数 `completed_fg`
+- 参数 `hover_fg`
+- 参数 `placeholder_fg`
+- 参数 `preview_fg`
+- 参数 `remaining_fg`
+- 富文本标签
 
 ### 示例
 
@@ -101,7 +106,12 @@ color.BRIGHT_GRAY
 
 - 参数 `fg`
 - 参数 `bg`
-- 富文本标签。
+- 参数 `completed_fg`
+- 参数 `hover_fg`
+- 参数 `placeholder_fg`
+- 参数 `preview_fg`
+- 参数 `remaining_fg`
+- 富文本标签
 
 ### 示例
 
@@ -148,7 +158,12 @@ color.BLACK
 
 - 参数 `fg`
 - 参数 `bg`
-- 富文本标签。
+- 参数 `completed_fg`
+- 参数 `hover_fg`
+- 参数 `placeholder_fg`
+- 参数 `preview_fg`
+- 参数 `remaining_fg`
+- 富文本标签
 
 ### 示例
 
@@ -194,7 +209,12 @@ color.RED
 
 - 参数 `fg`
 - 参数 `bg`
-- 富文本标签。
+- 参数 `completed_fg`
+- 参数 `hover_fg`
+- 参数 `placeholder_fg`
+- 参数 `preview_fg`
+- 参数 `remaining_fg`
+- 富文本标签
 
 ### 示例
 
@@ -240,7 +260,12 @@ color.GREEN
 
 - 参数 `fg`
 - 参数 `bg`
-- 富文本标签。
+- 参数 `completed_fg`
+- 参数 `hover_fg`
+- 参数 `placeholder_fg`
+- 参数 `preview_fg`
+- 参数 `remaining_fg`
+- 富文本标签
 
 ### 示例
 
@@ -286,7 +311,12 @@ color.YELLOW
 
 - 参数 `fg`
 - 参数 `bg`
-- 富文本标签。
+- 参数 `completed_fg`
+- 参数 `hover_fg`
+- 参数 `placeholder_fg`
+- 参数 `preview_fg`
+- 参数 `remaining_fg`
+- 富文本标签
 
 ### 示例
 
@@ -332,7 +362,12 @@ color.BLUE
 
 - 参数 `fg`
 - 参数 `bg`
-- 富文本标签。
+- 参数 `completed_fg`
+- 参数 `hover_fg`
+- 参数 `placeholder_fg`
+- 参数 `preview_fg`
+- 参数 `remaining_fg`
+- 富文本标签
 
 ### 示例
 
@@ -378,7 +413,12 @@ color.MAGENTA
 
 - 参数 `fg`
 - 参数 `bg`
-- 富文本标签。
+- 参数 `completed_fg`
+- 参数 `hover_fg`
+- 参数 `placeholder_fg`
+- 参数 `preview_fg`
+- 参数 `remaining_fg`
+- 富文本标签
 
 ### 示例
 
@@ -424,7 +464,12 @@ color.CYAN
 
 - 参数 `fg`
 - 参数 `bg`
-- 富文本标签。
+- 参数 `completed_fg`
+- 参数 `hover_fg`
+- 参数 `placeholder_fg`
+- 参数 `preview_fg`
+- 参数 `remaining_fg`
+- 富文本标签
 
 ### 示例
 
@@ -470,7 +515,12 @@ color.BRIGHT_RED
 
 - 参数 `fg`
 - 参数 `bg`
-- 富文本标签。
+- 参数 `completed_fg`
+- 参数 `hover_fg`
+- 参数 `placeholder_fg`
+- 参数 `preview_fg`
+- 参数 `remaining_fg`
+- 富文本标签
 
 ### 示例
 
@@ -516,7 +566,12 @@ color.BRIGHT_GREEN
 
 - 参数 `fg`
 - 参数 `bg`
-- 富文本标签。
+- 参数 `completed_fg`
+- 参数 `hover_fg`
+- 参数 `placeholder_fg`
+- 参数 `preview_fg`
+- 参数 `remaining_fg`
+- 富文本标签
 
 ### 示例
 
@@ -562,7 +617,12 @@ color.BRIGHT_YELLOW
 
 - 参数 `fg`
 - 参数 `bg`
-- 富文本标签。
+- 参数 `completed_fg`
+- 参数 `hover_fg`
+- 参数 `placeholder_fg`
+- 参数 `preview_fg`
+- 参数 `remaining_fg`
+- 富文本标签
 
 ### 示例
 
@@ -608,7 +668,12 @@ color.BRIGHT_BLUE
 
 - 参数 `fg`
 - 参数 `bg`
-- 富文本标签。
+- 参数 `completed_fg`
+- 参数 `hover_fg`
+- 参数 `placeholder_fg`
+- 参数 `preview_fg`
+- 参数 `remaining_fg`
+- 富文本标签
 
 ### 示例
 
@@ -654,7 +719,12 @@ color.BRIGHT_MAGENTA
 
 - 参数 `fg`
 - 参数 `bg`
-- 富文本标签。
+- 参数 `completed_fg`
+- 参数 `hover_fg`
+- 参数 `placeholder_fg`
+- 参数 `preview_fg`
+- 参数 `remaining_fg`
+- 富文本标签
 
 ### 示例
 
@@ -700,7 +770,12 @@ color.BRIGHT_CYAN
 
 - 参数 `fg`
 - 参数 `bg`
-- 富文本标签。
+- 参数 `completed_fg`
+- 参数 `hover_fg`
+- 参数 `placeholder_fg`
+- 参数 `preview_fg`
+- 参数 `remaining_fg`
+- 富文本标签
 
 ### 示例
 
@@ -746,7 +821,12 @@ color.WHITE
 
 - 参数 `fg`
 - 参数 `bg`
-- 富文本标签。
+- 参数 `completed_fg`
+- 参数 `hover_fg`
+- 参数 `placeholder_fg`
+- 参数 `preview_fg`
+- 参数 `remaining_fg`
+- 富文本标签
 
 ### 示例
 
@@ -792,6 +872,11 @@ color.NONE
 
 - 参数 `fg`
 - 参数 `bg`
+- 参数 `completed_fg`
+- 参数 `hover_fg`
+- 参数 `placeholder_fg`
+- 参数 `preview_fg`
+- 参数 `remaining_fg`
 
 ### 示例
 

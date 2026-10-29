@@ -1,5 +1,8 @@
 //! Layout support for the storage service.
 
+/// The deployment-owned runtime configuration and auxiliary tool directory.
+pub const SYSTEM_DIR: &str = "system";
+
 /// The data dir used by this module.
 pub const DATA_DIR: &str = "data";
 
@@ -95,6 +98,7 @@ pub const LANGUAGE_REGISTRY_FILE: &str = "assets/language/language_registry.json
 
 /// The required directories used by this module.
 pub const REQUIRED_DIRECTORIES: &[&str] = &[
+  SYSTEM_DIR,
   DATA_DIR,
   DATA_CACHE_DIR,
   IMAGE_CACHE_DIR,

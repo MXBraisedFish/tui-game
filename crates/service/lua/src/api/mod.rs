@@ -148,6 +148,17 @@ pub enum LuaDrawTarget {
 /// A structured drawing request collected during a script callback.
 #[derive(Clone, Debug)]
 pub enum LuaDrawCommand {
+  /// Render a session-owned single-row progress bar in its parent surface.
+  Progressbar {
+    /// The pool-local progress bar identity.
+    id: u64,
+    /// The owning base or slice destination.
+    target: LuaDrawTarget,
+    /// The original signed column.
+    x: i32,
+    /// The original signed row.
+    y: i32,
+  },
   /// Place an embedded layer component or a user slice within its parent.
   Surface {
     /// The canvas identity of the content surface.

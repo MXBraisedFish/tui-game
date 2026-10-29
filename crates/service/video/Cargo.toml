@@ -19,3 +19,6 @@ tg-service-async = { path = "../async", features = ["test-support"] }
 hound = "3.5"
 serde_json = { version = "1.0.150", features = ["preserve_order"] }
 tg-core-version = { path = "../../core/version" }
+
+[build-dependencies]
+cc = "1"

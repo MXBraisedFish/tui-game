@@ -6,11 +6,16 @@ use tg_service_ffmpeg::FfmpegService;
 
 fn main() {
   let executable = std::env::current_exe().expect("current executable");
-  let root = executable
-    .parent()
-    .expect("executable parent")
-    .to_path_buf();
-  let managed_directory = root.join(PathBuf::from("data/cache/ffmpeg"));
+  let root = std::env::args_os()
+    .nth(1)
+    .map(PathBuf::from)
+    .unwrap_or_else(|| {
+      executable
+        .parent()
+        .expect("executable parent")
+        .to_path_buf()
+    });
+  let managed_directory = root.join("system");
   let mut ffmpeg = FfmpegService::new(root, managed_directory);
   let found = ffmpeg.refresh();
   assert_eq!(found, ffmpeg.installation().is_some());

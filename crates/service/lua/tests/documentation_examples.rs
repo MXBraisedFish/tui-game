@@ -76,6 +76,7 @@ fn api_examples_execute_with_fixture_assets() {
     "widget/link",
     "widget/scrollbox",
     "widget/markdown",
+    "widget/progressbar",
   ];
   let mut failures = Vec::new();
   let mut count = 0;
@@ -209,6 +210,7 @@ fn documented_members_match_registered_libraries() {
     "widget/link",
     "widget/scrollbox",
     "widget/markdown",
+    "widget/progressbar",
   ];
   for library in libraries {
     assert_documented_members(library, &docs, &entry);
@@ -234,6 +236,7 @@ fn session_object_libraries_match_documented_members() {
     "widget/link",
     "widget/scrollbox",
     "widget/markdown",
+    "widget/progressbar",
   ] {
     assert_documented_members(library, &docs, &entry);
   }

@@ -312,7 +312,7 @@ end
 - 必填参数 `height` 取值范围为 $[1, 65535]$。
 - 选填参数 `wheel_step_vertical` 取值范围为 $[1, 65535]$。
 - 选填参数 `wheel_step_horizontal` 取值范围为 $[1, 65535]$。
-- 选填参数 `track_shape_vertical`，选填参数 `thumb_shape_vertical`，选填参数 `track_shape_horizontal` 和选填参数 `thumb_shape_horizontal` 填写时每个字段必须为宽度为 `1` 的字符。
+- 选填参数 `track_shape_vertical`、选填参数 `thumb_shape_vertical`、选填参数 `track_shape_horizontal` 和选填参数 `thumb_shape_horizontal` 填写时每个字段必须宽度为 `1` 的字符。
 - 选填参数 `include_scrollbar` 仅对当前方法的必填参数 `width` 和必填参数 `height` 生效，实际仍区分内容尺寸和滚动框实际尺寸。
 
 ---
@@ -757,7 +757,7 @@ true
 - 选填参数 `wheel_step_horizontal` 取值范围为 $[1, 65535]$。
 - 选填参数 `scroll_offset_vertical` 取值范围为 $[0, n]$；`n` 为滚动框内的内容总高度，超出范围会修正回正常区域。
 - 选填参数 `scroll_offset_horizontal` 取值范围为 $[0, n]$；`n` 为滚动框内的内容总宽度，超出范围会修正回正常区域。
-- 选填参数 `track_shape_vertical`，选填参数 `thumb_shape_vertical`，选填参数 `track_shape_horizontal` 和选填参数 `thumb_shape_horizontal` 填写时每个字段必须为宽度为 `1` 的字符。
+- 选填参数 `track_shape_vertical`、选填参数 `thumb_shape_vertical`、选填参数 `track_shape_horizontal` 和选填参数 `thumb_shape_horizontal` 填写时每个字段必须宽度为 `1` 的字符。
 - 选填参数 `include_scrollbar` 仅对当前方法的选填参数 `width` 和选填参数 `height` 生效，实际仍区分内容尺寸和滚动框实际尺寸。
 
 ---

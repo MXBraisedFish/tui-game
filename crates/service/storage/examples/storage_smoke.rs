@@ -16,6 +16,18 @@ fn main() {
     storage.data_dir_path().is_dir(),
     "data directory is created"
   );
+  assert_eq!(storage.system_dir_path(), root.join("system"));
+  assert!(storage.system_dir_path().is_dir());
+  std::fs::write(storage.system_dir_path().join("runtime.json"), b"{}").unwrap();
+  let configuration = storage
+    .resolve_system_file(std::path::Path::new("runtime.json"))
+    .expect("resolve deployment runtime configuration");
+  assert_eq!(std::fs::read(configuration).unwrap(), b"{}");
+  assert!(
+    storage
+      .resolve_system_file(std::path::Path::new("../runtime.json"))
+      .is_err()
+  );
   let fps = storage.display_settings_profile().game_list_fps;
   assert_eq!(
     fps,

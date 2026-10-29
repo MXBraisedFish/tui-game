@@ -3847,6 +3847,7 @@ dependencies = [
 name = "tg-service-video"
 version = "2.0.0"
 dependencies = [
+ "cc",
  "crossbeam-channel",
  "hound",
  "mp4",
