@@ -227,7 +227,7 @@ end
   data = {
     id = "timer_001",
     timer_kind = "timer",
-    kind = "tick",
+    kind = "ticked",
     executed_count = 3,
     tip = "提醒",
   },
@@ -238,11 +238,11 @@ end
 |---|---|---|---|
 | `id` | `string` | 始终 | 与 timer.create 返回的 ID 相同。 |
 | `timer_kind` | `string` | 始终 | 当前固定为 timer。 |
-| `kind` | `string` | 始终 | 非末次触发为 tick，末次为 finished。 |
+| `kind` | `string` | 始终 | 非末次触发为 ticked，末次为 finished。 |
 | `executed_count` | `integer` | 始终 | 已完成的触发次数，从 1 开始。 |
 | `tip` | `string / nil` | 配置了 tip 时 | 创建或修改时填写的自定义文字。 |
 
-- 一次性计时器只产生 finished；有限循环的前几次产生 tick，最后一次只产生 finished，不会额外产生一次 tick；无限循环只产生 tick。
+- 一次性计时器只产生 finished；有限循环的前几次产生 ticked，最后一次只产生 finished，不会额外产生一次 ticked；无限循环只产生 ticked。
 - 每个计时器每帧最多产生一次事件，余下计时进度留给后续帧。事件投递仍遵守每帧 128 条和待处理上限 1024 条的规则。
 - callback 配置后只调用它；未配置时交给 HandleEvent。结束后保留对象和 callback，便于重启；删除、清空、取消 callback 或脚本结束时释放。
 - 暂停、重置、重启、修改或删除会让尚未投递的旧事件失效。
@@ -257,7 +257,7 @@ end
   type = "animation",
   data = {
     id = "2",
-    kind = "marker",
+    kind = "marker_reached",
     name = "impact",
   },
 }
@@ -266,9 +266,9 @@ end
 | `data` 字段 | 类型 | 出现条件 | 作用 |
 |---|---|---|---|
 | `id` | `string` | 始终 | Session 内动画 ID。 |
-| `kind` | `string` | 始终 | `started`、`marker`、`loop`、`finished` 或 `cancelled`。 |
-| `name` | `string \| nil` | `kind == "marker"` | 当前触发的标记名称。 |
-| `completed` | `integer \| nil` | `kind == "loop"` | 已完成的循环次数。 |
+| `kind` | `string` | 始终 | `started`、`marker_reached`、`looped`、`finished` 或 `cancelled`。 |
+| `name` | `string \| nil` | `kind == "marker_reached"` | 当前触发的标记名称。 |
+| `completed` | `integer \| nil` | `kind == "looped"` | 已完成的循环次数。 |
 
 ## 5. 异步服务结果
 
@@ -308,14 +308,14 @@ error = {
 
 ### 5.2 `file`
 
-异步文件请求完成或失败时发送。`file.read` 和 `file.write` 默认产生 `read_text`、`write_text`；传入 `byte = true` 时产生 `read_bytes`、`write_bytes`。其他公开文件 API 会产生 `list_dir`、`create_dir` 和 `remove`。同步的 `file.exists` 直接返回布尔值，不产生事件。
+异步文件请求完成或失败时发送。`file.read` 和 `file.write` 默认产生 `read_text_completed`、`write_text_completed`；传入 `byte = true` 时产生 `read_bytes_completed`、`write_bytes_completed`。其他公开文件 API 会产生 `list_dir_completed`、`create_dir_completed` 和 `remove_completed`。同步的 `file.exists` 直接返回布尔值，不产生事件。
 
 ```lua
 {
   type = "file",
   data = {
     request_id = "4",
-    kind = "read_text",
+    kind = "read_text_completed",
     path = "config/state.txt",
     tip = "load_state",
     ok = true,
@@ -327,13 +327,13 @@ error = {
 | `data` 字段 | 类型 | 出现条件 | 作用 |
 |---|---|---|---|
 | `request_id` | `string` | 始终 | Session 内请求 ID。 |
-| `kind` | `string` | 始终 | `read_text`、`read_bytes`、`write_text`、`write_bytes`、`list_dir`、`create_dir` 或 `remove`。 |
+| `kind` | `string` | 始终 | `read_text_completed`、`read_bytes_completed`、`write_text_completed`、`write_bytes_completed`、`list_dir_completed`、`create_dir_completed` 或 `remove_completed`。 |
 | `path` | `string` | 始终 | 调用方可见的虚拟相对路径，不是操作系统绝对路径。 |
 | `tip` | `string \| nil` | 请求传入 `event_tip` 时 | 调用方自定义的事件标记，原样返回以便区分请求。 |
 | `ok` | `boolean` | 始终 | 操作是否成功完成。 |
-| `text` | `string \| nil` | `read_text` 成功 | 经过严格解码且换行统一为 `\n` 的文本。 |
-| `bytes` | `string \| nil` | `read_bytes` 成功 | Lua 二进制字符串。 |
-| `entries` | `table \| nil` | `list_dir` 成功 | 文件条目数组。目录仅在递归扫描时使用，不作为条目返回。 |
+| `text` | `string \| nil` | `read_text_completed` 成功 | 经过严格解码且换行统一为 `\n` 的文本。 |
+| `bytes` | `string \| nil` | `read_bytes_completed` 成功 | Lua 二进制字符串。 |
+| `entries` | `table \| nil` | `list_dir_completed` 成功 | 文件条目数组。目录仅在递归扫描时使用，不作为条目返回。 |
 | `error` | `table \| nil` | `ok == false` | 通用错误表。 |
 
 `entries` 的每个元素为：
@@ -350,7 +350,7 @@ error = {
 | `path` | `string` | 相对于安全文件根目录的虚拟文件路径。 |
 | `file_type` | `string` | 不含点号的扩展名，例如 `rs`。 |
 
-`write_text`、`write_bytes`、`create_dir` 和 `remove` 成功时只携带 `ok = true`，不携带正文。`text`、`bytes`、`entries` 互斥。屏保只允许收到自身只读文件请求的结果；创建目录与删除操作仅允许游戏会话发起，并仍受包内 `assets/` 路径限制。
+`write_text_completed`、`write_bytes_completed`、`create_dir_completed` 和 `remove_completed` 成功时只携带 `ok = true`，不携带正文。`text`、`bytes`、`entries` 互斥。屏保只允许收到自身只读文件请求的结果；创建目录与删除操作仅允许游戏会话发起，并仍受包内 `assets/` 路径限制。
 
 创建目录成功事件示例：
 
@@ -359,7 +359,7 @@ error = {
   type = "file",
   data = {
     request_id = "5",
-    kind = "create_dir",
+    kind = "create_dir_completed",
     path = "save/slot-a",
     tip = "create_slot",
     ok = true,
@@ -374,7 +374,7 @@ error = {
   type = "file",
   data = {
     request_id = "6",
-    kind = "remove",
+    kind = "remove_completed",
     path = "save/slot-a",
     tip = "remove_slot",
     ok = true,
@@ -391,7 +391,7 @@ error = {
   type = "image",
   data = {
     request_id = "5",
-    kind = "convert",
+    kind = "conversion_completed",
     ok = true,
     output = "f%<bg:#000000><fg:#ffffff>▅",
   },
@@ -401,7 +401,7 @@ error = {
 | `data` 字段 | 类型 | 出现条件 | 作用 |
 |---|---|---|---|
 | `request_id` | `string` | 始终 | Session 内请求 ID。 |
-| `kind` | `string` | 始终 | 固定为 `convert`。 |
+| `kind` | `string` | 始终 | 固定为 `conversion_completed`。 |
 | `ok` | `boolean` | 始终 | 转换是否成功。 |
 | `output` | `string \| nil` | `ok == true` | 可直接传给 `draw.text(x, y, event.data.output)` 的富文本字符串。 |
 | `error` | `table \| nil` | `ok == false` | 通用错误表。 |
@@ -417,7 +417,7 @@ GET 或 POST 请求产生唯一终态结果。HTTP 4xx/5xx 是成功收到的 HT
   type = "network",
   data = {
     request_id = "6",
-    kind = "get",
+    kind = "get_completed",
     url = "https://example.com/data",
     ok = true,
     final_url = "https://example.com/data",
@@ -431,7 +431,7 @@ GET 或 POST 请求产生唯一终态结果。HTTP 4xx/5xx 是成功收到的 HT
 | `data` 字段 | 类型 | 出现条件 | 作用 |
 |---|---|---|---|
 | `request_id` | `string` | 始终 | Session 内请求 ID。 |
-| `kind` | `string` | 始终 | `get` 或 `post`。 |
+| `kind` | `string` | 始终 | `get_completed` 或 `post_completed`。 |
 | `url` | `string` | 始终 | 原始规范化 URL。 |
 | `ok` | `boolean` | 始终 | 请求是否正常完成。 |
 | `final_url` | `string \| nil` | `ok == true` | 完成重定向后的最终 URL。 |
@@ -500,8 +500,8 @@ GET 或 POST 请求产生唯一终态结果。HTTP 4xx/5xx 是成功收到的 HT
 | `data` 字段 | 类型 | 出现条件 | 作用 |
 |---|---|---|---|
 | `id` | `string` | 始终 | Session 内音频对象 ID。 |
-| `kind` | `string` | 始终 | `ready`、`started`、`paused`、`resumed`、`stopped`、`finished` 或 `failed`。 |
-| `duration_ms` | `integer \| nil` | `ready`、`finished` | 音频总时长，单位毫秒。 |
+| `kind` | `string` | 始终 | `prepared`、`started`、`paused`、`resumed`、`stopped`、`finished` 或 `failed`。 |
+| `duration_ms` | `integer \| nil` | `prepared`、`finished` | 音频总时长，单位毫秒。 |
 | `position_ms` | `integer \| nil` | `started`、`paused`、`resumed`、`finished` | 当前播放位置，单位毫秒；`finished` 时等于总时长。 |
 | `error` | `table \| nil` | `kind == "failed"` | 通用错误表，常见音频错误为 `decode`、`backend_unavailable`。 |
 
@@ -518,7 +518,7 @@ GET 或 POST 请求产生唯一终态结果。HTTP 4xx/5xx 是成功收到的 HT
   type = "hitbox",
   data = {
     id = "hitbox_008",
-    kind = "drag",
+    kind = "dragged",
     x = 30,
     y = 12,
     relative_x = 5,
@@ -533,21 +533,21 @@ GET 或 POST 请求产生唯一终态结果。HTTP 4xx/5xx 是成功收到的 HT
 | `data` 字段 | 类型 | 出现条件 | 作用 |
 |---|---|---|---|
 | `id` | `string` | 始终 | Session 内点击区域 ID。 |
-| `kind` | `string` | 始终 | `hover_enter`、`hover_move`、`hover_leave`、`press`、`release`、`click` 或 `drag`。 |
+| `kind` | `string` | 始终 | `hover_entered`、`hover_moved`、`hover_left`、`pressed`、`released`、`clicked` 或 `dragged`。 |
 | `x` | `integer` | 始终 | 目标切片原始坐标系中的水平坐标。 |
 | `y` | `integer` | 始终 | 目标切片原始坐标系中的垂直坐标。 |
 | `relative_x` | `integer` | 始终 | 相对于 hitbox 未裁剪左上角的水平坐标。 |
 | `relative_y` | `integer` | 始终 | 相对于 hitbox 未裁剪左上角的垂直坐标。 |
-| `button` | `string \| nil` | `press`、`release`、`click`、`drag` | `left`、`middle` 或 `right`。 |
-| `dx` | `integer \| nil` | `drag` | 本次拖动的水平位移。 |
-| `dy` | `integer \| nil` | `drag` | 本次拖动的垂直位移。 |
+| `button` | `string \| nil` | `pressed`、`released`、`clicked`、`dragged` | `left`、`middle` 或 `right`。 |
+| `dx` | `integer \| nil` | `dragged` | 本次拖动的水平位移。 |
+| `dy` | `integer \| nil` | `dragged` | 本次拖动的垂直位移。 |
 
 ### 7.2 `link`
 
 `widget.link` 通过 `HandleEvent` 发送点击通知：
 
 ```lua
-{type = "link", data = {id = "link_001", kind = "click", link = "./manual.txt"}}
+{type = "link", data = {id = "link_001", kind = "clicked", link = "./manual.txt"}}
 ```
 
 真实鼠标点击和 `widget.link.click` 均自动请求系统默认程序打开目标，并在开启 `copy` 时复制目标；文件/目录复制解析后的绝对路径，网页复制 URL。打开或复制失败静默，事件仍保留原始 `link` 文本。对象删除后丢弃未交付事件。屏保不接收此类交互事件。详见 [link API](api/widget/link.md)。
@@ -557,22 +557,22 @@ GET 或 POST 请求产生唯一终态结果。HTTP 4xx/5xx 是成功收到的 HT
 ```lua
 {
   type = "markdown",
-  data = { id = "10", kind = "link_clicked", href = "guide.md", text = "Guide" },
+  data = { id = "10", kind = "clicked", href = "guide.md", text = "Guide" },
 }
 ```
 
 | `data` 字段 | 类型 | 出现条件 | 作用 |
 |---|---|---|---|
 | `id` | `string` | 始终 | Session 内 Markdown 对象 ID。 |
-| `kind` | `string` | 始终 | 固定为 `link_clicked`。 |
+| `kind` | `string` | 始终 | 固定为 `clicked`。 |
 | `href` | `string` | 始终 | 链接目标。 |
 | `text` | `string` | 始终 | 链接显示文本。 |
 
 ### 7.4 `input`
 
-`widget.input` 的事件使用 `type = "input"`。`data.id` 为 `input_001` 形式的字符串，`data.kind` 为 `focus`、`focused`、`blur`、`blurred`、`change`、`submit`、`cancel`。`change/submit/cancel` 另有 `data.text`，内容为完整文本。
+`widget.input` 的事件使用 `type = "input"`。`data.id` 为 `input_001` 形式的字符串，`data.kind` 为 `focus_requested`、`focused`、`blur_requested`、`blurred`、`changed`、`submitted`、`cancelled`。`changed/submitted/cancelled` 另有 `data.text`，内容为完整文本。
 
-`focus/blur` 是鼠标请求通知，需要脚本决定是否调用聚焦/失焦方法；`focused/blurred` 是实际焦点变化通知。提交、取消不会自动清空或失焦。原始终端文字事件没有 `data.id/kind`。详见 [input API](api/widget/input.md)。
+`focus_requested/blur_requested` 是鼠标请求通知，需要脚本决定是否调用聚焦/失焦方法；`focused/blurred` 是实际焦点变化通知。提交、取消不会自动清空或失焦。原始终端文字事件没有 `data.id/kind`。详见 [input API](api/widget/input.md)。
 
 ### 7.5 `scroll_box`
 
@@ -596,7 +596,7 @@ GET 或 POST 请求产生唯一终态结果。HTTP 4xx/5xx 是成功收到的 HT
 
 - `resize`：保留最新尺寸。
 - `mouse`：同一 `kind` 和 `button` 的 `moved` 或 `held` 保留最新坐标。
-- `hitbox`：同一对象的 `hover_move` 保留最新坐标。
+- `hitbox`：同一对象的 `hover_moved` 保留最新坐标。
 - `scroll_box`：同一对象保留最新滚动位置。
 
 以下事件不会合并：动作按下/按住/释放、鼠标按键、拖动、滚轮、焦点、覆盖屏生命周期、计时器、动画标记以及所有异步终态事件。

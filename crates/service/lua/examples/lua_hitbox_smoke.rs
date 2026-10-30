@@ -53,7 +53,7 @@ fn main() {
       debug.assert(event.type == "hitbox" and event.sequence > 0)
       local data = event.data
       if data.id == sliced then
-        if data.kind == "click" then
+        if data.kind == "clicked" then
           debug.assert(data.x == 0 and data.y == 0 and data.relative_x == 1 and data.relative_y == 0)
           slice_clicks = slice_clicks + 1
         end
@@ -63,16 +63,16 @@ fn main() {
       debug.assert(data.relative_x == data.x + (data.id == first and 2 or 0))
       debug.assert(data.relative_y == data.y + (data.id == first and 1 or 0))
       table.insert(events, data.kind)
-      if data.kind == "press" then
+      if data.kind == "pressed" then
         debug.assert(data.button == "left")
         debug.assert(data.id == (data.x == 0 and top or first))
         debug.assert(data.y == (data.x == 0 and 0 or 1))
       end
-      if data.kind == "drag" then debug.assert(data.id == first and data.dx == 1 and data.dy == 0) end
+      if data.kind == "dragged" then debug.assert(data.id == first and data.dx == 1 and data.dy == 0) end
     end
     function Update(dt)
       local sequence = table.concat(events, {separator = ","})
-      debug.assert(sequence == "hover_enter,press,release,click,hover_leave,hover_enter,press,drag,hover_move,release,click", {message = sequence})
+      debug.assert(sequence == "hover_entered,pressed,released,clicked,hover_left,hover_entered,pressed,dragged,hover_moved,released,clicked", {message = sequence})
       debug.assert(widget.hitbox.delete(first) and widget.hitbox.clear())
       debug.assert(widget.hitbox.count() == 0)
     end

@@ -85,7 +85,9 @@ impl Harness {
       .with_objects_mut(|objects| {
         objects.ui_mut().begin_render();
         objects.ui().prepare_canvas(&mut self.canvas, &self.layout);
-        objects.replay_draw_commands(&mut RenderService::new(), &mut self.canvas, commands);
+        objects
+          .replay_draw_commands(&mut RenderService::new(), &mut self.canvas, commands)
+          .unwrap();
       })
       .unwrap();
   }
@@ -161,8 +163,8 @@ pub(crate) fn main() {
     function Render() widget.markdown.draw(id,0,0);draw.text(0,5,rich) end
     function HandleEvent(event)
       debug.assert(event.type=="markdown" and event.data.id==id)
-      if event.data.kind=="click" then debug.assert(event.data.link=="./manual.txt" and event.data.text=="Open");clicks=clicks+1
-      elseif event.data.kind=="scroll" then debug.assert(event.data.scroll_offset_horizontal~=nil and event.data.scroll_offset_vertical~=nil);scrolled=scrolled+1 end
+      if event.data.kind=="clicked" then debug.assert(event.data.link=="./manual.txt" and event.data.text=="Open");clicks=clicks+1
+      elseif event.data.kind=="scrolled" then debug.assert(event.data.scroll_offset_horizontal~=nil and event.data.scroll_offset_vertical~=nil);scrolled=scrolled+1 end
     end
     function Update(dt)
       phase=phase+1

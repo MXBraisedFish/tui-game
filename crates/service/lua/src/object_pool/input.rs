@@ -141,13 +141,13 @@ impl LuaObjectPool {
 
   pub(crate) fn translate_input_event(&self, event: TextInputEvent) -> Option<LuaEventData> {
     let (id, kind, value) = match event {
-      TextInputEvent::Pressed { id } => (id, "focus", None),
-      TextInputEvent::PressedOutside { id } => (id, "blur", None),
+      TextInputEvent::Pressed { id } => (id, "focus_requested", None),
+      TextInputEvent::PressedOutside { id } => (id, "blur_requested", None),
       TextInputEvent::Focused { id } => (id, "focused", None),
       TextInputEvent::Blurred { id } => (id, "blurred", None),
-      TextInputEvent::Changed { id, value } => (id, "change", Some(value)),
-      TextInputEvent::Submit { id, value } => (id, "submit", Some(value)),
-      TextInputEvent::Cancel { id, value } => (id, "cancel", Some(value)),
+      TextInputEvent::Changed { id, value } => (id, "changed", Some(value)),
+      TextInputEvent::Submit { id, value } => (id, "submitted", Some(value)),
+      TextInputEvent::Cancel { id, value } => (id, "cancelled", Some(value)),
     };
     self
       .inputs

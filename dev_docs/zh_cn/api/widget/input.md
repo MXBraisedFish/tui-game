@@ -62,9 +62,9 @@ end
 function HandleEvent(event)
   if event.type == "input" then
     debug.print(table.pretty(event))
-    if event.data.kind == "submit" then
+    if event.data.kind == "submitted" then
       widget.input.blur()
-    elseif event.data.kind == "focus" then
+    elseif event.data.kind == "focus_requested" then
       widget.input.focus(input)
     end
   end
@@ -112,9 +112,9 @@ end
 function HandleEvent(event)
   if event.type == "input" then
     debug.print(table.pretty(event))
-    if event.data.kind == "submit" then
+    if event.data.kind == "submitted" then
       widget.input.blur()
-    elseif event.data.kind == "focus" then
+    elseif event.data.kind == "focus_requested" then
       widget.input.focus(input)
     end
   end
@@ -162,9 +162,9 @@ end
 function HandleEvent(event)
   if event.type == "input" then
     debug.print(table.pretty(event))
-    if event.data.kind == "submit" then
+    if event.data.kind == "submitted" then
       widget.input.blur()
-    elseif event.data.kind == "focus" then
+    elseif event.data.kind == "focus_requested" then
       widget.input.focus(input)
     end
   end
@@ -212,9 +212,9 @@ end
 function HandleEvent(event)
   if event.type == "input" then
     debug.print(table.pretty(event))
-    if event.data.kind == "submit" then
+    if event.data.kind == "submitted" then
       widget.input.blur()
-    elseif event.data.kind == "focus" then
+    elseif event.data.kind == "focus_requested" then
       widget.input.focus(input)
     end
   end
@@ -262,9 +262,9 @@ end
 function HandleEvent(event)
   if event.type == "input" then
     debug.print(table.pretty(event))
-    if event.data.kind == "submit" then
+    if event.data.kind == "submitted" then
       widget.input.blur()
-    elseif event.data.kind == "focus" then
+    elseif event.data.kind == "focus_requested" then
       widget.input.focus(input)
     end
   end
@@ -353,9 +353,9 @@ end
 function HandleEvent(event)
   if event.type == "input" then
     debug.print(table.pretty(event))
-    if event.data.kind == "submit" then
+    if event.data.kind == "submitted" then
       widget.input.blur()
-    elseif event.data.kind == "focus" then
+    elseif event.data.kind == "focus_requested" then
       widget.input.focus(input)
     end
   end
@@ -646,9 +646,9 @@ end
 function HandleEvent(event)
   if event.type == "input" then
     debug.print(table.pretty(event))
-    if event.data.kind == "submit" then
+    if event.data.kind == "submitted" then
       widget.input.blur()
-    elseif event.data.kind == "focus" then
+    elseif event.data.kind == "focus_requested" then
       widget.input.focus(input)
     end
   end
@@ -942,7 +942,7 @@ debug.print(table.pretty(widget.input.get_info(input)))
   text = "",                 -- string（已输入的文本）
   max_chars = nil,           -- integer / nil / false（最大字符数）
   line_mode = "singleline",  -- const-input（输入模式）
-              -- boolean（是否允许鼠标操作）
+  mouse = true               -- boolean（是否允许鼠标操作）
   enter_submit = true,       -- boolean（提交按键模式）
   placeholder = "",          -- string（空内容提示文本）
   placeholder_fg = "none",   -- string（空内容提示文本前景色）

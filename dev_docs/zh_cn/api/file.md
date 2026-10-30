@@ -1965,7 +1965,7 @@ end
   sequence = X,     -- 占位符
   data = {
     request_id = X, -- 占位符
-    kind = "read_text",
+    kind = "read_text_completed",
     ok = true,
     path = "file.txt",
     text = "Hello Tui Game"
@@ -1975,7 +1975,7 @@ end
 
 ### 额外说明
 
-- 事件返回值见⌊[事件协议](../EVENT.md)⌉
+- 事件返回值见⌊[事件协议](../EVENT.md)⌉。
 - 路径相对当前包的 `assets/`。
 - 选填参数 `byte` 为 `false` 时按文本读取。
 - 选填参数 `byte` 为 `true` 时按二进制读取，选填参数 `encoding` 与选填参数 `end_of_line` 会被忽略。
@@ -2049,7 +2049,7 @@ end
   sequence = X,     -- 占位符
   data = {
     request_id = X, -- 占位符
-    kind = "write_text",
+    kind = "write_text_completed",
     ok = true,
     path = "file.txt",
   }
@@ -2058,7 +2058,7 @@ end
 
 ### 额外说明
 
-- 事件返回值见⌊[事件协议](../EVENT.md)⌉
+- 事件返回值见⌊[事件协议](../EVENT.md)⌉。
 - 路径相对当前包的 `assets/`。
 - 选填参数 `byte` 为 `false` 时按文本读取。
 - 选填参数 `byte` 为 `true` 时按二进制读取，选填参数 `encoding` 与选填参数 `end_of_line` 会被忽略。
@@ -2149,7 +2149,7 @@ end
 
 ### 额外说明
 
-- 事件返回值见⌊[事件协议](../EVENT.md)⌉
+- 事件返回值见⌊[事件协议](../EVENT.md)⌉。
 - 路径相对当前包的 `assets/`。
 - 选填参数 `file_type` 只接受不含点号的扩展名，且不区分大小写。
 
@@ -2219,7 +2219,7 @@ end
   sequence = X,     -- 占位符
   data = {
     request_id = X, -- 占位符
-    kind = "create_dir",
+    kind = "create_dir_completed",
     ok = true,
     path = "file",
   }
@@ -2230,7 +2230,7 @@ end
   sequence = X,     -- 占位符
   data = {
     request_id = X, -- 占位符
-    kind = "create_dir",
+    kind = "create_dir_completed",
     ok = true,
     path = "test1/test2",
   }
@@ -2239,7 +2239,7 @@ end
 
 ### 额外说明
 
-- 事件返回值见⌊[事件协议](../EVENT.md)⌉
+- 事件返回值见⌊[事件协议](../EVENT.md)⌉。
 - 路径相对当前包的 `assets/`。
 - 方法会逐级创建缺失的目录。
 - 返回值最后一级目录不含带 `/` 字符结尾。
@@ -2360,7 +2360,7 @@ end
   sequence = X,     -- 占位符
   data = {
     request_id = X, -- 占位符
-    kind = "remove",
+    kind = "remove_completed",
     ok = false,
     error = {
       code = "io", 

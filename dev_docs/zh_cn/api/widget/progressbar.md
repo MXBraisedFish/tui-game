@@ -2,13 +2,7 @@
 
 `widget.progressbar` 用于设置进度条。
 
-- 从左向右填充。`completed_ratio` 和 `preview_ratio` 均从左端独立计算，已完成区域覆盖预完成区域。例如 `completed_ratio=0.3`、`preview_ratio=0.5`，显示已完成 30%、额外预完成 20%、剩余 50%。
-- 各部分格数按完整宽度乘以比例后向下取整；裁剪不会改变原始宽度或填充比例。
-- 比例必须是 `[0, 1]` 内的有限数，非法参数会报错；`set` 验证全部字段后才更新，省略或 nil 保持原值。
-- `slice_layer` 可指定普通切片、scrollbox 或 Markdown 文档。进度条遵循所在容器的绘制顺序和裁剪规则，并计入滚动内容范围。
-
-
-> 进度条属于绘制组件，高度固定为一行，不产生鼠标交互事件。
+> 滚动框由绘制组件构成。
 
 ---
 
@@ -62,6 +56,7 @@ widget.progressbar.create
 | `preview_fg`      | string / const-color | `color.BRIGHT_BLUE` | 预完成部分进度条颜色 |
 | `remaining_shape` | string               | `"─"`               | 未完成部分进度条形状 |
 | `remaining_fg`    | string / const-color | `color.WHITE`       | 未完成部分进度条颜色 |
+| `fill_direction`  | const-align          | `align.LEFT`        | 填充方向             |
 
 ### 返回值
 
@@ -228,6 +223,7 @@ debug.print(table.pretty(widget.progressbar.list()))
     preview_fg = "bright_blue",
     remaining_shape = "─",
     remaining_fg = "white",
+    fill_direction = "left"
   },
   n = 1
 }
@@ -250,6 +246,7 @@ debug.print(table.pretty(widget.progressbar.list()))
     preview_fg = "bright_blue", -- string（预完成部分进度条颜色）
     remaining_shape = "─",      -- string（未完成部分进度条形状）
     remaining_fg = "white",     -- string（未完成部分进度条颜色）
+    fill_direction = "left"     -- string（填充方向）
   },
   n = 1,                        -- integer（进度条数量）
 }
@@ -376,6 +373,7 @@ widget.progressbar.set
 | `preview_fg`      | string / const-color | 保持原值 | 预完成部分进度条颜色 |
 | `remaining_shape` | string               | 保持原值 | 未完成部分进度条形状 |
 | `remaining_fg`    | string / const-color | 保持原值 | 未完成部分进度条颜色 |
+| `fill_direction`  | const-align          | 保持原值 | 填充方向             |
 
 ### 返回值
 
@@ -410,6 +408,7 @@ true
   preview_fg = "bright_blue",
   remaining_shape = "─",
   remaining_fg = "white",
+  fill_direction = "left"
 }
 ```
 
@@ -476,6 +475,7 @@ debug.print(table.pretty(widget.progressbar.get_info(progressbar)))
   preview_fg = "bright_blue",
   remaining_shape = "─",
   remaining_fg = "white",
+  fill_direction = "left"
 }
 ```
 
@@ -495,6 +495,7 @@ debug.print(table.pretty(widget.progressbar.get_info(progressbar)))
   preview_fg = "bright_blue", -- string（预完成部分进度条颜色）
   remaining_shape = "─",      -- string（未完成部分进度条形状）
   remaining_fg = "white",     -- string（未完成部分进度条颜色）
+  fill_direction = "left"     -- string（填充方向）
 }
 ```
 

@@ -15,7 +15,7 @@ use crate::host_engine::services::UiObjectPoolOwner;
 /// * `game_warning_seconds_left` - The game warning seconds left.
 pub(super) fn route_render(
   services: &mut EngineServices,
-  world: &RuntimeWorld,
+  world: &mut RuntimeWorld,
   context: &mut RuntimeUiContext<'_>,
   game_warning_seconds_left: u8,
 ) -> Option<(u16, u16)> {
@@ -113,19 +113,18 @@ pub(super) fn route_render(
   if world.state.current_overlay_kind() == Some(OverlayKind::Screensaver) {
     apply_host_viewport(services, false);
     if services.screensaver.has_objects() {
-      let commands = services.screensaver.take_draw_commands();
       services.screensaver.with_objects_mut(|objects| {
         objects.ui_mut().begin_render();
         objects
           .ui()
           .prepare_canvas(&mut services.canvas, &services.layout);
-        apply_lua_draw_commands(
-          &mut services.render,
-          &mut services.canvas,
-          commands,
-          objects,
-        );
       });
+      if let Err(error) = services
+        .screensaver
+        .replay_draw_commands(&mut services.render, &mut services.canvas)
+      {
+        handle_lua_fault(services, world, error);
+      }
     } else {
       screensaver_overlay_ui.objects_mut().begin_render();
       screensaver_overlay_ui
@@ -243,19 +242,19 @@ pub(super) fn route_render(
 
   let lua_game_prepared = world.state.current_ui_kind().is_none() && services.game.is_active();
   if lua_game_prepared && services.game.has_objects() {
-    let commands = services.game.take_draw_commands();
     services.game.with_objects_mut(|objects| {
       objects.ui_mut().begin_render();
       objects
         .ui()
         .prepare_canvas(&mut services.canvas, &services.layout);
-      apply_lua_draw_commands(
-        &mut services.render,
-        &mut services.canvas,
-        commands,
-        objects,
-      );
     });
+    if let Err(error) = services
+      .game
+      .replay_draw_commands(&mut services.render, &mut services.canvas)
+    {
+      handle_lua_fault(services, world, error);
+      return None;
+    }
   }
 
   if world.state.current_ui_kind() == Some(UiNodeKind::ScreensaverList) {
@@ -685,13 +684,16 @@ pub(super) fn route_render(
   input_cursor
 }
 
+#[cfg(test)]
 fn apply_lua_draw_commands(
   render: &mut crate::host_engine::services::RenderService,
   canvas: &mut crate::host_engine::services::CanvasService,
-  commands: Vec<crate::host_engine::services::LuaDrawCommand>,
+  commands: Vec<tg_service_lua::LuaDrawCommand>,
   objects: &mut tg_service_lua::LuaObjectPool,
 ) {
-  objects.replay_draw_commands(render, canvas, commands);
+  objects
+    .replay_draw_commands(render, canvas, commands)
+    .unwrap();
 }
 
 #[cfg(test)]
@@ -919,10 +921,10 @@ mod tests {
         };
         assert!(objects.route_hitbox_mouse(&canvas, mouse(1, 0)).is_empty());
         let events = objects.route_hitbox_mouse(&canvas, mouse(1, 3));
-        assert!(events.iter().any(|event| matches!(event, tg_service_lua::LuaEventData::HitArea(data) if data.kind == "press" && data.x == 1 && data.y == 1)));
-        assert!(!objects.route_hitbox_mouse(&canvas, mouse(2, 3)).iter().any(|event| matches!(event, tg_service_lua::LuaEventData::HitArea(data) if data.kind == "press")));
+        assert!(events.iter().any(|event| matches!(event, tg_service_lua::LuaEventData::HitArea(data) if data.kind == "pressed" && data.x == 1 && data.y == 1)));
+        assert!(!objects.route_hitbox_mouse(&canvas, mouse(2, 3)).iter().any(|event| matches!(event, tg_service_lua::LuaEventData::HitArea(data) if data.kind == "pressed")));
         objects.ui_mut().begin_render();
-        assert!(!objects.route_hitbox_mouse(&canvas, mouse(1, 3)).iter().any(|event| matches!(event, tg_service_lua::LuaEventData::HitArea(data) if data.kind == "press")));
+        assert!(!objects.route_hitbox_mouse(&canvas, mouse(1, 3)).iter().any(|event| matches!(event, tg_service_lua::LuaEventData::HitArea(data) if data.kind == "pressed")));
       }).unwrap();
       let frame = FrameCompositor::new().compose(&canvas);
       assert_eq!((frame.width(), frame.height()), (6, 6));

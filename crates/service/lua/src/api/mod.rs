@@ -2,6 +2,7 @@
 
 mod args;
 mod libraries;
+pub(crate) use libraries::process_effect_buffer;
 pub(crate) use libraries::push_host_command;
 pub(crate) mod readonly;
 
@@ -148,6 +149,8 @@ pub enum LuaDrawTarget {
 /// A structured drawing request collected during a script callback.
 #[derive(Clone, Debug)]
 pub enum LuaDrawCommand {
+  /// Apply a captured shader after drawing its target surface.
+  Effect(crate::LuaEffectRequest),
   /// Render a session-owned single-row progress bar in its parent surface.
   Progressbar {
     /// The pool-local progress bar identity.

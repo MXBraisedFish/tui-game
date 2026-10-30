@@ -762,6 +762,118 @@ impl LuaSession {
     self.invoke_hot(Callback::Render, (), LuaBudgetKind::Render)
   }
 
+  /// Replay collected drawings and deferred cell shaders into a prepared canvas.
+  ///
+  /// Prepare the canvas from this session's object pool before calling this method. Slice
+  /// shaders run before parent composition; canvas shaders run after all developer surfaces.
+  /// Shader callbacks share one render execution budget and may call the session's other APIs.
+  ///
+  /// # Errors
+  ///
+  /// Fault the session for invalid state, shader failures, malformed cell output, or exhausted
+  /// instruction, time, or memory budgets. Release all session-owned objects on failure.
+  pub fn replay_draw_commands(
+    &mut self,
+    render: &mut tg_service_render::RenderService,
+    canvas: &mut tg_service_canvas::CanvasService,
+  ) -> Result<(), LuaSessionError> {
+    if self.state != LuaSessionState::Running {
+      return Err(self.error(
+        LuaErrorStage::Callback,
+        Some("Effect"),
+        format!("session is {:?}", self.state),
+      ));
+    }
+    let commands = self.take_draw_commands();
+    if !commands
+      .iter()
+      .any(|command| matches!(command, LuaDrawCommand::Effect(_)))
+    {
+      return self
+        .with_objects_mut(|objects| objects.replay_draw_commands(render, canvas, commands))
+        .unwrap_or_else(|| {
+          Err(mlua::Error::RuntimeError(
+            "session object pool is unavailable".into(),
+          ))
+        })
+        .map_err(|error| self.error(LuaErrorStage::Callback, Some("Effect"), error));
+    }
+    let steps = self
+      .with_objects_mut(|objects| objects.prepare_draw_commands(canvas, commands))
+      .ok_or_else(|| {
+        self.error(
+          LuaErrorStage::Callback,
+          Some("Effect"),
+          "session object pool is unavailable",
+        )
+      })?;
+    let objects = self.objects.clone();
+    let budget = self.policy.budget(LuaBudgetKind::Render);
+    let mut steps = Some(steps);
+    self.api_state.borrow_mut().phase = LuaCallPhase::Render;
+    let outcome = self.lua.scope(|scope| {
+      let function = scope.create_function_mut(|lua, ()| {
+        let mut skipped = 0;
+        let mut canvas_effects = Vec::new();
+        for step in steps.take().unwrap_or_default() {
+          if let crate::object_pool::ReplayStep::Effect(request) = step {
+            if skipped > 0 {
+              continue;
+            }
+            if request.effect.scope == crate::LuaEffectScope::Canvas {
+              canvas_effects.push(request);
+            } else {
+              let target = match request.target {
+                crate::LuaDrawTarget::Base => None,
+                crate::LuaDrawTarget::Slice(id) => Some(id),
+              };
+              if let Some((buffer, offset)) = canvas.cell_effect_buffer(target) {
+                api::process_effect_buffer(lua, &request, buffer, offset)?;
+              }
+            }
+          } else {
+            let mut objects = objects.borrow_mut();
+            let pool = objects.as_mut().ok_or_else(|| {
+              mlua::Error::RuntimeError("session object pool is unavailable".into())
+            })?;
+            pool.replay_step(render, canvas, step, &mut skipped);
+          }
+        }
+        if !canvas_effects.is_empty() {
+          let mut buffer =
+            tg_service_render_pipeline::FrameCompositor::new().compose_canvas(canvas);
+          for request in canvas_effects {
+            api::process_effect_buffer(lua, &request, &mut buffer, (0, 0))?;
+          }
+          canvas.set_composed_canvas(buffer);
+        }
+        Ok(())
+      })?;
+      Ok(run_with_budget(
+        &self.lua,
+        function,
+        (),
+        budget,
+        self.policy.hook_interval,
+        &self.api_state,
+      ))
+    });
+    self.api_state.borrow_mut().phase = LuaCallPhase::Idle;
+    let result = match outcome {
+      Ok(Ok((_, stats))) => {
+        self.last_stats = stats;
+        self.record_slow_callback("Effect", budget, stats);
+        Ok(())
+      }
+      Ok(Err(failure)) => Err(self.execution_error(LuaErrorStage::Callback, "Effect", failure)),
+      Err(error) => Err(self.error(LuaErrorStage::Callback, Some("Effect"), error)),
+    };
+    if result.is_err() {
+      self.mark_faulted();
+    }
+    result
+  }
+
   /// Drain host commands produced by the session callbacks.
   pub fn take_host_commands(&mut self) -> Vec<LuaHostCommand> {
     let mut state = self.api_state.borrow_mut();
@@ -3965,7 +4077,7 @@ mod tests {
             debug.assert(event.type == "timer" and event.data.id == repeating and event.data.tip == "hello")
             debug.assert(event.data.executed_count == callback_count + 1)
             callback_count = callback_count + 1
-            debug.assert(event.data.kind == (callback_count == 2 and "finished" or "tick"))
+            debug.assert(event.data.kind == (callback_count == 2 and "finished" or "ticked"))
           end})
         single = timer.create(0)
         timer.start(repeating)

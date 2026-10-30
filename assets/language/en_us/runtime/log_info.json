@@ -4,6 +4,7 @@
   "log_info.boot.stage_complete": "Boot stage completed: {stage}.",
   "log_info.boot.language_fallback": "Saved language '{code}' is unavailable; language selection is required.",
   "log_info.boot.service_failed": "Boot service group {domain} failed: {error}",
+  "log_info.boot.ffmpeg_missing": "FFmpeg was not found.",
   "log_info.runtime.started": "Runtime event loop started.",
   "log_info.runtime.stopped": "Runtime event loop stopped with exit mode {mode}.",
   "log_info.shutdown.write_failed": "A pending write could not be completed for {path}: {error}",

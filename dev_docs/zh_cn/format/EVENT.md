@@ -12,30 +12,30 @@
 
 ## 目录
 
-| 章节              | 说明                             | 索引                                |
-| ----------------- | -------------------------------- | ----------------------------------- |
-| 通用结构          | 所有事件共用的父结构             | [通用结构](#通用结构)               |
-| 类型事件结构      | 各类事件的数据结构               | [类型事件结构](#类型事件结构)       |
-| `action`          | 游戏动作触发事件                 | [action](#action)                   |
-| `key`             | 原始按键触发事件                 | [key](#key)                         |
-| `input`           | 终端提交的文字                   | [input](#input)                     |
-| `mouse`           | 使用鼠标触发的事件               | [mouse](#mouse)                     |
-| `resize`          | Base 画布尺寸变化事件            | [resize](#resize)                   |
-| `focus`           | 终端焦点变化事件                 | [focus](#focus)                     |
-| `overlay_started` | 覆盖屏开始接管事件               | [overlay_started](#overlay_started) |
-| `overlay_stopped` | 覆盖屏结束接管事件               | [overlay_stopped](#overlay_stopped) |
-| `timer`           | 计时器触发或结束事件             | [timer](#timer)                     |
-| `animation`       | 动画播放状态变化或触发标记的事件 | [animation](#animation)             |
-| `file`            | 异步文件操作结果事件             | [file](#file)                       |
-| `image`           | 图片转换结果事件                 | [image](#image)                     |
-| `network`         | 网络请求结果事件                 | [network](#network)                 |
-| `i18n`            | 国际化语言加载结果事件           | [i18n](#i18n)                       |
-| `audio`           | 音频对象状态变化事件             | [audio](#audio)                     |
-| `hitbox`        | 点击区域交互事件                 | [hitbox](#hitbox)               |
-| `link`       | 超链接点击事件                   | [link](#link)             |
-| `markdown`        | Markdown 文本中的链接点击事件    | [markdown](#markdown)               |
-| `input`（组件） | 输入框状态变化或交互事件 | [widget.input](#input输入框组件) |
-| `scroll_box`      | 滚动框位置变化事件               | [scroll_box](#scroll_box)           |
+| 章节                | 说明                  | 索引                                  |
+| ----------------- | ------------------- | ----------------------------------- |
+| 通用结构              | 所有事件共用的父结构          | [通用结构](#通用结构)                       |
+| 类型事件结构            | 各类事件的数据结构           | [类型事件结构](#类型事件结构)                   |
+| `action`          | 游戏动作触发事件            | [action](#action)                   |
+| `key`             | 原始按键触发事件            | [key](#key)                         |
+| `input`           | 终端提交的文字             | [input](#input)                     |
+| `mouse`           | 使用鼠标触发的事件           | [mouse](#mouse)                     |
+| `resize`          | Base 画布尺寸变化事件       | [resize](#resize)                   |
+| `focus`           | 终端焦点变化事件            | [focus](#focus)                     |
+| `overlay_started` | 覆盖屏开始接管事件           | [overlay_started](#overlay_started) |
+| `overlay_stopped` | 覆盖屏结束接管事件           | [overlay_stopped](#overlay_stopped) |
+| `timer`           | 计时器触发或结束事件          | [timer](#timer)                     |
+| `animation`       | 动画播放状态变化或触发标记的事件    | [animation](#animation)             |
+| `file`            | 异步文件操作结果事件          | [file](#file)                       |
+| `image`           | 图片转换结果事件            | [image](#image)                     |
+| `network`         | 网络请求结果事件            | [network](#network)                 |
+| `i18n`            | 国际化语言加载结果事件         | [i18n](#i18n)                       |
+| `audio`           | 音频对象状态变化事件          | [audio](#audio)                     |
+| `hitbox`          | 点击区域交互事件            | [hitbox](#hitbox)                   |
+| `link`            | 超链接点击事件             | [link](#link)                       |
+| `markdown`        | Markdown 文本中的链接点击事件 | [markdown](#markdown)               |
+| `input`（组件）       | 输入框状态变化或交互事件        | [widget.input](#input输入框组件)         |
+| `scroll_box`      | 滚动框位置变化事件           | [scroll_box](#scroll_box)           |
 
 ---
 
@@ -318,13 +318,13 @@ end
 }
 ```
 
-| 字段     | 类型         | 说明             |
-| -------- | ------------ | ---------------- |
-| `state`  | string       | 鼠标触发状态型   |
-| `button` | string / nil | 鼠标按键名称     |
+| 字段       | 类型           | 说明       |
+| -------- | ------------ | -------- |
+| `state`  | string       | 鼠标触发状态型  |
+| `button` | string / nil | 鼠标按键名称   |
 | `scroll` | string / nil | 鼠标滚轮滚动方向 |
-| `x`      | integer      | 指针 x 轴坐标    |
-| `y`      | integer      | 指针 y 轴坐标    |
+| `x`      | integer      | 指针 x 轴坐标 |
+| `y`      | integer      | 指针 y 轴坐标 |
 
 ### 示例
 
@@ -376,7 +376,7 @@ end
 "right"  -- 鼠标右键
 ```
 
-- 字段 `scroll` 包含以下固定值：
+- 字段 `scrolled` 包含以下固定值：
 
 ```lua
 "up"    -- 向上滚动
@@ -637,7 +637,7 @@ end
 | --- | --- | --- |
 | `id` | string | 与 timer.create 返回的 ID 相同 |
 | `timer_kind` | string | 当前为 timer |
-| `kind` | string | 非末次触发为 tick，末次为 finished |
+| `kind` | string | 非末次触发为 ticked，末次为 finished |
 | `executed_count` | integer | 已触发的次数，从 1 开始 |
 | `tip` | string / nil | 创建或修改时填写的自定义文字 |
 
@@ -667,7 +667,7 @@ end
 
 ## 额外补充
 
-- 当前 timer 库的每次触发只产生一次事件：非末次为 tick，末次为 finished；无限循环只产生 tick。
+- 当前 timer 库的每次触发只产生一次事件：非末次为 ticked，末次为 finished；无限循环只产生 ticked。
 - 提供 callback 时只调用它，否则交给 HandleEvent；结束后保留对象和回调，便于重启。
 - 每个计时器每帧最多触发一次；投递上限为每帧 128 条，待处理上限 1024 条。
 - 暂停、重置、重启、修改、删除或清空计时器会让尚未投递的旧事件失效。
@@ -727,7 +727,7 @@ end
   data =
   {
     id = "2",
-    kind = "marker",
+    kind = "marker_reached",
     name = "impact",
   },
 }
@@ -739,14 +739,14 @@ end
 
 ```lua
 "started"   -- 动画开始
-"marker"    -- 触发动画标记
-"loop"      -- 完成一次循环
+"marker_reached"    -- 触发动画标记
+"looped"      -- 完成一次循环
 "finished"  -- 动画结束
 "cancelled" -- 动画取消
 ```
 
-- `name` 仅在 `kind == "marker"` 时出现。
-- `completed` 仅在 `kind == "loop"` 时出现。
+- `name` 仅在 `kind == "marker_reached"` 时出现。
+- `completed` 仅在 `kind == "looped"` 时出现。
 - 动画标记事件不会合并。
 
 ---
@@ -812,7 +812,7 @@ end
   data =
   {
     request_id = "4",
-    kind = "read_text",
+    kind = "read_text_completed",
     path = "config/state.txt",
     tip = "load_state",
     ok = true,
@@ -827,7 +827,7 @@ end
   data =
   {
     request_id = "5",
-    kind = "create_dir",
+    kind = "create_dir_completed",
     path = "save/slot-a",
     tip = "create_slot",
     ok = true,
@@ -841,7 +841,7 @@ end
   data =
   {
     request_id = "6",
-    kind = "remove",
+    kind = "remove_completed",
     path = "save/slot-a",
     tip = "remove_slot",
     ok = true,
@@ -854,20 +854,20 @@ end
 - 字段 `kind` 包含以下固定值：
 
 ```lua
-"read_text"   -- 读取文本
-"read_bytes"  -- 读取二进制内容
-"write_text"  -- 写入文本
-"write_bytes" -- 写入二进制内容
-"list_dir"    -- 列出文件
-"create_dir"  -- 创建目录
-"remove"      -- 删除文件或目录
+"read_text_completed"   -- 读取文本
+"read_bytes_completed"  -- 读取二进制内容
+"write_text_completed"  -- 写入文本
+"write_bytes_completed" -- 写入二进制内容
+"list_dir_completed"    -- 列出文件
+"create_dir_completed"  -- 创建目录
+"remove_completed"      -- 删除文件或目录
 ```
 
-- `file.read` 和 `file.write` 默认产生 `read_text`、`write_text`；传入 `byte = true` 时产生 `read_bytes`、`write_bytes`。
+- `file.read` 和 `file.write` 默认产生 `read_text_completed`、`write_text_completed`；传入 `byte = true` 时产生 `read_bytes_completed`、`write_bytes_completed`。
 - 同步的 `file.exists` 直接返回布尔值，不产生事件。
 - `path` 为虚拟相对路径，不是操作系统绝对路径。
 - `text` 经过严格解码，换行统一为 `\n`。`text`、`bytes`、`entries` 互斥。
-- `write_text`、`write_bytes`、`create_dir` 和 `remove` 成功时不携带正文；除请求标识、操作类型、路径和可选标记外，只携带 `ok = true`。
+- `write_text_completed`、`write_bytes_completed`、`create_dir_completed` 和 `remove_completed` 成功时不携带正文；除请求标识、操作类型、路径和可选标记外，只携带 `ok = true`。
 - 创建目录与删除操作仅允许关闭安全模式的游戏发起。
 - `entries` 只包含文件，目录仅在递归扫描时使用，不作为条目返回。每个条目的结构如下：
 
@@ -940,7 +940,7 @@ end
   data =
   {
     request_id = "5",
-    kind = "convert",
+    kind = "conversion_completed",
     ok = true,
     output = "f%<bg:#000000><fg:#ffffff>▅",
   },
@@ -1018,7 +1018,7 @@ end
   data =
   {
     request_id = "6",
-    kind = "get",
+    kind = "get_completed",
     url = "https://example.com/data",
     ok = true,
     final_url = "https://example.com/data",
@@ -1034,8 +1034,8 @@ end
 - 字段 `kind` 包含以下固定值：
 
 ```lua
-"get"  -- GET 请求
-"post" -- POST 请求
+"get_completed"  -- GET 请求
+"post_completed" -- POST 请求
 ```
 
 - HTTP `4xx`、`5xx` 表示已收到 HTTP 响应，`ok` 仍为 `true`；校验、传输、超时或取消等失败才令 `ok` 为 `false`。
@@ -1197,7 +1197,7 @@ end
 - 字段 `kind` 包含以下固定值：
 
 ```lua
-"ready"    -- 音频就绪
+"prepared"    -- 音频就绪
 "started"  -- 开始播放
 "paused"   -- 暂停播放
 "resumed"  -- 恢复播放
@@ -1237,17 +1237,17 @@ end
 }
 ```
 
-| 字段     | 类型          | 说明                                         |
-| -------- | ------------- | -------------------------------------------- |
-| `id`     | string        | 当前会话内的点击区域 ID                      |
-| `kind`   | string        | 点击区域事件类型                             |
-| `x`      | integer       | 事件相对于目标切片原始坐标系的水平坐标                               |
-| `y`      | integer       | 事件相对于目标切片原始坐标系的垂直坐标                               |
-| `relative_x` | integer | 相对于 hitbox 未裁剪左上角的水平坐标 |
-| `relative_y` | integer | 相对于 hitbox 未裁剪左上角的垂直坐标 |
-| `button` | string / nil  | 按下、松开、点击或拖动时出现，表示对应鼠标键 |
-| `dx`     | integer / nil | 拖动时出现，表示本次水平位移                 |
-| `dy`     | integer / nil | 拖动时出现，表示本次垂直位移                 |
+| 字段           | 类型            | 说明                     |
+| ------------ | ------------- | ---------------------- |
+| `id`         | string        | 当前会话内的点击区域 ID          |
+| `kind`       | string        | 点击区域事件类型               |
+| `x`          | integer       | 事件相对于目标切片原始坐标系的水平坐标    |
+| `y`          | integer       | 事件相对于目标切片原始坐标系的垂直坐标    |
+| `relative_x` | integer       | 相对于 hitbox 未裁剪左上角的水平坐标 |
+| `relative_y` | integer       | 相对于 hitbox 未裁剪左上角的垂直坐标 |
+| `button`     | string / nil  | 按下、松开、点击或拖动时出现，表示对应鼠标键 |
+| `dx`         | integer / nil | 拖动时出现，表示本次水平位移         |
+| `dy`         | integer / nil | 拖动时出现，表示本次垂直位移         |
 
 ### 发送条件
 
@@ -1275,7 +1275,7 @@ end
   data =
   {
     id = "hitbox_008",
-    kind = "drag",
+    kind = "dragged",
     x = 30,
     y = 12,
     relative_x = 5,
@@ -1292,18 +1292,18 @@ end
 - 字段 `kind` 包含以下固定值：
 
 ```lua
-"hover_enter" -- 鼠标进入区域
-"hover_move"  -- 鼠标在区域内移动
-"hover_leave" -- 鼠标离开区域
-"press"       -- 按下鼠标键
-"release"     -- 松开鼠标键
-"click"       -- 点击区域
-"drag"        -- 拖动鼠标
+"hover_entered" -- 鼠标进入区域
+"hover_moved"  -- 鼠标在区域内移动
+"hover_left" -- 鼠标离开区域
+"pressed"       -- 按下鼠标键
+"released"     -- 松开鼠标键
+"clicked"       -- 点击区域
+"dragged"        -- 拖动鼠标
 ```
 
-- 字段 `button` 的值为 `"left"`、`"middle"` 或 `"right"`，仅在 `press`、`release`、`click`、`drag` 事件中出现。
-- `dx`、`dy` 仅在 `kind == "drag"` 时出现。
-- 同一对象尚未处理的 `hover_move` 事件只保留最新坐标，拖动事件不会合并。
+- 字段 `button` 的值为 `"left"`、`"middle"` 或 `"right"`，仅在 `pressed`、`released`、`clicked`、`dragged` 事件中出现。
+- `dx`、`dy` 仅在 `kind == "dragged"` 时出现。
+- 同一对象尚未处理的 `hover_moved` 事件只保留最新坐标，拖动事件不会合并。
 
 ---
 
@@ -1312,7 +1312,7 @@ end
 `widget.link` 通过 `HandleEvent` 发送点击通知：
 
 ```lua
-{type = "link", data = {id = "link_001", kind = "click", link = "./manual.txt"}}
+{type = "link", data = {id = "link_001", kind = "clicked", link = "./manual.txt"}}
 ```
 
 真实鼠标点击和 `widget.link.click` 均自动请求系统默认程序打开目标，并在开启 `copy` 时复制目标；文件/目录复制解析后的绝对路径，网页复制 URL。打开或复制失败静默，事件仍保留原始 `link` 文本。对象删除后丢弃未交付事件。屏保不接收此类交互事件。详见 [link API](../api/widget/link.md)。
@@ -1375,7 +1375,7 @@ end
   data =
   {
     id = "10",
-    kind = "link_clicked",
+    kind = "clicked",
     href = "guide.md",
     text = "Guide",
   },
@@ -1384,16 +1384,16 @@ end
 
 ## 额外补充
 
-- 字段 `kind` 固定为 `"link_clicked"`。
+- 字段 `kind` 固定为 `"clicked"`。
 - `href` 表示链接目标，`text` 表示该链接在 Markdown 中显示的文本。
 
 ---
 
 ## `input`（输入框组件）
 
-`widget.input` 的事件使用 `type = "input"`。`data.id` 为 `input_001` 形式的字符串，`data.kind` 为 `focus`、`focused`、`blur`、`blurred`、`change`、`submit`、`cancel`。`change/submit/cancel` 另有 `data.text`，内容为完整文本。
+`widget.input` 的事件使用 `type = "input"`。`data.id` 为 `input_001` 形式的字符串，`data.kind` 为 `focus_requested`、`focused`、`blur_requested`、`blurred`、`changed`、`submitted`、`cancelled`。`changed/submitted/cancelled` 另有 `data.text`，内容为完整文本。
 
-`focus/blur` 是鼠标请求通知，需要脚本决定是否调用聚焦/失焦方法；`focused/blurred` 是实际焦点变化通知。提交、取消不会自动清空或失焦。原始终端文字事件没有 `data.id/kind`。详见 [input API](../api/widget/input.md)。
+`focus_requested/blur_requested` 是鼠标请求通知，需要脚本决定是否调用聚焦/失焦方法；`focused/blurred` 是实际焦点变化通知。提交、取消不会自动清空或失焦。原始终端文字事件没有 `data.id/kind`。详见 [input API](../api/widget/input.md)。
 
 ## `scroll_box`
 

@@ -82,23 +82,23 @@ pub(crate) fn main() {
       debug.assert(event.type == "input" and event.data.id == first)
       local data = event.data
       seen[data.kind] = (seen[data.kind] or 0) + 1
-      if data.kind == "focus" then debug.assert(widget.input.focus(first)) end
-      if data.kind == "change" then table.insert(changes, data.text) end
-      if data.kind == "submit" then debug.assert(data.text == "a\nb" or data.text == "a\nb\n") end
+      if data.kind == "focus_requested" then debug.assert(widget.input.focus(first)) end
+      if data.kind == "changed" then table.insert(changes, data.text) end
+      if data.kind == "submitted" then debug.assert(data.text == "a\nb" or data.text == "a\nb\n") end
     end
     function Update(dt)
       phase = phase + 1
       if phase == 1 then
         slice.set(overlay, {event_passthrough=true})
       elseif phase == 2 then
-        debug.assert(seen.focus == 1 and seen.focused == 1)
+        debug.assert(seen.focus_requested == 1 and seen.focused == 1)
         debug.assert(changes[#changes] == "a\nb")
         debug.assert(widget.input.get_info(first).text == "a\nb")
-        debug.assert(seen.submit == 1 and seen.cancel == 1)
+        debug.assert(seen.submitted == 1 and seen.cancelled == 1)
         debug.assert(widget.input.set(first, {enter_submit=true}))
       elseif phase == 3 then
         debug.assert(widget.input.get_info(first).text == "a\nb\n")
-        debug.assert(seen.submit == 2)
+        debug.assert(seen.submitted == 2)
         debug.assert(widget.input.set(first, {line_mode=widget.input.SINGLELINE, max_chars=2}))
         debug.assert(widget.input.get_info(first).text == "ab")
         debug.assert(widget.input.blur())
@@ -184,7 +184,9 @@ pub(crate) fn main() {
     assert_eq!(
       events
         .iter()
-        .filter(|event| matches!(event,LuaEventData::TextInput(data) if data.kind=="focus"))
+        .filter(
+          |event| matches!(event,LuaEventData::TextInput(data) if data.kind=="focus_requested")
+        )
         .count(),
       phase
     );
@@ -230,7 +232,7 @@ pub(crate) fn main() {
   session.update().unwrap();
   let stale = LuaEventData::TextInput(tg_service_lua::LuaTextInputEvent {
     id: 1,
-    kind: "change",
+    kind: "changed",
     value: Some("stale".into()),
   });
   session.update().unwrap();

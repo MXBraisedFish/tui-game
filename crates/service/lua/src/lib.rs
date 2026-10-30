@@ -12,6 +12,7 @@
 //! ```
 
 mod api;
+mod effects;
 mod events;
 mod game;
 mod input;
@@ -22,6 +23,7 @@ mod screensaver;
 mod session;
 
 pub use api::{LuaApiConfig, LuaApiContext, LuaDrawCommand, LuaDrawTarget, LuaHostCommand};
+pub use effects::{LuaCellEffect, LuaEffectRequest, LuaEffectScope};
 pub use events::{
   LuaActionState, LuaAnimationEvent, LuaAnimationEventKind, LuaAudioEvent, LuaAudioEventKind,
   LuaEnqueueError, LuaEventBroker, LuaEventCallbackId, LuaEventData, LuaEventDelivery,

@@ -1,4 +1,7 @@
 //! Independent widget smoke entry exercising the public API and checking its results.
+//!
+//! Run with `cargo run -p tg-service-widget --example widget_smoke --locked`.
+//! No deployment assets, interactive terminal, devices, or external tools are required.
 
 use tg_service_widget::{HitAreaOptions, HitAreaService, SliceOptions, SliceService, UiObjectPool};
 
@@ -129,5 +132,76 @@ fn main() {
   assert_eq!(canvas.base_buffer().get(0, 0).unwrap().text, "b");
   assert!(input.blur(&mut pool));
   assert!(input.remove(&mut pool, edit));
-  println!("widget ok: slice lifecycle, signed hit region, event options, press and cleanup");
+  let scrolls = tg_service_widget::ScrollBoxService::new();
+  let scroll = scrolls
+    .create(
+      &mut pool,
+      tg_service_widget::ScrollBoxOptions {
+        rect: tg_service_layout::Rect {
+          x: 2,
+          y: 1,
+          width: 8,
+          height: 4,
+        },
+        content_width: 8,
+        content_height: 20,
+        ..Default::default()
+      },
+    )
+    .unwrap();
+  let background = hitboxes.create(&mut pool, HitAreaOptions::default());
+  pool.begin_render();
+  canvas.begin_frame(&layout);
+  pool.prepare_canvas(&mut canvas, &layout);
+  assert!(hitboxes.render_in_scroll_box(
+    &mut pool,
+    background,
+    scroll,
+    tg_service_layout::Rect {
+      x: 0,
+      y: 0,
+      width: 8,
+      height: 20
+    },
+    &canvas
+  ));
+  assert!(scrolls.route_mouse_event(
+    &mut pool,
+    &canvas,
+    &layout,
+    tg_core_input::MouseEvent {
+      kind: tg_core_input::MouseEventKind::Scroll,
+      button: None,
+      scroll: Some(tg_core_input::ScrollDirection::Down),
+      x: 3,
+      y: 2,
+    }
+  ));
+  assert_eq!(scrolls.scroll_y(&pool, scroll), Some(3));
+  for kind in [
+    tg_core_input::MouseEventKind::Press,
+    tg_core_input::MouseEventKind::Release,
+  ] {
+    assert!(hitboxes.route_mouse_event(
+      &mut pool,
+      &mut input,
+      &canvas,
+      tg_core_input::MouseEvent {
+        kind,
+        button: Some(tg_core_input::MouseButton::Right),
+        scroll: None,
+        x: 3,
+        y: 2,
+      }
+    ));
+  }
+  assert!(
+    std::iter::from_fn(|| pool.pop_event()).any(|event| matches!(event,
+    tg_service_widget::UiEvent::HitArea(tg_service_widget::HitAreaEvent::Click {
+      id, button: tg_core_input::MouseButton::Right, ..
+    }) if id == background))
+  );
+  assert!(hitboxes.remove(&mut pool, background));
+  assert!(scrolls.remove(&mut pool, scroll));
+  println!("widget ok: slice lifecycle, signed hits, scrolling, content clicks and cleanup");
 }

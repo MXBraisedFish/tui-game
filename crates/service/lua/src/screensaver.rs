@@ -189,6 +189,21 @@ impl ScreensaverService {
     session.render()
   }
 
+  /// Replay this screensaver's prepared drawing frame and budgeted character shaders.
+  ///
+  /// # Errors
+  ///
+  /// Propagate drawing, shader validation, or execution-budget failures from the session.
+  pub fn replay_draw_commands(
+    &mut self,
+    render: &mut tg_service_render::RenderService,
+    canvas: &mut tg_service_canvas::CanvasService,
+  ) -> Result<(), LuaSessionError> {
+    self.session.as_mut().map_or(Ok(()), |session| {
+      session.replay_draw_commands(render, canvas)
+    })
+  }
+
   /// Drain host commands produced by the session callbacks.
   pub fn take_host_commands(&mut self) -> Vec<LuaHostCommand> {
     self

@@ -1,7 +1,7 @@
 //! Strict Lua bindings for single-row progress indicators.
 use super::*;
 use crate::object_pool::LuaProgressbarBinding;
-use tg_service_widget::{ProgressBarId, ProgressBarService};
+use tg_service_widget::{ProgressBarFillOrigin, ProgressBarId, ProgressBarService};
 const FIELDS: &[&str] = &[
   "width",
   "completed_ratio",
@@ -12,6 +12,7 @@ const FIELDS: &[&str] = &[
   "preview_fg",
   "remaining_shape",
   "remaining_fg",
+  "fill_direction",
 ];
 
 /// Build the read-only progress bar library.
@@ -165,6 +166,24 @@ fn options(
   if !matches!(table.raw_get::<Value>("width")?, Value::Nil) {
     binding.width = positive_u16(table, method, "width")?;
   }
+  binding.fill_direction = args::optional_string(
+    table,
+    method,
+    "fill_direction",
+    Some(&binding.fill_direction),
+  )?
+  .unwrap();
+  binding.options.origin = match binding.fill_direction.as_str() {
+    "auto" | "left" => ProgressBarFillOrigin::Left,
+    "center" | "horizontal_center" => ProgressBarFillOrigin::Center,
+    "right" => ProgressBarFillOrigin::Right,
+    _ => {
+      return Err(args::message(
+        method,
+        "invalid horizontal fill_direction constant",
+      ));
+    }
+  };
   for (name, stored) in [
     ("completed_ratio", &mut binding.completed_ratio),
     ("preview_ratio", &mut binding.preview_ratio),
@@ -244,6 +263,7 @@ fn info(lua: &Lua, id: u64, binding: &LuaProgressbarBinding) -> mlua::Result<Tab
   result.raw_set("width", binding.width)?;
   result.raw_set("completed_ratio", binding.completed_ratio)?;
   result.raw_set("preview_ratio", binding.preview_ratio)?;
+  result.raw_set("fill_direction", binding.fill_direction.as_str())?;
   for (name, value) in [
     ("completed_shape", binding.options.completed.ch),
     ("preview_shape", binding.options.preview.ch),

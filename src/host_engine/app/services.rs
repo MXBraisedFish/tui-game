@@ -164,6 +164,12 @@ impl EngineServices {
       })?;
     let image_cache_dir = storage.path("data/cache/images");
     let ffmpeg = FfmpegService::new(storage.root_dir().to_path_buf(), storage.system_dir_path());
+    if ffmpeg.installation().is_none() {
+      log.warn_message(
+        LogSource::Boot,
+        HostLogMessage::new("log_info.boot.ffmpeg_missing", "FFmpeg was not found."),
+      );
+    }
     let async_runtime = AsyncRuntime::new();
     let audio = AudioService::new(tg_service_async::EventSink::new(
       async_runtime.event_sender(),

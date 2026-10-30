@@ -85,7 +85,9 @@ impl Harness {
       .with_objects_mut(|objects| {
         objects.ui_mut().begin_render();
         objects.ui().prepare_canvas(&mut self.canvas, &self.layout);
-        objects.replay_draw_commands(&mut RenderService::new(), &mut self.canvas, commands);
+        objects
+          .replay_draw_commands(&mut RenderService::new(), &mut self.canvas, commands)
+          .unwrap();
       })
       .unwrap();
   }
@@ -144,7 +146,7 @@ impl Harness {
 fn hit(events: &[LuaEventData], id: u64) -> bool {
   events
     .iter()
-    .any(|event| matches!(event,LuaEventData::HitArea(data) if data.id==id && data.kind=="press"))
+    .any(|event| matches!(event,LuaEventData::HitArea(data) if data.id==id && data.kind=="pressed"))
 }
 
 pub(crate) fn main() {
@@ -179,7 +181,7 @@ pub(crate) fn lifecycle_and_order() {
     end
     function HandleEvent(event)
       if event.type=="scrollbox" then
-        debug.assert(event.data.id==box and event.data.kind=="scroll")
+        debug.assert(event.data.id==box and event.data.kind=="scrolled")
         debug.assert(event.data.scroll_offset_horizontal~=nil and event.data.scroll_offset_vertical~=nil)
         debug.assert(event.data.x==nil and event.data.y==nil)
         changed=changed+1
@@ -215,24 +217,20 @@ pub(crate) fn lifecycle_and_order() {
   let events = harness.mouse(2, 2, MouseEventKind::Press, None);
   assert!(hit(&events, 2));
   assert!(!hit(&events, 1));
-  assert!(events.iter().any(|event|matches!(event,LuaEventData::HitArea(data) if data.kind=="press" && data.x==1 && data.y==0 && data.relative_x==2 && data.relative_y==1)));
+  assert!(events.iter().any(|event|matches!(event,LuaEventData::HitArea(data) if data.kind=="pressed" && data.x==1 && data.y==0 && data.relative_x==2 && data.relative_y==1)));
   harness.mouse(2, 2, MouseEventKind::Release, None);
   assert!(hit(&harness.mouse(0, 2, MouseEventKind::Press, None), 1));
   let events = harness.mouse(2, 2, MouseEventKind::Drag, None);
-  assert!(
-    !events
-      .iter()
-      .any(|event| matches!(event,LuaEventData::HitArea(data) if data.id==1 && data.kind=="drag"))
-  );
+  assert!(!events.iter().any(
+    |event| matches!(event,LuaEventData::HitArea(data) if data.id==1 && data.kind=="dragged")
+  ));
   harness.mouse(2, 2, MouseEventKind::Release, None);
   harness.mouse(0, 2, MouseEventKind::Press, None);
   harness.mouse(6, 2, MouseEventKind::Release, None);
   let events = harness.mouse(0, 2, MouseEventKind::Drag, None);
-  assert!(
-    !events
-      .iter()
-      .any(|event| matches!(event,LuaEventData::HitArea(data) if data.id==1 && data.kind=="drag"))
-  );
+  assert!(!events.iter().any(
+    |event| matches!(event,LuaEventData::HitArea(data) if data.id==1 && data.kind=="dragged")
+  ));
   // The scrollbar consumes the lower base hitbox even without its own button event.
   assert!(!hit(&harness.mouse(6, 2, MouseEventKind::Press, None), 1));
   harness.mouse(6, 2, MouseEventKind::Release, None);

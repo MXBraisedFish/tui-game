@@ -76,12 +76,12 @@ pub(crate) fn main() {
     end
     function HandleEvent(event)
       if event.type=="link" then
-        debug.assert(event.data.id==first and event.data.kind=="click")
+        debug.assert(event.data.id==first and event.data.kind=="clicked")
         debug.assert(event.data.link=="./manual.txt" or event.data.link=="./folder")
         clicks=clicks+1
       elseif event.type=="input" then
         debug.assert(event.data.id==input)
-        if event.data.kind=="focus" then debug.assert(widget.input.focus(input)) end
+        if event.data.kind=="focus_requested" then debug.assert(widget.input.focus(input)) end
         if event.data.kind=="focused" then input_focused=true end
       end
     end

@@ -3680,6 +3680,7 @@ dependencies = [
  "tg-service-package",
  "tg-service-random",
  "tg-service-render",
+ "tg-service-render-pipeline",
  "tg-service-rich-text",
  "tg-service-text-layout",
  "tg-service-time",

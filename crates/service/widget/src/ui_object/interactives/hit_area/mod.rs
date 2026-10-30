@@ -7,7 +7,7 @@ pub(crate) use self::state::HitAreaObjects;
 use self::state::{HitAreaState, HitSnapshot, PressState};
 pub use self::types::{HitAreaEvent, HitAreaId, HitAreaOptions};
 use crate::UiObjectPool;
-use crate::{SliceId, TextInputService};
+use crate::{ScrollBoxId, SliceId, TextInputService};
 use tg_core_input::{MouseButton, MouseEvent, MouseEventKind};
 use tg_service_canvas::CanvasService;
 use tg_service_layout::Rect;
@@ -185,6 +185,26 @@ impl HitAreaService {
     canvas: &CanvasService,
   ) -> bool {
     self.render_resolved(pool, id, canvas.slice_hit_rect(slice, rect))
+  }
+
+  /// Register a hit region in scroll-box content coordinates, clipped to its viewport.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The owning UI pool.
+  /// * `id` - The region to submit for this frame.
+  /// * `scroll_box` - The prepared scroll box containing the region.
+  /// * `rect` - The region in unscrolled content coordinates.
+  /// * `canvas` - The prepared canvas providing viewport clipping and surface order.
+  pub fn render_in_scroll_box(
+    &self,
+    pool: &mut UiObjectPool,
+    id: HitAreaId,
+    scroll_box: ScrollBoxId,
+    rect: Rect,
+    canvas: &CanvasService,
+  ) -> bool {
+    self.render_resolved(pool, id, canvas.scroll_box_hit_rect(scroll_box, rect))
   }
 
   /// Render the component into the physical host surface and update its interaction geometry.

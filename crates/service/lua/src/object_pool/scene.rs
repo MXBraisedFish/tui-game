@@ -9,6 +9,13 @@ use tg_service_widget::{SliceLength, SliceService, clip_rect};
 
 type Commands = HashMap<LuaDrawTarget, Vec<LuaDrawCommand>>;
 
+pub(crate) enum ReplayStep {
+  Draw(LuaDrawCommand),
+  Begin(SliceId),
+  End(SliceId),
+  Effect(crate::LuaEffectRequest),
+}
+
 impl LuaObjectPool {
   /// Replay one frame with ancestor clipping and container-local drawing order.
   ///
@@ -20,14 +27,47 @@ impl LuaObjectPool {
   /// * `render` - The drawing service used for text and geometry.
   /// * `canvas` - The current frame's prepared canvas.
   /// * `commands` - The ordered script submissions for this frame.
+  ///
+  /// # Errors
+  ///
+  /// Reject shader submissions, which require [`crate::LuaSession::replay_draw_commands`]
+  /// to supervise Lua callbacks and release pool borrows before calling script code.
   pub fn replay_draw_commands(
     &mut self,
     render: &mut RenderService,
     canvas: &mut CanvasService,
     commands: Vec<LuaDrawCommand>,
-  ) {
+  ) -> mlua::Result<()> {
+    if commands
+      .iter()
+      .any(|command| matches!(command, LuaDrawCommand::Effect(_)))
+    {
+      return Err(mlua::Error::RuntimeError(
+        "cell shaders require LuaSession::replay_draw_commands".into(),
+      ));
+    }
+    let steps = self.prepare_draw_commands(canvas, commands);
+    let mut skipped = 0;
+    for step in steps {
+      self.replay_step(render, canvas, step, &mut skipped);
+    }
+    Ok(())
+  }
+
+  pub(crate) fn prepare_draw_commands(
+    &mut self,
+    canvas: &mut CanvasService,
+    commands: Vec<LuaDrawCommand>,
+  ) -> Vec<ReplayStep> {
     let mut grouped = Commands::new();
+    let mut canvas_effects = Vec::new();
     for command in commands {
+      if let LuaDrawCommand::Effect(request) = &command
+        && request.effect.scope == crate::LuaEffectScope::Canvas
+      {
+        canvas_effects.push(ReplayStep::Effect(request.clone()));
+        continue;
+      }
       grouped
         .entry(command_target(&command))
         .or_default()
@@ -63,16 +103,19 @@ impl LuaObjectPool {
       }
     }
     self.ui.refresh_pointer_surfaces(canvas);
-    self.replay_surface(LuaDrawTarget::Base, render, canvas, &grouped, 0);
+    let mut steps = Vec::new();
+    self.plan_surface(LuaDrawTarget::Base, &grouped, &mut steps, 0);
     for id in SliceService::new().ids_by_layer(&self.ui) {
       if self
         .surface_placements
         .get(&id)
         .is_none_or(|placement| placement.parent == LuaDrawTarget::Base)
       {
-        self.replay_surface(LuaDrawTarget::Slice(id), render, canvas, &grouped, 0);
+        self.plan_surface(LuaDrawTarget::Slice(id), &grouped, &mut steps, 0);
       }
     }
+    steps.extend(canvas_effects);
+    steps
   }
 
   fn measure_surface(
@@ -210,7 +253,7 @@ impl LuaObjectPool {
           );
           (*x, *y, Size { width, height })
         }
-        LuaDrawCommand::EraseRect { .. } => continue,
+        LuaDrawCommand::EraseRect { .. } | LuaDrawCommand::Effect(_) => continue,
       };
       if size.width > 0
         && size.height > 0
@@ -276,12 +319,11 @@ impl LuaObjectPool {
     self.static_size(id, self.configured_surface_size(parent, base, depth + 1))
   }
 
-  fn replay_surface(
-    &mut self,
+  fn plan_surface(
+    &self,
     target: LuaDrawTarget,
-    render: &mut RenderService,
-    canvas: &mut CanvasService,
     commands: &Commands,
+    steps: &mut Vec<ReplayStep>,
     depth: usize,
   ) {
     if depth > 32 {
@@ -295,10 +337,10 @@ impl LuaObjectPool {
             .get(id)
             .is_some_and(|placement| placement.sequence == *sequence)
         {
-          self.replay_embedded(*id, render, canvas, commands, depth + 1);
+          self.plan_embedded(*id, commands, steps, depth + 1);
         }
-      } else {
-        self.replay_command(render, canvas, command.clone());
+      } else if !matches!(command, LuaDrawCommand::Effect(_)) {
+        steps.push(ReplayStep::Draw(command.clone()));
       }
     }
     // User slices keep their explicit layer order above ordinary parent drawing.
@@ -309,21 +351,68 @@ impl LuaObjectPool {
           .get(&id)
           .is_some_and(|placement| placement.parent == target)
       {
-        self.replay_embedded(id, render, canvas, commands, depth + 1);
+        self.plan_embedded(id, commands, steps, depth + 1);
+      }
+    }
+    for command in commands.get(&target).into_iter().flatten() {
+      if let LuaDrawCommand::Effect(request) = command {
+        steps.push(ReplayStep::Effect(request.clone()));
       }
     }
   }
 
-  fn replay_embedded(
-    &mut self,
+  fn plan_embedded(
+    &self,
     id: SliceId,
-    render: &mut RenderService,
-    canvas: &mut CanvasService,
     commands: &Commands,
+    steps: &mut Vec<ReplayStep>,
     depth: usize,
   ) {
-    let Some(placement) = self.surface_placements.get(&id).copied() else {
+    if depth > 32 {
       return;
+    }
+    steps.push(ReplayStep::Begin(id));
+    self.plan_surface(LuaDrawTarget::Slice(id), commands, steps, depth);
+    steps.push(ReplayStep::End(id));
+  }
+
+  pub(crate) fn replay_step(
+    &mut self,
+    render: &mut RenderService,
+    canvas: &mut CanvasService,
+    step: ReplayStep,
+    skipped: &mut usize,
+  ) {
+    match step {
+      ReplayStep::Begin(id) => {
+        if *skipped > 0 || !self.begin_embedded(id, canvas) {
+          *skipped += 1;
+        }
+      }
+      ReplayStep::End(id) => {
+        if *skipped > 0 {
+          *skipped -= 1;
+        } else {
+          let parent =
+            self
+              .surface_placements
+              .get(&id)
+              .and_then(|placement| match placement.parent {
+                LuaDrawTarget::Base => None,
+                LuaDrawTarget::Slice(id) => Some(id),
+              });
+          canvas.composite_embedded_slice(id, parent);
+          self.ui.end_pointer_scope();
+        }
+      }
+      ReplayStep::Draw(command) if *skipped == 0 => self.replay_command(render, canvas, command),
+      _ => {}
+    }
+  }
+
+  fn begin_embedded(&mut self, id: SliceId, canvas: &mut CanvasService) -> bool {
+    let Some(placement) = self.surface_placements.get(&id).copied() else {
+      return false;
     };
     let parent = match placement.parent {
       LuaDrawTarget::Base => None,
@@ -335,16 +424,16 @@ impl LuaObjectPool {
         .widget
         .begin_draw(&mut self.ui, canvas, parent, placement.position)
       else {
-        return;
+        return false;
       };
       canvas.prepare_embedded_slice(id, view.clip, view.origin, view.rank, None, false);
     } else {
       let service = SliceService::new();
       if !service.is_visible(&self.ui, id) {
-        return;
+        return false;
       }
       let Some((parent_clip, parent_origin, rank)) = canvas.surface_geometry(parent) else {
-        return;
+        return false;
       };
       let size = self.configured_surface_size(
         LuaDrawTarget::Slice(id),
@@ -360,7 +449,7 @@ impl LuaObjectPool {
       );
       let clip = clip_rect(origin, size, parent_clip);
       if clip.width == 0 || clip.height == 0 {
-        return;
+        return false;
       }
       let scope = if let Some(scope) = self.slice_scopes.get(&id) {
         *scope
@@ -370,7 +459,7 @@ impl LuaObjectPool {
         scope
       };
       if !self.ui.begin_pointer_scope(scope, clip) {
-        return;
+        return false;
       }
       if !service.event_passthrough(&self.ui, id).unwrap_or(false) {
         self.ui.register_pointer_region(rank, clip);
@@ -397,9 +486,7 @@ impl LuaObjectPool {
         canvas,
       );
     }
-    self.replay_surface(LuaDrawTarget::Slice(id), render, canvas, commands, depth);
-    canvas.composite_embedded_slice(id, parent);
-    self.ui.end_pointer_scope();
+    true
   }
 
   fn replay_command(
@@ -409,7 +496,7 @@ impl LuaObjectPool {
     command: LuaDrawCommand,
   ) {
     match command {
-      LuaDrawCommand::Surface { .. } => {}
+      LuaDrawCommand::Surface { .. } | LuaDrawCommand::Effect(_) => {}
       LuaDrawCommand::Progressbar { id, target, x, y } => {
         self.draw_progressbar(id, target, (x, y), canvas)
       }
@@ -479,6 +566,7 @@ impl LuaObjectPool {
 
 fn command_target(command: &LuaDrawCommand) -> LuaDrawTarget {
   match command {
+    LuaDrawCommand::Effect(request) => request.target,
     LuaDrawCommand::Progressbar { target, .. }
     | LuaDrawCommand::Surface { target, .. }
     | LuaDrawCommand::Link { target, .. }

@@ -418,7 +418,7 @@ fn checked_i32(value: i64, method: &str, name: &str) -> mlua::Result<i32> {
   i32::try_from(value).map_err(|_| args::message(method, format!("{name} is out of i32 range")))
 }
 
-fn background_name(color: Option<TextColor>) -> String {
+pub(super) fn background_name(color: Option<TextColor>) -> String {
   match color {
     None => "none".to_string(),
     Some(TextColor::Transparent) => "transparent".to_string(),

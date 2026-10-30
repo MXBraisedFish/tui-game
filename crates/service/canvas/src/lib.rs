@@ -49,10 +49,12 @@
 //! ```
 
 pub mod buffer;
+mod cell_effect;
 mod service;
 mod surface;
 mod top_layer;
 
+pub use cell_effect::{CellEffectCell, CellEffectRegion};
 pub use tg_core_style::CanvasCell;
 
 pub use service::CanvasService;

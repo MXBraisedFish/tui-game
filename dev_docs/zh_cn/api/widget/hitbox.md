@@ -87,7 +87,7 @@ end
   sequence = X, -- 占位符
   data = {
     id = X,     -- 占位符
-    kind = "click",
+    kind = "clicked",
     button = "left",
     x = 12,
     y = 4
@@ -355,7 +355,7 @@ end
   sequence = X, -- 占位符
   data = {
     id = X,     -- 占位符
-    kind = "click",
+    kind = "clicked",
     button = "left",
     x = 12,
     y = 4

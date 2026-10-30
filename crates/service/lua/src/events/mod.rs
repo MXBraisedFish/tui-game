@@ -82,7 +82,7 @@ pub enum LuaTimerEventKind {
 impl LuaTimerEventKind {
   fn as_str(self) -> &'static str {
     match self {
-      Self::Tick => "tick",
+      Self::Tick => "ticked",
       Self::Finished => "finished",
     }
   }
@@ -142,8 +142,8 @@ impl LuaAnimationEventKind {
   fn as_str(&self) -> &'static str {
     match self {
       Self::Started => "started",
-      Self::Marker { .. } => "marker",
-      Self::Loop { .. } => "loop",
+      Self::Marker { .. } => "marker_reached",
+      Self::Loop { .. } => "looped",
       Self::Finished => "finished",
       Self::Cancelled => "cancelled",
     }
@@ -601,7 +601,7 @@ impl LuaAudioEventKind {
   /// Return the stable string key for this Lua audio event kind.
   pub fn as_str(self) -> &'static str {
     match self {
-      Self::Ready => "ready",
+      Self::Ready => "prepared",
       Self::Started => "started",
       Self::Paused => "paused",
       Self::Resumed => "resumed",
@@ -806,7 +806,7 @@ impl LuaEventData {
           && matches!(*left_kind, "moved" | "held")
       }
       (Self::HitArea(left), Self::HitArea(right)) => {
-        left.id == right.id && left.kind == "hover_move" && right.kind == "hover_move"
+        left.id == right.id && left.kind == "hover_moved" && right.kind == "hover_moved"
       }
       (Self::ScrollBox(left), Self::ScrollBox(right)) => left.id == right.id,
       (Self::Markdown(left), Self::Markdown(right)) => {
@@ -904,7 +904,7 @@ impl LuaEventData {
       }
       Self::File(event) => {
         data.set("request_id", event.request_id.to_string())?;
-        data.set("kind", event.kind.as_str())?;
+        data.set("kind", format!("{}_completed", event.kind.as_str()))?;
         data.set("path", event.path.as_str())?;
         data.set("tip", event.tip.as_deref())?;
         match &event.outcome {
@@ -950,7 +950,7 @@ impl LuaEventData {
       }
       Self::Image(event) => {
         data.set("request_id", event.request_id.to_string())?;
-        data.set("kind", "convert")?;
+        data.set("kind", "conversion_completed")?;
         match &event.outcome {
           LuaImageOutcome::Converted(output) => {
             data.set("ok", true)?;
@@ -964,7 +964,7 @@ impl LuaEventData {
       }
       Self::Network(event) => {
         data.set("request_id", event.request_id.to_string())?;
-        data.set("kind", event.method.as_str())?;
+        data.set("kind", format!("{}_completed", event.method.as_str()))?;
         data.set("url", event.url.as_str())?;
         match &event.outcome {
           LuaNetworkOutcome::Response {
@@ -1016,17 +1016,17 @@ impl LuaEventData {
       }
       Self::Hyperlink(event) => {
         data.set("id", format!("link_{:03}", event.id))?;
-        data.set("kind", "click")?;
+        data.set("kind", "clicked")?;
         data.set("link", event.link.as_str())?;
       }
       Self::Markdown(event) => {
         data.set("id", format!("markdown_{:03}", event.id))?;
         if let Some((x, y)) = event.scroll_offset {
-          data.set("kind", "scroll")?;
+          data.set("kind", "scrolled")?;
           data.set("scroll_offset_horizontal", x)?;
           data.set("scroll_offset_vertical", y)?;
         } else {
-          data.set("kind", "click")?;
+          data.set("kind", "clicked")?;
           data.set("link", event.href.as_str())?;
           data.set("text", event.text.as_str())?;
         }
@@ -1038,7 +1038,7 @@ impl LuaEventData {
       }
       Self::ScrollBox(event) => {
         data.set("id", format!("scrollbox_{:03}", event.id))?;
-        data.set("kind", "scroll")?;
+        data.set("kind", "scrolled")?;
         data.set("scroll_offset_horizontal", event.x)?;
         data.set("scroll_offset_vertical", event.y)?;
       }
@@ -1179,15 +1179,125 @@ mod tests {
   }
 
   #[test]
+  fn event_kinds_describe_completed_actions_without_changing_operation_names() {
+    let lua = Lua::new();
+    let assert_kind = |event: LuaEventData, expected: &str| {
+      assert_eq!(
+        event
+          .to_lua_table(&lua)
+          .unwrap()
+          .get::<String>("kind")
+          .unwrap(),
+        expected
+      );
+    };
+    for (operation, expected) in [
+      (LuaFileOperation::ReadText, "read_text_completed"),
+      (LuaFileOperation::ReadBytes, "read_bytes_completed"),
+      (LuaFileOperation::WriteText, "write_text_completed"),
+      (LuaFileOperation::WriteBytes, "write_bytes_completed"),
+      (LuaFileOperation::ListDir, "list_dir_completed"),
+      (LuaFileOperation::CreateDir, "create_dir_completed"),
+      (LuaFileOperation::Remove, "remove_completed"),
+    ] {
+      assert_kind(
+        LuaEventData::File(LuaFileEvent {
+          request_id: 1,
+          kind: operation,
+          path: "file.txt".into(),
+          tip: None,
+          outcome: LuaFileOutcome::Failed(LuaEventError::sanitized(LuaEventErrorCode::NotFound)),
+        }),
+        expected,
+      );
+      assert_eq!(expected, format!("{}_completed", operation.as_str()));
+    }
+    for outcome in [
+      LuaImageOutcome::Converted("image_001".into()),
+      LuaImageOutcome::Failed(LuaEventError::sanitized(LuaEventErrorCode::InvalidRequest)),
+    ] {
+      assert_kind(
+        LuaEventData::Image(LuaImageEvent {
+          request_id: 2,
+          outcome,
+        }),
+        "conversion_completed",
+      );
+    }
+    assert_kind(
+      LuaEventData::Hyperlink(LuaHyperlinkEvent {
+        id: 1,
+        link: "https://example.com".into(),
+      }),
+      "clicked",
+    );
+    for (offset, expected) in [(None, "clicked"), (Some((2, 3)), "scrolled")] {
+      assert_kind(
+        LuaEventData::Markdown(LuaMarkdownEvent {
+          id: 1,
+          href: "https://example.com".into(),
+          text: "Example".into(),
+          scroll_offset: offset,
+        }),
+        expected,
+      );
+    }
+    assert_kind(
+      LuaEventData::ScrollBox(LuaScrollBoxEvent { id: 1, x: 2, y: 3 }),
+      "scrolled",
+    );
+    assert_kind(
+      LuaEventData::Audio(LuaAudioEvent {
+        id: 1,
+        kind: LuaAudioEventKind::Ready,
+        duration_ms: Some(1000),
+        position_ms: None,
+        error: None,
+      }),
+      "prepared",
+    );
+    for (kind, expected) in [
+      (
+        LuaAnimationEventKind::Marker {
+          name: "impact".into(),
+        },
+        "marker_reached",
+      ),
+      (LuaAnimationEventKind::Loop { completed: 2 }, "looped"),
+    ] {
+      assert_kind(
+        LuaEventData::Animation(LuaAnimationEvent { id: 1, kind }),
+        expected,
+      );
+    }
+    assert_kind(
+      LuaEventData::Timer(LuaTimerEvent {
+        id: 1,
+        timer_kind: LuaTimerKind::Timer,
+        kind: LuaTimerEventKind::Tick,
+        executed_count: Some(1),
+        object_id: None,
+        tip: None,
+        revision: None,
+      }),
+      "ticked",
+    );
+  }
+
+  #[test]
   fn directory_file_payloads_only_expose_success_metadata() {
     let lua = Lua::new();
     for (kind, outcome, expected_kind) in [
       (
         LuaFileOperation::CreateDir,
         LuaFileOutcome::DirectoryCreated,
-        "create_dir",
+        "create_dir_completed",
       ),
-      (LuaFileOperation::Remove, LuaFileOutcome::Removed, "remove"),
+      (
+        LuaFileOperation::Remove,
+        LuaFileOutcome::Removed,
+        "remove_completed",
+      ),
     ] {
       let data = LuaEventData::File(LuaFileEvent {
         request_id: 8,
@@ -1227,7 +1337,7 @@ mod tests {
     })
     .to_lua_table(&lua)
     .unwrap();
-    assert_eq!(text.get::<String>("kind").unwrap(), "get");
+    assert_eq!(text.get::<String>("kind").unwrap(), "get_completed");
     assert_eq!(
       text.get::<String>("url").unwrap(),
       "https://example.com/request"
@@ -1255,7 +1365,7 @@ mod tests {
     })
     .to_lua_table(&lua)
     .unwrap();
-    assert_eq!(bytes.get::<String>("kind").unwrap(), "post");
+    assert_eq!(bytes.get::<String>("kind").unwrap(), "post_completed");
     assert!(matches!(bytes.get::<Value>("text").unwrap(), Value::Nil));
     assert_eq!(
       bytes
@@ -1393,7 +1503,7 @@ mod tests {
           relative_x: 1,
           relative_y: 2,
           id: 6,
-          kind: "drag",
+          kind: "dragged",
           x: 7,
           y: 8,
           button: Some("left"),
@@ -1421,7 +1531,7 @@ mod tests {
       (
         LuaEventData::TextInput(LuaTextInputEvent {
           id: 9,
-          kind: "change",
+          kind: "changed",
           value: Some("value".to_string()),
         }),
         "input",

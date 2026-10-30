@@ -18,6 +18,7 @@ use tg_service_text_layout::{self as text_layout, DrawTextParams, LayoutLine, Te
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CanvasService {
   base: CanvasBuffer,
+  composed_canvas: Option<CanvasBuffer>,
   host: CanvasBuffer,
   top: TopLayer,
   slices: HashMap<SliceId, PreparedSlice>,
@@ -122,6 +123,7 @@ impl CanvasService {
     let (width, height) = crossterm::terminal::size().unwrap_or((95, 24));
     Self {
       base: CanvasBuffer::new(width, height),
+      composed_canvas: None,
       host: CanvasBuffer::new(width, height),
       top: TopLayer::new(width, height),
       slices: HashMap::new(),
@@ -159,6 +161,7 @@ impl CanvasService {
   /// Prepare per-frame state and discard submissions or observations belonging to the previous
   /// frame.
   pub fn begin_frame(&mut self, layout: &LayoutService) {
+    self.composed_canvas = None;
     let physical = layout.physical_size();
     if self.host.width() != physical.width || self.host.height() != physical.height {
       self.host.resize(physical.width, physical.height);
@@ -179,6 +182,7 @@ impl CanvasService {
   /// * `surfaces` - The surfaces.
   /// * `layout` - The service resolving terminal sizes and positions.
   pub fn prepare(&mut self, pool_id: u64, surfaces: Vec<SurfaceFrame>, layout: &LayoutService) {
+    self.composed_canvas = None;
     self.viewport = layout.developer_viewport_rect();
     let size = layout.developer_size();
     if self.base.width() != size.width || self.base.height() != size.height {
@@ -399,6 +403,7 @@ impl CanvasService {
 
   /// Discard the previously retained canvas contents.
   pub fn clear(&mut self) {
+    self.composed_canvas = None;
     self.base.clear();
   }
 
@@ -873,6 +878,7 @@ impl CanvasService {
 
   /// Resize the base terminal-cell buffer and invalidate its previous contents.
   pub fn resize(&mut self, width: u16, height: u16) {
+    self.composed_canvas = None;
     self.host.resize(width, height);
     let _ = self.top.resize_or_clear(width, height);
     self.force_full_redraw = true;
@@ -908,6 +914,44 @@ impl CanvasService {
   /// Return the current base buffer.
   pub fn base_buffer(&self) -> &CanvasBuffer {
     &self.base
+  }
+
+  /// Return the shader-processed developer canvas for the current frame, when supplied.
+  pub fn composed_canvas(&self) -> Option<&CanvasBuffer> {
+    self.composed_canvas.as_ref()
+  }
+
+  /// Replace the developer canvas's visual composition while retaining interaction surfaces.
+  ///
+  /// Return `false` if the buffer dimensions differ from the current developer viewport.
+  pub fn set_composed_canvas(&mut self, buffer: CanvasBuffer) -> bool {
+    if buffer.width() != self.viewport.width || buffer.height() != self.viewport.height {
+      return false;
+    }
+    self.composed_canvas = Some(buffer);
+    true
+  }
+
+  /// Borrow a visible surface buffer and the logical coordinate represented by its first cell.
+  ///
+  /// Use `None` for the base canvas. Embedded surfaces retain their unclipped content origin.
+  pub fn cell_effect_buffer(
+    &mut self,
+    target: Option<SliceId>,
+  ) -> Option<(&mut CanvasBuffer, (i32, i32))> {
+    match target {
+      None => Some((&mut self.base, (0, 0))),
+      Some(id) => self
+        .slices
+        .get_mut(&id)
+        .filter(|slice| slice.visible)
+        .map(|slice| {
+          (
+            &mut slice.buffer,
+            (i32::from(slice.source_x), i32::from(slice.source_y)),
+          )
+        }),
+    }
   }
 
   /// Return the surfaces resolved for the current frame.

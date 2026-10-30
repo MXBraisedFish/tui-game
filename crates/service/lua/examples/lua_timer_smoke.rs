@@ -49,7 +49,7 @@ fn main() {
     function HandleEvent(event)
       debug.assert(event.data.id == regular and event.data.executed_count == handled + 1)
       handled = handled + 1
-      debug.assert(event.data.kind == (handled == 2 and "finished" or "tick"))
+      debug.assert(event.data.kind == (handled == 2 and "finished" or "ticked"))
     end
     function Update(dt) end
     function UpdateFrame(dt, alpha)

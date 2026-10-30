@@ -31,6 +31,8 @@ mod color;
 mod date;
 mod debug;
 mod draw;
+mod effect;
+pub(crate) use effect::process_buffer as process_effect_buffer;
 mod encoding;
 mod events;
 mod file;
@@ -108,6 +110,7 @@ pub fn install(lua: &Lua, environment: &Table, state: SharedApiState) -> mlua::R
   environment.set("random", random::random(lua, state.clone())?)?;
   environment.set("slice", slice::slice(lua, state.clone())?)?;
   environment.set("timer", timer::timer(lua, state.clone())?)?;
+  environment.set("effect", effect::effect(lua, state.clone())?)?;
   let widget = lua.create_table()?;
   widget.raw_set("hitbox", hitbox::hitbox(lua, state.clone())?)?;
   widget.raw_set("input", widget_input::input(lua, state.clone())?)?;

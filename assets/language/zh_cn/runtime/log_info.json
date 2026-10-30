@@ -4,6 +4,7 @@
   "log_info.boot.stage_complete": "启动阶段已完成：{stage}。",
   "log_info.boot.language_fallback": "已保存的语言“{code}”不可用，需要重新选择语言。",
   "log_info.boot.service_failed": "启动服务组“{domain}”失败：{error}",
+  "log_info.boot.ffmpeg_missing": "未找到 FFmpeg。",
   "log_info.runtime.started": "运行时事件循环已启动。",
   "log_info.runtime.stopped": "运行时事件循环已停止，退出方式：{mode}。",
   "log_info.shutdown.write_failed": "未能完成 {path} 的待处理写入：{error}",

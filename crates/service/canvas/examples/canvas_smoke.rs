@@ -41,6 +41,33 @@ fn main() {
     Some("e")
   );
   assert_eq!(canvas.prepared_slice_width(slice), Some(4));
+  let (buffer, origin) = canvas.cell_effect_buffer(Some(slice)).unwrap();
+  assert_eq!(origin, (0, 0));
+  buffer
+    .transform_region(
+      tg_service_canvas::CellEffectRegion {
+        x: 0,
+        y: 0,
+        width: 1,
+        height: 1,
+        include_continuation: false,
+      },
+      |mut cell| {
+        cell.cell.text = "H".into();
+        Ok::<_, ()>(cell)
+      },
+    )
+    .unwrap();
+  assert_eq!(
+    canvas
+      .cell_effect_buffer(Some(slice))
+      .unwrap()
+      .0
+      .get(0, 0)
+      .unwrap()
+      .text,
+    "H"
+  );
   canvas.begin_frame(&layout);
   let text = DrawTextParams {
     text: "a\nabcdef".to_string(),

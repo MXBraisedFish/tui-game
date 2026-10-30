@@ -33,31 +33,65 @@ impl FrameCompositor {
     }
 
     let viewport = canvas.viewport();
-    overlay(
-      &mut frame,
-      canvas.base_buffer(),
-      viewport.x,
-      viewport.y,
-      true,
-    );
-    for surface in canvas.prepared_surfaces() {
-      match surface {
-        PreparedSurface::Slice(slice) if slice.visible => overlay_slice(
-          &mut frame,
-          slice,
-          viewport.x.saturating_add(slice.rect.x),
-          viewport.y.saturating_add(slice.rect.y),
-        ),
-        PreparedSurface::ScrollBox(scroll_box) if scroll_box.visible => {
-          overlay_scroll_box(&mut frame, scroll_box, viewport.x, viewport.y)
+    if let Some(buffer) = canvas.composed_canvas() {
+      overlay(&mut frame, buffer, viewport.x, viewport.y, true);
+    } else {
+      overlay(
+        &mut frame,
+        canvas.base_buffer(),
+        viewport.x,
+        viewport.y,
+        true,
+      );
+      for surface in canvas.prepared_surfaces() {
+        match surface {
+          PreparedSurface::Slice(slice) if slice.visible => overlay_slice(
+            &mut frame,
+            slice,
+            viewport.x.saturating_add(slice.rect.x),
+            viewport.y.saturating_add(slice.rect.y),
+          ),
+          PreparedSurface::ScrollBox(scroll_box) if scroll_box.visible => {
+            overlay_scroll_box(&mut frame, scroll_box, viewport.x, viewport.y)
+          }
+          _ => {}
         }
-        _ => {}
       }
     }
     overlay(&mut frame, host, 0, 0, false);
     overlay(&mut frame, canvas.top_buffer(), 0, 0, false);
 
     frame
+  }
+
+  /// Compose developer surfaces in base coordinates before host and top-layer overlays.
+  ///
+  /// Preserve unwritten cells so character shaders can distinguish empty space from explicit
+  /// spaces. Retain the original surfaces for pointer routing and subsequent frame preparation.
+  pub fn compose_canvas(&self, canvas: &CanvasService) -> CanvasBuffer {
+    let viewport = canvas.viewport();
+    let mut frame = ComposedFrame::new(viewport.width, viewport.height);
+    overlay(&mut frame, canvas.base_buffer(), 0, 0, false);
+    for surface in canvas.prepared_surfaces() {
+      match surface {
+        PreparedSurface::Slice(slice) if slice.visible => {
+          overlay_slice(&mut frame, slice, slice.rect.x, slice.rect.y)
+        }
+        PreparedSurface::ScrollBox(scroll_box) if scroll_box.visible => {
+          overlay_scroll_box(&mut frame, scroll_box, 0, 0)
+        }
+        _ => {}
+      }
+    }
+    let mut buffer = CanvasBuffer::new(viewport.width, viewport.height);
+    for y in 0..viewport.height {
+      for x in 0..viewport.width {
+        if let Some(ComposedCell::Text(cell)) = frame.get(x, y) {
+          buffer.set(x, y, cell.clone());
+        }
+      }
+    }
+    buffer
   }
 }
 
@@ -235,6 +269,40 @@ fn write_cell(frame: &mut ComposedFrame, x: u16, y: u16, source: &CanvasCell) {
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn processed_canvas_preserves_host_overlays_geometry_and_frame_reset() {
+    use tg_service_layout::{LayoutService, Rect};
+    let mut layout = LayoutService::new();
+    layout.resize_physical(5, 4);
+    layout.set_developer_viewport(Rect {
+      x: 1,
+      y: 1,
+      width: 3,
+      height: 2,
+    });
+    let mut canvas = CanvasService::new();
+    canvas.begin_frame(&layout);
+    canvas.prepare(1, vec![], &layout);
+    canvas.styled_text(0, 0, "a", Default::default());
+    canvas.host_cell(2, 1, CanvasCell::new("H"));
+    let compositor = FrameCompositor::new();
+    let ordinary = compositor.compose(&canvas);
+    let mut processed = compositor.compose_canvas(&canvas);
+    assert!(!processed.is_written(2, 1));
+    assert!(canvas.set_composed_canvas(processed.clone()));
+    assert_eq!(compositor.compose(&canvas), ordinary);
+    processed.set(0, 0, CanvasCell::new("b"));
+    processed.set(1, 0, CanvasCell::new("c"));
+    assert!(canvas.set_composed_canvas(processed));
+    let frame = compositor.compose(&canvas);
+    assert!(matches!(frame.get(1, 1), Some(ComposedCell::Text(cell)) if cell.text == "b"));
+    assert!(matches!(frame.get(2, 1), Some(ComposedCell::Text(cell)) if cell.text == "H"));
+    assert_eq!(canvas.cell_at(0, 0).unwrap().text, "a");
+    assert!(!canvas.set_composed_canvas(CanvasBuffer::new(1, 1)));
+    canvas.begin_frame(&layout);
+    assert!(canvas.composed_canvas().is_none());
+  }
   use tg_core_style::TextStyle;
   use tg_service_canvas::{SliceFrame, SliceId, SurfaceFrame};
   use tg_service_layout::{LayoutService, Rect};

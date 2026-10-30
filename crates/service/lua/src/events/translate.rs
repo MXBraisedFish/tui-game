@@ -58,17 +58,17 @@ pub fn translate_animation_event(lua_id: u64, event: &AnimationEvent) -> LuaEven
 /// Convert a pointer-region outcome into its script-visible hit-area event.
 pub fn translate_hit_area_event(lua_id: u64, event: &HitAreaEvent) -> LuaEventData {
   let (kind, x, y, button, dx, dy) = match event {
-    HitAreaEvent::HoverEnter { x, y, .. } => ("hover_enter", *x, *y, None, None, None),
-    HitAreaEvent::HoverMove { x, y, .. } => ("hover_move", *x, *y, None, None, None),
-    HitAreaEvent::HoverLeave { x, y, .. } => ("hover_leave", *x, *y, None, None, None),
+    HitAreaEvent::HoverEnter { x, y, .. } => ("hover_entered", *x, *y, None, None, None),
+    HitAreaEvent::HoverMove { x, y, .. } => ("hover_moved", *x, *y, None, None, None),
+    HitAreaEvent::HoverLeave { x, y, .. } => ("hover_left", *x, *y, None, None, None),
     HitAreaEvent::Press { button, x, y, .. } => {
-      ("press", *x, *y, Some(mouse_button(*button)), None, None)
+      ("pressed", *x, *y, Some(mouse_button(*button)), None, None)
     }
     HitAreaEvent::Release { button, x, y, .. } => {
-      ("release", *x, *y, Some(mouse_button(*button)), None, None)
+      ("released", *x, *y, Some(mouse_button(*button)), None, None)
     }
     HitAreaEvent::Click { button, x, y, .. } => {
-      ("click", *x, *y, Some(mouse_button(*button)), None, None)
+      ("clicked", *x, *y, Some(mouse_button(*button)), None, None)
     }
     HitAreaEvent::Drag {
       button,
@@ -78,7 +78,7 @@ pub fn translate_hit_area_event(lua_id: u64, event: &HitAreaEvent) -> LuaEventDa
       dy,
       ..
     } => (
-      "drag",
+      "dragged",
       *x,
       *y,
       Some(mouse_button(*button)),
@@ -124,6 +124,109 @@ mod tests {
   use tg_service_animation::AnimationId;
   use tg_service_time::RepeatTimerId;
   use tg_service_widget::{HitAreaId, ScrollBoxId};
+
+  #[test]
+  fn hitbox_notifications_use_past_tense_for_every_transition() {
+    let id = HitAreaId(1);
+    let button = MouseButton::Left;
+    for (event, expected) in [
+      (HitAreaEvent::HoverEnter { id, x: 2, y: 3 }, "hover_entered"),
+      (HitAreaEvent::HoverMove { id, x: 2, y: 3 }, "hover_moved"),
+      (HitAreaEvent::HoverLeave { id, x: 2, y: 3 }, "hover_left"),
+      (
+        HitAreaEvent::Press {
+          id,
+          button,
+          x: 2,
+          y: 3,
+        },
+        "pressed",
+      ),
+      (
+        HitAreaEvent::Release {
+          id,
+          button,
+          x: 2,
+          y: 3,
+        },
+        "released",
+      ),
+      (
+        HitAreaEvent::Click {
+          id,
+          button,
+          x: 2,
+          y: 3,
+        },
+        "clicked",
+      ),
+      (
+        HitAreaEvent::Drag {
+          id,
+          button,
+          x: 2,
+          y: 3,
+          dx: 1,
+          dy: -1,
+        },
+        "dragged",
+      ),
+    ] {
+      let LuaEventData::HitArea(data) = translate_hit_area_event(1, &event) else {
+        panic!("hitbox event")
+      };
+      assert_eq!(data.kind, expected);
+    }
+  }
+
+  #[test]
+  fn renamed_hover_motion_coalesces_without_merging_button_events() {
+    let hover = translate_hit_area_event(
+      1,
+      &HitAreaEvent::HoverMove {
+        id: HitAreaId(1),
+        x: 2,
+        y: 3,
+      },
+    );
+    let newer_hover = translate_hit_area_event(
+      1,
+      &HitAreaEvent::HoverMove {
+        id: HitAreaId(1),
+        x: 3,
+        y: 4,
+      },
+    );
+    assert!(hover.is_coalescible_with(&newer_hover));
+    let other_hover = translate_hit_area_event(
+      2,
+      &HitAreaEvent::HoverMove {
+        id: HitAreaId(2),
+        x: 3,
+        y: 4,
+      },
+    );
+    assert!(!hover.is_coalescible_with(&other_hover));
+    for event in [
+      HitAreaEvent::Press {
+        id: HitAreaId(1),
+        button: MouseButton::Left,
+        x: 2,
+        y: 3,
+      },
+      HitAreaEvent::Drag {
+        id: HitAreaId(1),
+        button: MouseButton::Left,
+        x: 2,
+        y: 3,
+        dx: 1,
+        dy: 0,
+      },
+    ] {
+      let event = translate_hit_area_event(1, &event);
+      assert!(!event.is_coalescible_with(&event));
+    }
+  }
 
   #[test]
   fn translators_use_lua_local_ids_instead_of_host_ids() {

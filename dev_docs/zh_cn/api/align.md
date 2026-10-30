@@ -45,6 +45,7 @@ align.AUTO
 
 - 参数 `horizontal_align`
 - 参数 `vertical_align`
+- 参数 `fill_direction`
 
 ### 示例
 
@@ -70,6 +71,7 @@ draw.text(x, y, "AUTO", { fg = color.BRIGHT_RED })
 - `draw` 库和 `measurement` 库中用于水平对齐时等价于常量 `align.LEFT`。
 - `widget.input` 库中用于水平对齐时等价于常量 `align.LEFT`。
 - `widget.input` 库中用于垂直对齐时等价于常量 `align.TOP`。
+- `widget.progressbar` 库中用于填充方向时等价于常量 `align.LEFT`。
 
 ---
 
@@ -86,6 +88,7 @@ align.LEFT
 ### 可用于
 
 - 参数 `horizontal_align`
+- 参数 `fill_direction`
 
 ### 示例
 
@@ -119,6 +122,7 @@ align.HORIZONTAL_CENTER
 ### 可用于
 
 - 参数 `horizontal_align`
+- 参数 `fill_direction`
 
 ### 示例
 
@@ -156,6 +160,7 @@ align.RIGHT
 ### 可用于
 
 - 参数 `horizontal_align`
+- 参数 `fill_direction`
 
 ### 示例
 
@@ -316,6 +321,7 @@ draw.text(x, y, "CENTER", { fg = color.BRIGHT_RED })
 - 水平对齐时等价于常量 `align.HORIZONTAL_CENTER`。
 - 垂直对齐时等价于常量 `align.VERTICAL_CENTER`。
 - 用于方法 `draw.text` 时，各行在最长显示行的宽度内居中。
+- `widget.progressbar` 库中用于填充方向时等价于常量 `align.HORIZONTAL_CENTER`。
 
 ---
 

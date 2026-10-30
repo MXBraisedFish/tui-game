@@ -51,7 +51,7 @@ fn slice_targets_passthrough_coordinates_and_hidden_frames_follow_rendered_geome
     function HandleEvent(event)
       debug.assert(event.type == "hitbox")
       local data = event.data
-      if data.kind == "click" then
+      if data.kind == "clicked" then
         clicks = clicks + 1
         if mode == 2 then
           debug.assert(data.id == upper and data.x == 0 and data.y == 0)
@@ -144,7 +144,7 @@ fn slice_targets_passthrough_coordinates_and_hidden_frames_follow_rendered_geome
         })
         .unwrap();
       for event in events {
-        if matches!(&event, LuaEventData::HitArea(data) if data.kind == "click") {
+        if matches!(&event, LuaEventData::HitArea(data) if data.kind == "clicked") {
           clicked += 1;
         }
         broker

@@ -83,7 +83,9 @@ impl Harness {
       .with_objects_mut(|objects| {
         objects.ui_mut().begin_render();
         objects.ui().prepare_canvas(&mut self.canvas, &self.layout);
-        objects.replay_draw_commands(&mut RenderService::new(), &mut self.canvas, commands);
+        objects
+          .replay_draw_commands(&mut RenderService::new(), &mut self.canvas, commands)
+          .unwrap();
       })
       .unwrap();
   }
@@ -200,8 +202,90 @@ pub(crate) fn main() {
     "CCR"
   );
   harness.update();
+  fill_directions();
   screensaver_and_limits();
   markdown_container();
+}
+fn fill_directions() {
+  let mut harness = Harness::new(
+    r#"
+    function Init(ctx)
+      local progressbar = widget.progressbar
+      directions = {align.LEFT, align.RIGHT, align.HORIZONTAL_CENTER, align.AUTO}
+      bars = {}
+      for index, direction in ipairs(directions) do
+        bars[index] = progressbar.create(10, {
+          completed_ratio=0.3, preview_ratio=0.6,
+          completed_shape="C", preview_shape="P", remaining_shape="R",
+          fill_direction=direction
+        })
+        debug.assert(progressbar.get_info(bars[index]).fill_direction == direction)
+      end
+      local defaults = progressbar.create(1)
+      debug.assert(progressbar.get_info(defaults).fill_direction == align.LEFT)
+      debug.assert(progressbar.delete(defaults))
+      local centered = progressbar.create(10, {fill_direction=align.CENTER})
+      debug.assert(progressbar.get_info(centered).fill_direction == align.CENTER)
+      debug.assert(progressbar.delete(centered))
+      local list = progressbar.list()
+      debug.assert(list.n == 4)
+      for index, direction in ipairs(directions) do
+        debug.assert(list[index].fill_direction == direction)
+      end
+      for _, invalid in ipairs({align.TOP, align.VERTICAL_CENTER, align.BOTTOM, "LEFT", "unknown", false, 1}) do
+        debug.assert(not debug.pcall(progressbar.create, 10, {fill_direction=invalid}))
+        debug.assert(not debug.pcall(progressbar.set, bars[2], {width=3, fill_direction=invalid}))
+        local info = progressbar.get_info(bars[2])
+        debug.assert(info.width == 10 and info.fill_direction == align.RIGHT)
+      end
+      debug.assert(progressbar.count() == 4)
+    end
+    function Render()
+      for index, id in ipairs(bars) do widget.progressbar.draw(id, 0, index-1) end
+    end
+    function Update(dt)
+      debug.assert(widget.progressbar.set(bars[1], {fill_direction=align.RIGHT}))
+      debug.assert(widget.progressbar.set(bars[2], {fill_direction=align.HORIZONTAL_CENTER}))
+      debug.assert(widget.progressbar.set(bars[3], {fill_direction=align.CENTER}))
+      debug.assert(widget.progressbar.set(bars[4], {fill_direction=nil, width=10}))
+      debug.assert(widget.progressbar.get_info(bars[4]).fill_direction == align.AUTO)
+      debug.assert(widget.progressbar.set(bars[2], {preview_ratio=0.6}))
+      debug.assert(widget.progressbar.get_info(bars[2]).fill_direction == align.HORIZONTAL_CENTER)
+      local list = widget.progressbar.list()
+      debug.assert(list[1].fill_direction == align.RIGHT)
+      debug.assert(list[2].fill_direction == align.HORIZONTAL_CENTER)
+      debug.assert(list[3].fill_direction == align.CENTER)
+      debug.assert(list[4].fill_direction == align.AUTO)
+    end
+    function UpdateFrame(dt, alpha) end
+    function HandleEvent(event) debug.assert(false) end
+  "#,
+  );
+  harness.render();
+  for (row, expected) in ["CCCPPPRRRR", "RRRRPPPCCC", "RRPCCCPPRR", "CCCPPPRRRR"]
+    .iter()
+    .enumerate()
+  {
+    assert_eq!(
+      (0..10)
+        .map(|column| harness.cell(column, row as u16 + 2))
+        .collect::<String>(),
+      *expected
+    );
+  }
+  harness.update();
+  harness.render();
+  for (row, expected) in ["RRRRPPPCCC", "RRPCCCPPRR", "RRPCCCPPRR", "CCCPPPRRRR"]
+    .iter()
+    .enumerate()
+  {
+    assert_eq!(
+      (0..10)
+        .map(|column| harness.cell(column, row as u16 + 2))
+        .collect::<String>(),
+      *expected
+    );
+  }
 }
 fn screensaver_and_limits() {
   let mut harness = Harness::new(
@@ -247,7 +331,9 @@ fn screensaver_and_limits() {
       objects
         .ui()
         .prepare_canvas(&mut harness.canvas, &harness.layout);
-      objects.replay_draw_commands(&mut RenderService::new(), &mut harness.canvas, commands);
+      objects
+        .replay_draw_commands(&mut RenderService::new(), &mut harness.canvas, commands)
+        .unwrap();
     })
     .unwrap();
   assert_eq!(harness.cell(0, 2), "█");

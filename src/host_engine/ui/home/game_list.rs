@@ -202,6 +202,7 @@ pub struct GameListUi {
   search_input: TextInputId,
   jump_input: TextInputId,
   info_scroll: ScrollBoxId,
+  info_area: HitAreaId,
   page_area: HitAreaId,
   flip_forward_area: HitAreaId,
   flip_backward_area: HitAreaId,
@@ -300,6 +301,7 @@ impl GameListUi {
       .expect("failed to create game info scroll box");
 
     let page_area = hit_area.create(&mut objects, HitAreaOptions::default());
+    let info_area = hit_area.create(&mut objects, HitAreaOptions::default());
     let flip_forward_area = hit_area.create(&mut objects, HitAreaOptions::default());
     let flip_backward_area = hit_area.create(&mut objects, HitAreaOptions::default());
     let order_area = hit_area.create(&mut objects, HitAreaOptions::default());
@@ -311,6 +313,7 @@ impl GameListUi {
       search_input,
       jump_input,
       info_scroll,
+      info_area,
       page_area,
       flip_forward_area,
       flip_backward_area,
@@ -481,6 +484,9 @@ impl GameListUi {
         }
         if let Some(pos) = self.list_item_areas.iter().position(|a| a == id) {
           self.selected_index = pos;
+          return self.selected_entry().map(|entry| GameListCommand::Confirm {
+            package_id: entry.id,
+          });
         }
         None
       }
@@ -599,14 +605,19 @@ impl GameListUi {
 
     self.sync_selection_for_per_page(positions.visible_items);
 
-    context.hit_area.render_host(
+    let viewport = context.layout.developer_viewport_rect();
+    // Keep the page background below the detail surface so it cannot block its wheel input.
+    context.hit_area.render(
       &mut self.objects,
       self.page_area,
-      context.layout.developer_viewport_rect(),
+      Rect {
+        width: viewport.width,
+        height: viewport.height,
+        ..Default::default()
+      },
       context.canvas,
     );
 
-    let viewport = context.layout.developer_viewport_rect();
     let info_scroll_rect = Rect {
       x: positions.right_inner.x.saturating_sub(viewport.x),
       y: positions.right_inner.y.saturating_sub(viewport.y),
@@ -628,6 +639,17 @@ impl GameListUi {
       context.layout,
     );
     self.objects.prepare_canvas(context.canvas, context.layout);
+    context.hit_area.render_in_scroll_box(
+      &mut self.objects,
+      self.info_area,
+      self.info_scroll,
+      Rect {
+        width: positions.right_inner.width,
+        height: info_content_height.max(positions.right_inner.height),
+        ..Default::default()
+      },
+      context.canvas,
+    );
 
     self.draw_right_panel(context, &positions);
     let input_cursor = self.draw_left_panel(context, &positions);
@@ -1925,6 +1947,173 @@ impl GameListUi {
 mod tests {
   use super::*;
   use crate::host_engine::services::BestGameSave;
+
+  #[test]
+  fn rendered_game_rows_start_games_and_details_accept_wheel_input() {
+    use crate::host_engine::services::{MouseEvent, MouseEventKind};
+    use tg_service_input::ScrollDirection;
+
+    let nonce = std::time::SystemTime::now()
+      .duration_since(std::time::UNIX_EPOCH)
+      .unwrap()
+      .as_nanos();
+    let root =
+      std::env::temp_dir().join(format!("tg-game-list-mouse-{}-{nonce}", std::process::id()));
+    for name in ["alpha", "beta"] {
+      let directory = root.join("data/mod/game").join(name);
+      let detail = (0..100)
+        .map(|line| format!("Detail line {line}"))
+        .collect::<Vec<_>>()
+        .join("\n");
+      for (relative, content) in [
+        ("package.json", serde_json::json!({"mod_id":name,"schema_version":2,"type":"game","version":"1.0","version_code":1,"api":{"min":1,"max":1}}).to_string()),
+        ("display.json", serde_json::json!({"title":name,"description":"Description","author":"Author"}).to_string()),
+        ("game.json", serde_json::json!({"name":name,"detail":detail,"command":name,"entry":"main","language":["en_us"]}).to_string()),
+        ("scripts/main.lua", "function Render() end".to_string()),
+      ] {
+        let path = directory.join(relative);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, content).unwrap();
+      }
+    }
+    let storage = StorageService::from_root_for_test(root.clone());
+    let mut log = LogService::new();
+    let mut package = PackageService::new();
+    package.scan_all(&root, &mut log, "en_us", "missing: {key}");
+    assert_eq!(package.game_list().len(), 2);
+    let hit_area = HitAreaService::new();
+    let mut text_input = TextInputService::new();
+    let scroll_box = ScrollBoxService::new();
+    let mut ui = GameListUi::init(&hit_area, &text_input, &scroll_box);
+    let mut layout = LayoutService::new();
+    layout.resize_physical(110, 40);
+    let mut canvas = CanvasService::new();
+    let mut render = RenderService::new();
+    let mut i18n = I18nService::new();
+    i18n.insert_runtime_namespace(
+      "game_list",
+      serde_json::from_str::<HashMap<String, String>>(include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/assets/language/en_us/runtime/game_list.json"
+      )))
+      .unwrap(),
+    );
+    for viewport in [
+      Rect {
+        x: 0,
+        y: 0,
+        width: 110,
+        height: 40,
+      },
+      Rect {
+        x: 3,
+        y: 2,
+        width: 104,
+        height: 35,
+      },
+    ] {
+      layout.set_developer_viewport(viewport);
+      ui.objects.begin_render();
+      canvas.begin_frame(&layout);
+      ui.objects.prepare_canvas(&mut canvas, &layout);
+      ui.render(&mut GameListRenderContext {
+        render: &mut render,
+        canvas: &mut canvas,
+        layout: &layout,
+        i18n: &i18n,
+        hit_area: &hit_area,
+        text_input: &text_input,
+        scroll_box: &scroll_box,
+        package: &package,
+        storage: &storage,
+        log: &mut log,
+        mouse_supported: true,
+        truecolor_supported: true,
+        top_toolbar: false,
+      });
+      let positions = ui.compute_positions(&layout, &i18n, &text_input);
+      let expected_id = ui.page_entries()[1].id.clone();
+      ui.selected_index = 0;
+      let mut commands = Vec::new();
+      for kind in [MouseEventKind::Press, MouseEventKind::Release] {
+        hit_area.route_mouse_event(
+          &mut ui.objects,
+          &mut text_input,
+          &canvas,
+          MouseEvent {
+            kind,
+            button: Some(MouseButton::Left),
+            scroll: None,
+            x: positions.left_inner.x + 1,
+            y: positions.list_start_y + 1,
+          },
+        );
+        while let Some(event) = ui.objects.pop_event() {
+          commands.extend(ui.handle_event(&event));
+        }
+      }
+      assert_eq!(
+        commands,
+        vec![GameListCommand::Confirm {
+          package_id: expected_id
+        }]
+      );
+      let initial_scroll = scroll_box.scroll_y(&ui.objects, ui.info_scroll).unwrap();
+      let wheel = |direction, x| MouseEvent {
+        kind: MouseEventKind::Scroll,
+        button: None,
+        scroll: Some(direction),
+        x,
+        y: positions.right_inner.y + 1,
+      };
+      assert!(scroll_box.route_mouse_event(
+        &mut ui.objects,
+        &canvas,
+        &layout,
+        wheel(ScrollDirection::Down, positions.right_inner.x + 1)
+      ));
+      assert_eq!(
+        scroll_box.scroll_y(&ui.objects, ui.info_scroll),
+        Some(initial_scroll + 3)
+      );
+      assert!(scroll_box.route_mouse_event(
+        &mut ui.objects,
+        &canvas,
+        &layout,
+        wheel(ScrollDirection::Up, positions.right_inner.x + 1)
+      ));
+      assert_eq!(
+        scroll_box.scroll_y(&ui.objects, ui.info_scroll),
+        Some(initial_scroll)
+      );
+      assert!(!scroll_box.route_mouse_event(
+        &mut ui.objects,
+        &canvas,
+        &layout,
+        wheel(ScrollDirection::Down, positions.left_inner.x + 1)
+      ));
+      commands.clear();
+      for kind in [MouseEventKind::Press, MouseEventKind::Release] {
+        hit_area.route_mouse_event(
+          &mut ui.objects,
+          &mut text_input,
+          &canvas,
+          MouseEvent {
+            kind,
+            button: Some(MouseButton::Right),
+            scroll: None,
+            x: positions.right_inner.x + 1,
+            y: positions.right_inner.y + 1,
+          },
+        );
+        while let Some(event) = ui.objects.pop_event() {
+          commands.extend(ui.handle_event(&event));
+        }
+      }
+      assert_eq!(commands, vec![GameListCommand::Back]);
+    }
+    std::fs::remove_dir_all(root).unwrap();
+  }
 
   #[test]
   fn size_warnings_use_physical_dimensions_and_track_scroll_content_height() {
