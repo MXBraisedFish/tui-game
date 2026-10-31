@@ -44,6 +44,10 @@ fn main() {
         timer.start(id)
       end
       regular = timer.create(0.1, {delay = 0.05, interval = 0, loop = true, ["repeat"] = 2})
+      debug.assert(not debug.pcall(timer.create, 1, {["repeat"] = false}))
+      debug.assert(not debug.pcall(timer.set, regular, {duration = 2, loop = false, ["repeat"] = false}))
+      local unchanged = timer.get_info(regular)
+      debug.assert(unchanged.duration == 0.1 and unchanged.loop and unchanged["repeat"] == 2)
       timer.start(regular)
     end
     function HandleEvent(event)
@@ -62,6 +66,22 @@ fn main() {
         debug.assert(timer.set(regular, {loop = false, tip = "new"}))
         debug.assert(timer.get_info(regular).state == "idle" and timer.get_info(regular).executed_count == 0)
         debug.assert(timer.clear() and timer.count() == 0)
+        infinite_count = {0, 0}
+        local function callback(index)
+          return function(event)
+            debug.assert(event.data.kind == "ticked")
+            infinite_count[index] = infinite_count[index] + 1
+            debug.assert(event.data.executed_count == infinite_count[index])
+          end
+        end
+        local created = timer.create(0, {loop = true, ["repeat"] = math.POSITIVE_INFINITE, callback = callback(1)})
+        local changed = timer.create(0, {loop = true, ["repeat"] = 1, callback = callback(2)})
+        debug.assert(timer.set(changed, {["repeat"] = math.INFINITE}))
+        debug.assert(timer.start(created) and timer.start(changed))
+      end
+      if frame >= 6 then
+        debug.assert(infinite_count[1] == frame - 5 and infinite_count[2] == frame - 5)
+        for _, info in ipairs(timer.list()) do debug.assert(info.state == "running") end
       end
     end
     function Render() end
@@ -94,7 +114,7 @@ fn main() {
         save_best_enabled: false,
       })
       .expect("initialize timer session");
-    for frame in 1..=5 {
+    for frame in 1..=10 {
       let events = session
         .with_objects_mut(|objects| {
           TimeService::new().update(&mut objects.runtime_mut().time, Duration::from_millis(50));
@@ -122,6 +142,6 @@ fn main() {
   }
   assert!(broker.take_overflowed_sessions().is_empty());
   println!(
-    "timer Lua ok: game/screensaver ownership, strict options, callback delivery, 128-event frame budget and cleanup"
+    "timer Lua ok: game/screensaver ownership, strict options, unlimited repetitions, callback delivery, 128-event frame budget and cleanup"
   );
 }

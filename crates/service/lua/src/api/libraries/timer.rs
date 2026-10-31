@@ -197,7 +197,7 @@ fn binding_options(
   binding.looping = args::optional_bool(table, method, "loop", binding.looping)?;
   match table.raw_get::<Value>("repeat")? {
     Value::Nil => {}
-    Value::Boolean(false) => binding.repetitions = None,
+    Value::Number(value) if value == f64::INFINITY => binding.repetitions = None,
     value => {
       let count = args::integer(value, method, "repeat")?;
       binding.repetitions = Some(
@@ -207,7 +207,7 @@ fn binding_options(
           .ok_or_else(|| {
             args::message(
               method,
-              "repeat must be an integer from 1 to 4294967295, or false",
+              "repeat must be an integer from 1 to 4294967295 or positive infinity",
             )
           })?,
       );

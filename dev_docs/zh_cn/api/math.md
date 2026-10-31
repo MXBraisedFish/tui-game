@@ -304,6 +304,7 @@ math.POSITIVE_INFINITE
 
 ### 可用于
 
+- 参数 `repeat`
 - 数学比较
 
 ### 示例

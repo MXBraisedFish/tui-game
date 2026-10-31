@@ -47,14 +47,14 @@ timer.create
 
 #### 选填参数
 
-| 参数名     | 类型                     | 默认值  | 说明                   |
-| ---------- | ------------------------ | ------- | ---------------------- |
-| `delay`    | integer / float          | `0`     | 首次启动延迟时长（秒） |
-| `loop`     | boolean                  | `false` | 是否循环               |
-| `interval` | integer / float          | `0`     | 循环之间间隔时长（秒） |
-| `repeat`   | integer / nil / `false`  | `nil`   | 循环次数               |
-| `callback` | function / nil / `false` | `nil`   | 接收事件的回调函数     |
-| `tip`      | string / nil / `false`   | `nil`   | 随事件返回的自定义信息 |
+| 参数名     | 类型                       | 默认值  | 说明                   |
+| ---------- | -------------------------- | ------- | ---------------------- |
+| `delay`    | integer / float            | `0`     | 首次启动延迟时长（秒） |
+| `loop`     | boolean                    | `false` | 是否循环               |
+| `interval` | integer / float            | `0`     | 循环之间间隔时长（秒） |
+| `repeat`   | integer / const-math / nil | `nil`   | 循环次数               |
+| `callback` | function / nil / `false`   | `nil`   | 接收事件的回调函数     |
+| `tip`      | string / nil / `false`     | `nil`   | 随事件返回的自定义信息 |
 
 ### 返回值
 
@@ -82,7 +82,7 @@ timer.start(id)
 - 必填参数 `duration` 取值范围为 $[0, 18446744073709551616]$；单位秒。
 - 选填参数 `delay` 取值范围为 $[0, 18446744073709551616]$；单位秒。
 - 选填参数 `interval` 取值范围为 $(-\infty, +\infty)$；必须为有限数，单位秒。
-- 选填参数 `repeat` 取值范围为 $[1, 4294967295]$。
+- 选填参数 `repeat` 取值范围为 $[1, 4294967295]$；常量 `math.POSITIVE_INFINITE` 表示无限循环。
 - 创建后状态为 idle。
 
 ---
@@ -340,14 +340,14 @@ end
 ```lua
 true
 {
-  type = "timer", 
+  type = "timer",
   frame = X,    -- 占位符
   sequence = X, -- 占位符
   data = {
     id = X,     -- 占位符
-    kind = "finished", 
-    timer_kind = "timer", 
-    executed_count = 1, 
+    kind = "finished",
+    timer_kind = "timer",
+    executed_count = 1,
     tip = "Get!"
   }
 }
@@ -500,15 +500,15 @@ timer.set
 
 #### 选填参数
 
-| 参数名     | 类型                     | 默认值   | 说明                   |
-| ---------- | ------------------------ | -------- | ---------------------- |
-| `duration` | integer / float          | 保持原值 | 计时时长（秒）         |
-| `delay`    | integer / float          | 保持原值 | 首次启动延迟时长（秒） |
-| `loop`     | boolean                  | 保持原值 | 是否循环               |
-| `interval` | integer / float          | 保持原值 | 循环之间间隔时长（秒） |
-| `repeat`   | integer / nil / `false`  | 保持原值 | 循环次数               |
-| `callback` | function / nil / `false` | 保持原值 | 接收事件的回调函数     |
-| `tip`      | string / nil / `false`   | 保持原值 | 随事件返回的自定义信息 |
+| 参数名     | 类型                       | 默认值   | 说明                   |
+| ---------- | -------------------------- | -------- | ---------------------- |
+| `duration` | integer / float            | 保持原值 | 计时时长（秒）         |
+| `delay`    | integer / float            | 保持原值 | 首次启动延迟时长（秒） |
+| `loop`     | boolean                    | 保持原值 | 是否循环               |
+| `interval` | integer / float            | 保持原值 | 循环之间间隔时长（秒） |
+| `repeat`   | integer / const-math / nil | 保持原值 | 循环次数               |
+| `callback` | function / nil / `false`   | 保持原值 | 接收事件的回调函数     |
+| `tip`      | string / nil / `false`     | 保持原值 | 随事件返回的自定义信息 |
 
 ### 返回值
 
@@ -564,7 +564,7 @@ debug.print(table.pretty(timer.get_info(id)))
 - 必填参数 `duration` 取值范围为 $[0, 18446744073709551616]$；单位秒。
 - 选填参数 `delay` 取值范围为 $[0, 18446744073709551616]$；单位秒。
 - 选填参数 `interval` 取值范围为 $(-\infty, +\infty)$；必须为有限数，单位秒。
-- 选填参数 `repeat` 取值范围为 $[1, 4294967295]$。
+- 选填参数 `repeat` 取值范围为 $[1, 4294967295]$；常量 `math.POSITIVE_INFINITE` 表示无限循环。
 - 修改后计时器状态会强制改为 idle。
 
 ---
@@ -644,6 +644,7 @@ debug.print(table.pretty(timer.get_info(id)))
   tip = nil,          -- string / nil / false（随事件返回的自定义信息）
 }
 ```
+
 ---
 
 ## `exists`

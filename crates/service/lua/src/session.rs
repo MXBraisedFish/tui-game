@@ -3961,7 +3961,10 @@ mod tests {
         debug.assert(fails(function() timer.set(id, {interval = -0.05}) end))
         debug.assert(timer.get_info(id).state == "running" and timer.get_info(id).delay == 0.1)
         debug.assert(timer.get_info(id).interval == 0.05)
-        debug.assert(timer.set(id, {duration = 0.5, ["repeat"] = false, tip = false, callback = false}))
+        debug.assert(fails(function() timer.set(id, {duration = 0.5, loop = false, ["repeat"] = false}) end))
+        info = timer.get_info(id)
+        debug.assert(info.state == "running" and info.duration == 0.25 and info.loop and info["repeat"] == 2)
+        debug.assert(timer.set(id, {duration = 0.5, ["repeat"] = math.INFINITE, tip = false, callback = false}))
         info = timer.get_info(id)
         debug.assert(info.state == "idle" and info.duration == 0.5 and info["repeat"] == nil and info.tip == nil)
         debug.assert(timer.get_info("timer_999") == nil and not timer.exists("timer_999"))
@@ -4014,6 +4017,72 @@ mod tests {
     "##,
     );
     LuaSession::load(spec(&source, LuaSessionKind::Game), LuaPolicy::default()).unwrap();
+  }
+
+  #[test]
+  fn timer_positive_infinity_aliases_allow_unlimited_repetitions_on_create_and_set() {
+    for kind in [LuaSessionKind::Game, LuaSessionKind::Screensaver] {
+      for constant in ["math.POSITIVE_INFINITE", "math.INFINITE"] {
+        let source = valid_script(&r#"
+          function Init(ctx)
+            created_count, changed_count, single_count, finished_count = 0, 0, 0, 0
+            created = timer.create(1, {loop=true, ["repeat"]=UNLIMITED, callback=function(event)
+              created_count = created_count + 1
+              if event.data.kind == "finished" then finished_count = finished_count + 1 end
+            end})
+            changed = timer.create(1, {loop=true, ["repeat"]=2, callback=function(event)
+              debug.assert(event.data.kind == "ticked")
+              changed_count = changed_count + 1
+            end})
+            for _, invalid in ipairs({math.NEGATIVE_INFINITE, 0/0, 0, -1, 2.5, 4294967296, true, false, "infinite"}) do
+              debug.assert(not debug.pcall(timer.create, 1, {["repeat"]=invalid}))
+              debug.assert(not debug.pcall(timer.set, changed, {duration=2, ["repeat"]=invalid}))
+              local info = timer.get_info(changed)
+              debug.assert(info.duration == 1 and info["repeat"] == 2)
+            end
+            debug.assert(timer.set(changed, {["repeat"]=UNLIMITED}))
+            debug.assert(timer.get_info(created)["repeat"] == nil)
+            debug.assert(timer.get_info(changed)["repeat"] == nil)
+            debug.assert(timer.list()[1]["repeat"] == nil and timer.list()[2]["repeat"] == nil)
+            single = timer.create(1, {["repeat"]=UNLIMITED, callback=function(event)
+              debug.assert(event.data.kind == "finished")
+              single_count = single_count + 1
+            end})
+            debug.assert(timer.start(created) and timer.start(changed) and timer.start(single))
+          end
+          function Update(dt)
+            debug.assert(created_count == 5 and changed_count == 5 and single_count == 1 and finished_count == 0)
+            debug.assert(timer.get_info(created).state == "running" and timer.get_info(changed).state == "running")
+            debug.assert(timer.get_info(single).state == "finished")
+            debug.assert(timer.set(created, {["repeat"]=2}) and timer.start(created))
+            debug.assert(timer.set(changed, {["repeat"]=nil}) and timer.start(changed))
+          end
+        "#.replace("UNLIMITED", constant));
+        let mut session = LuaSession::load(spec(&source, kind), LuaPolicy::default()).unwrap();
+        for _ in 0..5 {
+          advance_test_timers(&mut session, Duration::from_secs(1)).unwrap();
+        }
+        session.update().unwrap();
+        for _ in 0..3 {
+          advance_test_timers(&mut session, Duration::from_secs(1)).unwrap();
+        }
+        assert_eq!(
+          session.environment_value("created_count"),
+          Value::Integer(7)
+        );
+        assert_eq!(
+          session.environment_value("changed_count"),
+          Value::Integer(8)
+        );
+        assert_eq!(session.environment_value("single_count"), Value::Integer(1));
+        assert_eq!(
+          session.environment_value("finished_count"),
+          Value::Integer(1)
+        );
+        session.stop();
+        assert!(!session.has_objects());
+      }
+    }
   }
 
   #[test]

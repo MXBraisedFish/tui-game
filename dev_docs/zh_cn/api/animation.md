@@ -46,7 +46,7 @@
 ### 调用
 
 ```lua
-effect.STEP
+animation.STEP
 ```
 
 ### 可用于
@@ -73,12 +73,12 @@ effect.STEP
 
 ## `LINEAR`
 
-步进插值函数。
+线性插值函数。
 
 ### 调用
 
 ```lua
-effect.LINEAR
+animation.LINEAR
 ```
 
 ### 可用于
@@ -98,8 +98,156 @@ effect.LINEAR
 ### 等值
 
 ```text
-"step"
+"linear"
 ```
+
+### 额外说明
+
+- 该插值函数要求传递的起始值和结束值必须可参与数学计算。
+
+---
+
+## `EASE_IN_QUAD`
+
+缓入快出插值函数。
+
+### 调用
+
+```lua
+animation.EASE_IN_QUAD
+```
+
+### 可用于
+
+- 参数 `easing`
+
+### 示例
+
+```lua
+
+```
+
+**输出：**
+
+![widget_animation_EASE_IN_QUAD_example](../image/widget_animation_EASE_IN_QUAD_example.png)
+
+### 等值
+
+```text
+"ease_in_quad"
+```
+
+### 额外说明
+
+- 该插值函数要求传递的起始值和结束值必须可参与数学计算。
+
+---
+
+## `EASE_OUT_QUAD`
+
+快入缓出插值函数。
+
+### 调用
+
+```lua
+animation.EASE_OUT_QUAD
+```
+
+### 可用于
+
+- 参数 `easing`
+
+### 示例
+
+```lua
+
+```
+
+**输出：**
+
+![widget_animation_EASE_OUT_QUAD_example](../image/widget_animation_EASE_OUT_QUAD_example.png)
+
+### 等值
+
+```text
+"ease_out_quad"
+```
+
+### 额外说明
+
+- 该插值函数要求传递的起始值和结束值必须可参与数学计算。
+
+---
+
+## `EASE_IN_OUT_CUBIC`
+
+慢快慢插值函数。
+
+### 调用
+
+```lua
+animation.EASE_IN_OUT_CUBIC
+```
+
+### 可用于
+
+- 参数 `easing`
+
+### 示例
+
+```lua
+
+```
+
+**输出：**
+
+![widget_animation_EASE_IN_OUT_CUBIC_example](../image/widget_animation_EASE_IN_OUT_CUBIC_example.png)
+
+### 等值
+
+```text
+"ease_in_out_cubic"
+```
+
+### 额外说明
+
+- 该插值函数要求传递的起始值和结束值必须可参与数学计算。
+
+---
+
+## `EASE_IN_OUT_REVERSE_CUBIC`
+
+快慢快插值函数。
+
+### 调用
+
+```lua
+animation.EASE_IN_OUT_REVERSE_CUBIC
+```
+
+### 可用于
+
+- 参数 `easing`
+
+### 示例
+
+```lua
+
+```
+
+**输出：**
+
+![widget_animation_EASE_IN_OUT_REVERSE_CUBIC_example](../image/widget_animation_EASE_IN_OUT_REVERSE_CUBIC_example.png)
+
+### 等值
+
+```text
+"ease_in_out_reverse_cubic"
+```
+
+### 额外说明
+
+- 该插值函数要求传递的起始值和结束值必须可参与数学计算。
 
 ---
 
@@ -112,25 +260,29 @@ effect.LINEAR
 ### 调用
 
 ```lua
-effect.create
+animation.create
 ```
 
 ### 参数
 
 #### 必填参数
 
-| 参数名   | 类型    | 说明         |
-| -------- | ------- | ------------ |
-| `width`  | integer | 作用区域宽度 |
-| `height` | integer | 作用区域高度 |
+| 参数名     | 类型                               | 说明           |
+| ---------- | ---------------------------------- | -------------- |
+| `duration` | integer / float                    | 计时时长（秒） |
+| `track`    | table                              | 参数轨道       |
+| `easing`   | table / function / const-animation | 插值函数       |
 
 #### 选填参数
 
-| 参数                   | 类型           | 默认值          | 含义                 |
-| ---------------------- | -------------- | --------------- | -------------------- |
-| `process`              | function / nil | `nil`           | 处理函数             |
-| `scope`                | const-effect   | `effect.CANVAS` | 作用层级             |
-| `include_continuation` | boolean        | `false`         | 占位符是否命中宽字符 |
+| 参数名             | 类型                       | 默认值               | 说明                     |
+| ------------------ | -------------------------- | -------------------- | ------------------------ |
+| `delay`            | integer / float            | `0`                  | 首次启动延迟时长（秒）   |
+| `loop`             | boolean                    | `false`              | 是否循环                 |
+| `interval`         | integer / float            | `0`                  | 循环之间间隔时长（秒）   |
+| `repeat`           | integer / const-math / nil | `nil`                | 循环次数                 |
+| `play_direction`   | const-animation            | `animation.NORMAL`   | 播放方向                 |
+| `repeat_fill_mode` | const-animation            | `animation.FORWARDS` | 重复播放结束后的停止位置 |
 
 ### 返回值
 
@@ -144,7 +296,7 @@ effect.create
 
 ```lua
 function Init(ctx)
-  ef = effect.create(5, 1, {
+  ef = animation.create(5, 1, {
   process = function(char)
     local r, g, b = random.randint({ min = 0, max = 255 }), random.randint({ min = 0, max = 255 }), random.randint({ min = 0, max = 255 })
     char.fg = color.rgb(r, g, b)
@@ -155,7 +307,7 @@ end
 
 function Render()
   draw.text(5, 2, "@@@@@")
-  effect.apply(ef, 5, 2)
+  animation.apply(ef, 5, 2)
 end
 ```
 
@@ -177,7 +329,7 @@ end
 ### 调用
 
 ```lua
-effect.delete
+animation.delete
 ```
 
 ### 参数
@@ -199,12 +351,12 @@ effect.delete
 ### 示例
 
 ```lua
-local ef = effect.create(20, 10)
+local ef = animation.create(20, 10)
 debug.print(ef)
 
-debug.print(effect.delete(ef))
+debug.print(animation.delete(ef))
 
-debug.print(table.pretty(effect.list()))
+debug.print(table.pretty(animation.list()))
 ```
 
 **输出：**
@@ -226,7 +378,7 @@ true
 ### 调用
 
 ```lua
-effect.clear
+animation.clear
 ```
 
 ### 返回值
@@ -240,14 +392,14 @@ effect.clear
 ### 示例
 
 ```lua
-effect.create(20, 10)
-effect.create(30, 8)
-effect.create(40, 6)
-effect.create(50, 4)
+animation.create(20, 10)
+animation.create(30, 8)
+animation.create(40, 6)
+animation.create(50, 4)
 
-debug.print(effect.clear())
+debug.print(animation.clear())
 
-debug.print(table.pretty(effect.list()))
+debug.print(table.pretty(animation.list()))
 ```
 
 **输出：**
@@ -268,7 +420,7 @@ true
 ### 调用
 
 ```lua
-effect.list
+animation.list
 ```
 
 ### 返回值
@@ -282,9 +434,9 @@ effect.list
 ### 示例
 
 ```lua
-local ef = effect.create(20, 10)
+local ef = animation.create(20, 10)
 
-debug.print(table.pretty(effect.list()))
+debug.print(table.pretty(animation.list()))
 ```
 
 **输出：**
@@ -330,7 +482,7 @@ debug.print(table.pretty(effect.list()))
 ### 调用
 
 ```lua
-effect.count
+animation.count
 ```
 
 ### 返回值
@@ -344,10 +496,10 @@ effect.count
 ### 示例
 
 ```lua
-effect.create(20, 10)
-effect.create(30, 8)
+animation.create(20, 10)
+animation.create(30, 8)
 
-debug.print(effect.count())
+debug.print(animation.count())
 ```
 
 **输出：**
@@ -612,7 +764,7 @@ true
 ### 调用
 
 ```lua
-effect.set
+animation.set
 ```
 
 ### 参数
@@ -644,11 +796,11 @@ effect.set
 ### 示例
 
 ```lua
-local ef = effect.create(20, 10)
+local ef = animation.create(20, 10)
 
-debug.print(effect.set(ef, { width = 25, height = 5 }))
+debug.print(animation.set(ef, { width = 25, height = 5 }))
 
-debug.print(table.pretty(effect.get_info(ef)))
+debug.print(table.pretty(animation.get_info(ef)))
 ```
 
 **输出：**
@@ -679,7 +831,7 @@ true
 ### 调用
 
 ```lua
-effect.get_info
+animation.get_info
 ```
 
 ### 参数
@@ -707,9 +859,9 @@ effect.get_info
 ### 示例
 
 ```lua
-local ef = effect.create(20, 10)
+local ef = animation.create(20, 10)
 
-debug.print(table.pretty(effect.get_info(ef)))
+debug.print(table.pretty(animation.get_info(ef)))
 ```
 
 **输出：**
@@ -749,7 +901,7 @@ debug.print(table.pretty(effect.get_info(ef)))
 ### 调用
 
 ```lua
-effect.exists
+animation.exists
 ```
 
 ### 参数
@@ -771,11 +923,11 @@ effect.exists
 ### 示例
 
 ```lua
-local ef = effect.create(20, 10)
-debug.print(effect.exists(ef))
+local ef = animation.create(20, 10)
+debug.print(animation.exists(ef))
 
-effect.delete(ef)
-debug.print(effect.exists(ef))
+animation.delete(ef)
+debug.print(animation.exists(ef))
 ```
 
 **输出：**
