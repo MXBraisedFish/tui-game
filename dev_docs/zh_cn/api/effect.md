@@ -15,18 +15,18 @@
 
 ## 方法
 
-| 方法       | 说明                       | 定位                  |
-| ---------- | -------------------------- | --------------------- |
-| `effect`   | 对一片区域字符着色器       | [effect](#effect)     |
-| `create`   | 创建一个字符着色器对象     | [create](#create)     |
-| `delete`   | 删除指定字符着色器         | [delete](#delete)     |
-| `clear`    | 删除所有字符着色器         | [clear](#clear)       |
-| `list`     | 获取所有字符着色器信息     | [list](#list)         |
-| `count`    | 返回当前字符着色器的总数   | [count](#count)       |
-| `apply`    | 应用字符着色器             | [apply](#apply)       |
-| `set`      | 修改字符着色器的参数       | [set](#set)           |
-| `get_info` | 获取字符着色器的完整信息表 | [get_info](#get_info) |
-| `exists`   | 检查字符着色器是否存在     | [exists](#exists)     |
+| 方法       | 说明                         | 定位                  |
+| ---------- | ---------------------------- | --------------------- |
+| `effect`   | 使用临时字符着色器作用于区域字符 | [effect](#effect)     |
+| `create`   | 创建一个字符着色器对象       | [create](#create)     |
+| `delete`   | 删除指定字符着色器           | [delete](#delete)     |
+| `clear`    | 删除所有字符着色器           | [clear](#clear)       |
+| `list`     | 获取所有字符着色器信息       | [list](#list)         |
+| `count`    | 返回当前字符着色器的总数     | [count](#count)       |
+| `apply`    | 应用字符着色器               | [apply](#apply)       |
+| `set`      | 修改字符着色器的参数         | [set](#set)           |
+| `get_info` | 获取字符着色器的完整信息表   | [get_info](#get_info) |
+| `exists`   | 检查字符着色器是否存在       | [exists](#exists)     |
 
 ---
 
@@ -100,7 +100,7 @@ effect.SLICE
 
 ## `effect`
 
-对一片区域字符着色器。
+使用临时字符着色器作用于区域字符。
 
 ### 调用
 
