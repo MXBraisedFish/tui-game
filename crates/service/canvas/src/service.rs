@@ -1,5 +1,7 @@
 //! Service support for the canvas service.
 
+mod cell_sources;
+
 use std::collections::HashMap;
 
 use super::surface::{
@@ -19,6 +21,8 @@ use tg_service_text_layout::{self as text_layout, DrawTextParams, LayoutLine, Te
 pub struct CanvasService {
   base: CanvasBuffer,
   composed_canvas: Option<CanvasBuffer>,
+  track_cell_sources: bool,
+  source_backgrounds_resolved: bool,
   host: CanvasBuffer,
   top: TopLayer,
   slices: HashMap<SliceId, PreparedSlice>,
@@ -124,6 +128,8 @@ impl CanvasService {
     Self {
       base: CanvasBuffer::new(width, height),
       composed_canvas: None,
+      track_cell_sources: false,
+      source_backgrounds_resolved: false,
       host: CanvasBuffer::new(width, height),
       top: TopLayer::new(width, height),
       slices: HashMap::new(),
@@ -162,6 +168,7 @@ impl CanvasService {
   /// frame.
   pub fn begin_frame(&mut self, layout: &LayoutService) {
     self.composed_canvas = None;
+    self.track_cell_sources = false;
     let physical = layout.physical_size();
     if self.host.width() != physical.width || self.host.height() != physical.height {
       self.host.resize(physical.width, physical.height);
@@ -183,6 +190,7 @@ impl CanvasService {
   /// * `layout` - The service resolving terminal sizes and positions.
   pub fn prepare(&mut self, pool_id: u64, surfaces: Vec<SurfaceFrame>, layout: &LayoutService) {
     self.composed_canvas = None;
+    self.track_cell_sources = false;
     self.viewport = layout.developer_viewport_rect();
     let size = layout.developer_size();
     if self.base.width() != size.width || self.base.height() != size.height {
@@ -352,6 +360,13 @@ impl CanvasService {
         visible: clip.width > 0 && clip.height > 0,
       },
     );
+    if self.track_cell_sources {
+      let slice = self.slices.get_mut(&id).unwrap();
+      slice.buffer.track_surface(
+        crate::CellSurface::Slice(id),
+        (i32::from(slice.source_x), i32::from(slice.source_y)),
+      );
+    }
   }
 
   /// Composite an embedded slice at its physical clip into the supplied parent buffer.
@@ -377,14 +392,19 @@ impl CanvasService {
         }
         let physical_x = i32::from(self.viewport.x) + i32::from(source.rect.x) + i32::from(x);
         let physical_y = i32::from(self.viewport.y) + i32::from(source.rect.y) + i32::from(y);
-        writes.push((physical_x - origin.0, physical_y - origin.1, cell));
+        writes.push((
+          physical_x - origin.0,
+          physical_y - origin.1,
+          cell,
+          source.buffer.cell_source(x, y),
+        ));
       }
     }
-    for (x, y, cell) in writes {
+    for (x, y, cell, source) in writes {
       match parent {
         None => {
           if let (Ok(x), Ok(y)) = (u16::try_from(x), u16::try_from(y)) {
-            self.base.set(x, y, cell);
+            self.base.set_composited(x, y, cell, source);
           }
         }
         Some(parent) => {
@@ -394,7 +414,7 @@ impl CanvasService {
               u16::try_from(y - i32::from(target.source_y)),
             )
           {
-            target.buffer.set(x, y, cell);
+            target.buffer.set_composited(x, y, cell, source);
           }
         }
       }

@@ -50,11 +50,13 @@
 
 pub mod buffer;
 mod cell_effect;
+mod cell_source;
 mod service;
 mod surface;
 mod top_layer;
 
-pub use cell_effect::{CellEffectCell, CellEffectRegion};
+pub use cell_effect::{CellEffectCell, CellEffectChange, CellEffectRegion};
+pub use cell_source::{CellFrameSnapshot, CellSource, CellSurface};
 pub use tg_core_style::CanvasCell;
 
 pub use service::CanvasService;

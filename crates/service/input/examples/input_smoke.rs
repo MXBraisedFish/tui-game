@@ -11,6 +11,7 @@ use tg_service_log::LogService;
 
 fn main() {
   let mut input = InputService::new();
+  assert!(!input.has_confirmed_focus());
   let mut log = LogService::new();
   input.load_key_bindings(vec![
     KeyBinding {
@@ -37,6 +38,7 @@ fn main() {
 
   assert!(input.is_down(Key::A));
   assert!(input.was_pressed(Key::A));
+  assert!(!input.has_confirmed_focus());
   let events = input.collect_action_events();
   assert_eq!(
     events
@@ -67,6 +69,7 @@ fn main() {
       .all(|event| event.state == KeyState::Released)
   );
   assert!(!input.is_down(Key::A));
+  assert!(!input.has_confirmed_focus());
   input.begin_frame();
   input.queue_system_event(SystemEvent::Focus(FocusEvent { gained: true }), &mut log);
   input.queue_key_event(
@@ -78,6 +81,7 @@ fn main() {
   );
   input.poll();
   assert!(!input.is_down(Key::A));
+  assert!(input.has_confirmed_focus());
   input.queue_key_event(
     KeyEvent {
       key: Key::A,

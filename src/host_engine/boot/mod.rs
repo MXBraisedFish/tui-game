@@ -43,6 +43,10 @@ pub fn prepare(deployment_root: PathBuf) -> io::Result<BootOutput> {
         )
       },
     )?;
+    // Capture focus changes throughout package scanning and other potentially slow boot work.
+    services
+      .input
+      .start_system_listener(&mut services.async_runtime);
     prepare_supervised(&mut services)
   });
   Ok(BootOutput::from_boot_result(services, world, result))
@@ -150,9 +154,6 @@ fn prepare_supervised(services: &mut EngineServices) -> Result<(), HostFault> {
   services
     .input
     .start_key_listener(&mut services.async_runtime);
-  services
-    .input
-    .start_system_listener(&mut services.async_runtime);
   services.package.start_watcher(&mut services.async_runtime);
   log_stage_complete(services, BootStage::Listeners);
 

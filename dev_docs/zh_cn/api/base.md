@@ -21,7 +21,7 @@
 | `tonumber`     | 尝试将值转换为数字                                         | [tonumber](#tonumber)         |
 | `tostring`     | 将值转换为字符串                                           | [tostring](#tostring)         |
 | `type`         | 返回值的 Lua 类型名                                        | [type](#type)                 |
-| `setmetatable` | 为表设置或移除元表，或传入 `nil` 移除元表                  | [setmetatable](#setmetatable) |
+| `setmetatable` | 为表设置或移除元表                                         | [setmetatable](#setmetatable) |
 | `getmetatable` | 获取表的元表，或获取它设置的保护值                         | [getmetatable](#getmetatable) |
 
 ---
@@ -669,7 +669,7 @@ type
 
 ## `setmetatable`
 
-为表设置或移除元表，或传入 `nil` 移除元表。
+为表设置或移除元表。
 
 ### 调用
 

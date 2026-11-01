@@ -113,7 +113,147 @@ pub(crate) fn main() {
   coordinates_and_snapshots();
   wide_graphemes_and_styles();
   nested_containers();
+  completed_frame_queries();
+  nested_source_queries();
+  wide_character_queries();
   callback_failures();
+}
+
+fn completed_frame_queries() {
+  for kind in [LuaSessionKind::Game, LuaSessionKind::Screensaver] {
+    let mut harness = Harness::new(
+      r#"
+      function Init(ctx)
+        layer_a, layer_b = slice.create(3,1,{bg=color.BLUE}), slice.create(3,1)
+        layer_blank = slice.create(2,1,{bg=color.RED})
+        rendered = 0
+        debug.assert(effect.chars(0,0,1,1).n == 0)
+        debug.assert(effect.chars(0,0,1,1,{scope=effect.SLICE,slice_layer=layer_a}).n == 0)
+        for _, options in ipairs({{scope="bad"},{include_continuation=1},{scope=effect.SLICE,slice_layer="slice_999"},{unknown=true}}) do
+          debug.assert(not debug.pcall(effect.chars,0,0,1,1,options))
+        end
+        for _, invalid in ipairs({0,-1,65536,1.5,false}) do
+          debug.assert(not debug.pcall(effect.chars,0,0,invalid,1))
+        end
+        debug.assert(not debug.pcall(effect.chars,2147483648,0,1,1))
+      end
+      function Render()
+        rendered = rendered + 1
+        local previous = effect.chars(0,0,1,1)
+        debug.assert(rendered == 1 and previous.n == 0 or rendered == 2 and previous[1].char == "8")
+        slice.draw(layer_blank,8,0)
+        if rendered == 2 then draw.text(0,0,"9"); return end
+        draw.text(0,0,"888",{fg=color.WHITE})
+        draw.text(0,0,"aaa",{fg=color.WHITE,slice_layer=layer_a})
+        draw.text(0,0,"bbb",{fg=color.WHITE,slice_layer=layer_b})
+        slice.draw(layer_a,1,0)
+        slice.draw(layer_b,3,0)
+        effect.effect(0,0,6,1,{process=function(cell)
+          debug.assert(effect.chars(0,0,1,1).n == 0)
+          return {fg=color.GREEN,bg=color.NONE}
+        end})
+      end
+      function Update(dt)
+        local chars = effect.chars(0,0,6,1,{slice_layer="ignored"})
+        debug.assert(chars.n == 6)
+        local blank_canvas = effect.chars(8,0,2,1)
+        local blank_slice = effect.chars(0,0,2,1,{scope=effect.SLICE,slice_layer=layer_blank})
+        for index=1,2 do
+          debug.assert(blank_canvas[index].char == "" and blank_canvas[index].bg == color.RED)
+          debug.assert(blank_slice[index].char == "" and blank_slice[index].bg == color.RED)
+        end
+        if rendered == 2 then
+          debug.assert(chars[1].char == "9" and chars[2].char == "")
+          debug.assert(effect.chars(0,0,3,1,{scope=effect.SLICE,slice_layer=layer_a}).n == 0)
+          return
+        end
+        local text = {"8","a","a","b","b","b"}
+        for index, cell in ipairs(chars) do
+          debug.assert(cell.char == text[index] and cell.x == index-1 and cell.y == 0)
+          debug.assert(cell.fg == color.GREEN and cell.bg == color.NONE)
+          debug.assert(cell.bold == false and cell.italic == false and cell.underline == false and cell.strike == false)
+          debug.assert(cell.blink == false and cell.reverse == false and cell.hidden == false and cell.dim == false)
+          debug.assert(cell.relative_x == nil and cell.relative_y == nil)
+        end
+        local base = effect.chars(0,0,6,1,{scope=effect.SLICE})
+        debug.assert(base.n == 6 and base[1].char == "8" and base[2].char == "8" and base[3].char == "8" and base[4].char == "")
+        debug.assert(base[1].fg == color.GREEN and base[2].fg == color.WHITE and base[3].fg == color.WHITE)
+        local a = effect.chars(0,0,3,1,{scope=effect.SLICE,slice_layer=layer_a})
+        local b = effect.chars(0,0,3,1,{scope=effect.SLICE,slice_layer=layer_b})
+        for index=1,3 do
+          debug.assert(a[index].char == "a" and a[index].x == index-1)
+          debug.assert(a[index].fg == (index <= 2 and color.GREEN or color.WHITE))
+          debug.assert(b[index].char == "b" and b[index].fg == color.GREEN)
+        end
+        debug.assert(a[1].bg == color.NONE and a[2].bg == color.NONE and a[3].bg == color.BLUE)
+        chars[1].char = "changed by caller"
+        debug.assert(effect.chars(0,0,1,1)[1].char == "8")
+        local clipped = effect.chars(-1,0,3,1)
+        debug.assert(clipped.n == 2 and clipped[1].x == 0 and clipped[2].x == 1)
+        debug.assert(effect.chars(2147483647,-2147483648,65535,65535).n == 0)
+      end
+    "#,
+      kind,
+    );
+    for _ in 0..2 {
+      harness.render().unwrap();
+      harness.session.update().unwrap();
+    }
+    harness.session.stop();
+    assert!(!harness.session.has_objects());
+  }
+}
+
+fn nested_source_queries() {
+  let mut harness = Harness::new(
+    r#"
+    function Init(ctx) parent=slice.create(4,2); child=slice.create(3,1) end
+    function Render()
+      draw.text(0,0,"PPPP",{fg=color.WHITE,slice_layer=parent})
+      draw.text(0,0,"ABC",{fg=color.WHITE,slice_layer=child})
+      slice.draw(child,-1,0,{slice_layer=parent})
+      slice.draw(parent,2,1)
+      effect.effect(0,0,2,1,{scope=effect.SLICE,slice_layer=parent,process=function(cell) return {fg=color.RED} end})
+      effect.effect(2,1,1,1,{process=function(cell) return {x=3,char="Z",fg=color.GREEN} end})
+      effect.effect(3,1,1,1,{process=function(cell) return {fg=color.BLUE,bold=true} end})
+    end
+    function Update(dt)
+      local parent_chars=effect.chars(0,0,4,1,{scope=effect.SLICE,slice_layer=parent})
+      for index=1,4 do debug.assert(parent_chars[index].char == "P" and parent_chars[index].fg == color.WHITE) end
+      local child_chars=effect.chars(0,0,3,1,{scope=effect.SLICE,slice_layer=child})
+      debug.assert(child_chars.n == 2 and child_chars[1].x == 1 and child_chars[1].char == "")
+      debug.assert(child_chars[2].x == 2 and child_chars[2].char == "Z" and child_chars[2].fg == color.BLUE and child_chars[2].bold)
+      local final=effect.chars(3,1,1,1)
+      debug.assert(final[1].char == "Z" and final[1].x == 3 and final[1].fg == color.BLUE)
+    end
+  "#,
+    LuaSessionKind::Game,
+  );
+  harness.render().unwrap();
+  harness.session.update().unwrap();
+}
+
+fn wide_character_queries() {
+  let mut harness = Harness::new(
+    r#"
+    function Render()
+      draw.text(2,0,"我́a")
+      effect.effect(2,0,3,1,{process=function(cell) return {fg=color.BLUE} end})
+    end
+    function Update(dt)
+      for _, scope in ipairs({effect.CANVAS,effect.SLICE}) do
+        debug.assert(effect.chars(3,0,1,1,{scope=scope}).n == 0)
+        local wide=effect.chars(3,0,1,1,{scope=scope,include_continuation=true})
+        debug.assert(wide.n == 1 and wide[1].x == 2 and wide[1].char == "我́" and wide[1].fg == color.BLUE)
+        local all=effect.chars(2,0,3,1,{scope=scope,include_continuation=true})
+        debug.assert(all.n == 2 and all[2].x == 4 and all[2].char == "a")
+      end
+    end
+  "#,
+    LuaSessionKind::Game,
+  );
+  harness.render().unwrap();
+  harness.session.update().unwrap();
 }
 
 fn lifecycle_and_identity() {

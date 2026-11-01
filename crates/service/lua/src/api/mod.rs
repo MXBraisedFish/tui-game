@@ -399,6 +399,8 @@ pub(crate) struct LuaApiState {
   pub draw_command_count: usize,
   /// The draw text measured in bytes.
   pub draw_text_bytes: usize,
+  /// The immutable cells from this session's most recently completed rendering frame.
+  pub completed_frame: Option<Rc<tg_service_canvas::CellFrameSnapshot>>,
   /// The ordered loader stack retained by this owner.
   pub loader_stack: Vec<PathBuf>,
   /// The loader source measured in bytes.
@@ -483,6 +485,7 @@ pub(crate) fn build_environment(
     commands: Vec::new(),
     draw_command_count: 0,
     draw_text_bytes: 0,
+    completed_frame: None,
     loader_stack: Vec::new(),
     loader_source_bytes: 0,
     next_file_request_id: 1,

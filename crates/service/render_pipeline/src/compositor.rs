@@ -5,7 +5,37 @@ use tg_core_style::{CanvasCell, TextColor};
 use tg_core_unicode::graphemes;
 use tg_service_canvas::CanvasService;
 use tg_service_canvas::buffer::CanvasBuffer;
-use tg_service_canvas::{PreparedScrollBox, PreparedSurface};
+use tg_service_canvas::{CellSource, CellSurface, PreparedScrollBox, PreparedSurface};
+
+trait CompositionTarget {
+  fn background(&self, x: u16, y: u16) -> Option<Option<TextColor>>;
+  fn write(&mut self, x: u16, y: u16, cell: CanvasCell, source: Option<CellSource>);
+}
+
+impl CompositionTarget for ComposedFrame {
+  fn background(&self, x: u16, y: u16) -> Option<Option<TextColor>> {
+    self.get(x, y).map(|cell| match cell {
+      ComposedCell::Text(cell) => cell.style.background.clone(),
+      ComposedCell::Empty => None,
+    })
+  }
+  fn write(&mut self, x: u16, y: u16, mut cell: CanvasCell, _source: Option<CellSource>) {
+    // Presentation needs a physical space; completed-frame queries retain logical empty text.
+    if cell.text.is_empty() && !cell.is_continuation() {
+      cell.text.push(' ');
+    }
+    self.set(x, y, ComposedCell::Text(cell));
+  }
+}
+
+impl CompositionTarget for CanvasBuffer {
+  fn background(&self, x: u16, y: u16) -> Option<Option<TextColor>> {
+    self.get(x, y).map(|cell| cell.style.background.clone())
+  }
+  fn write(&mut self, x: u16, y: u16, cell: CanvasCell, source: Option<CellSource>) {
+    self.set_composited(x, y, cell, source);
+  }
+}
 
 /// The frame compositor representation used by this module.
 pub struct FrameCompositor;
@@ -70,7 +100,8 @@ impl FrameCompositor {
   /// spaces. Retain the original surfaces for pointer routing and subsequent frame preparation.
   pub fn compose_canvas(&self, canvas: &CanvasService) -> CanvasBuffer {
     let viewport = canvas.viewport();
-    let mut frame = ComposedFrame::new(viewport.width, viewport.height);
+    let mut frame = CanvasBuffer::new(viewport.width, viewport.height);
+    frame.track_cell_sources(CellSurface::Base);
     overlay(&mut frame, canvas.base_buffer(), 0, 0, false);
     for surface in canvas.prepared_surfaces() {
       match surface {
@@ -83,19 +114,17 @@ impl FrameCompositor {
         _ => {}
       }
     }
-    let mut buffer = CanvasBuffer::new(viewport.width, viewport.height);
-    for y in 0..viewport.height {
-      for x in 0..viewport.width {
-        if let Some(ComposedCell::Text(cell)) = frame.get(x, y) {
-          buffer.set(x, y, cell.clone());
-        }
-      }
-    }
-    buffer
+    frame
   }
 }
 
-fn overlay(frame: &mut ComposedFrame, buffer: &CanvasBuffer, ox: u16, oy: u16, opaque: bool) {
+fn overlay(
+  frame: &mut impl CompositionTarget,
+  buffer: &CanvasBuffer,
+  ox: u16,
+  oy: u16,
+  opaque: bool,
+) {
   for y in 0..buffer.height() {
     for x in 0..buffer.width() {
       if !opaque && !buffer.is_written(x, y) {
@@ -106,13 +135,19 @@ fn overlay(frame: &mut ComposedFrame, buffer: &CanvasBuffer, ox: u16, oy: u16, o
       };
       let px = ox.saturating_add(x);
       let py = oy.saturating_add(y);
-      write_cell(frame, px, py, source);
+      if !buffer.is_written(x, y) {
+        let mut empty = source.clone();
+        empty.text.clear();
+        write_cell(frame, px, py, &empty, buffer.cell_source(x, y));
+      } else {
+        write_cell(frame, px, py, source, buffer.cell_source(x, y));
+      }
     }
   }
 }
 
 fn overlay_slice(
-  frame: &mut ComposedFrame,
+  frame: &mut impl CompositionTarget,
   slice: &tg_service_canvas::PreparedSlice,
   ox: u16,
   oy: u16,
@@ -126,15 +161,29 @@ fn overlay_slice(
         continue;
       };
       let mut source = source.clone();
+      if !slice.buffer.is_written(x, y) {
+        source.text.clear();
+      }
       if source.style.background.is_none() {
         source.style.background = slice.background.clone();
       }
-      write_cell(frame, ox.saturating_add(x), oy.saturating_add(y), &source);
+      write_cell(
+        frame,
+        ox.saturating_add(x),
+        oy.saturating_add(y),
+        &source,
+        slice.buffer.cell_source(x, y),
+      );
     }
   }
 }
 
-fn overlay_scroll_box(frame: &mut ComposedFrame, scroll_box: &PreparedScrollBox, ox: u16, oy: u16) {
+fn overlay_scroll_box(
+  frame: &mut impl CompositionTarget,
+  scroll_box: &PreparedScrollBox,
+  ox: u16,
+  oy: u16,
+) {
   let content = scroll_box.layout.content_viewport_rect;
   let x0 = ox.saturating_add(content.x);
   let y0 = oy.saturating_add(content.y);
@@ -150,26 +199,26 @@ fn overlay_scroll_box(frame: &mut ComposedFrame, scroll_box: &PreparedScrollBox,
         continue;
       }
       let Some(source) = scroll_box.buffer.get(sx, sy) else {
-        write_cell(frame, px, py, &CanvasCell::blank());
+        write_cell(frame, px, py, &CanvasCell::blank(), None);
         continue;
       };
       if source.is_continuation() {
         if x == 0 {
           if scroll_box.opaque {
-            write_cell(frame, px, py, &CanvasCell::blank());
+            write_cell(frame, px, py, &CanvasCell::blank(), None);
           }
         } else {
-          write_cell(frame, px, py, source);
+          write_cell(frame, px, py, source, scroll_box.buffer.cell_source(sx, sy));
         }
         continue;
       }
       if is_clipped_wide_cell(source, sx, scroll_box.scroll_x, visible_width) {
         if scroll_box.opaque {
-          write_cell(frame, px, py, &CanvasCell::blank());
+          write_cell(frame, px, py, &CanvasCell::blank(), None);
         }
         continue;
       }
-      write_cell(frame, px, py, source);
+      write_cell(frame, px, py, source, scroll_box.buffer.cell_source(sx, sy));
     }
   }
   draw_horizontal_scrollbar(frame, scroll_box, ox, oy);
@@ -177,7 +226,7 @@ fn overlay_scroll_box(frame: &mut ComposedFrame, scroll_box: &PreparedScrollBox,
 }
 
 fn draw_vertical_scrollbar(
-  frame: &mut ComposedFrame,
+  frame: &mut impl CompositionTarget,
   scroll_box: &PreparedScrollBox,
   ox: u16,
   oy: u16,
@@ -206,12 +255,13 @@ fn draw_vertical_scrollbar(
       ox.saturating_add(track.x),
       oy.saturating_add(cell_y),
       &CanvasCell::styled(ch.to_string(), style),
+      None,
     );
   }
 }
 
 fn draw_horizontal_scrollbar(
-  frame: &mut ComposedFrame,
+  frame: &mut impl CompositionTarget,
   scroll_box: &PreparedScrollBox,
   ox: u16,
   oy: u16,
@@ -240,6 +290,7 @@ fn draw_horizontal_scrollbar(
       ox.saturating_add(cell_x),
       oy.saturating_add(track.y),
       &CanvasCell::styled(ch.to_string(), style),
+      None,
     );
   }
 }
@@ -252,18 +303,21 @@ fn is_clipped_wide_cell(cell: &CanvasCell, sx: u16, scroll_x: u16, visible_width
   width > 1 && sx as usize + width > scroll_x as usize + visible_width as usize
 }
 
-fn write_cell(frame: &mut ComposedFrame, x: u16, y: u16, source: &CanvasCell) {
-  let Some(lower) = frame.get(x, y) else {
+fn write_cell(
+  frame: &mut impl CompositionTarget,
+  x: u16,
+  y: u16,
+  source: &CanvasCell,
+  origin: Option<CellSource>,
+) {
+  let Some(background) = frame.background(x, y) else {
     return;
   };
   let mut cell = source.clone();
   if cell.style.background == Some(TextColor::Transparent) {
-    cell.style.background = match lower {
-      ComposedCell::Text(lower) => lower.style.background.clone(),
-      ComposedCell::Empty => None,
-    };
+    cell.style.background = background;
   }
-  frame.set(x, y, ComposedCell::Text(cell));
+  frame.write(x, y, cell, origin);
 }
 
 #[cfg(test)]

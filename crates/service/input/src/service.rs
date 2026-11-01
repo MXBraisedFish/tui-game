@@ -82,6 +82,7 @@ enum QueuedInput {
   Focus(FocusEvent),
   Text(CommittedTextEvent),
   TerminalKey(TerminalKeyEvent),
+  TerminalActivity,
 }
 
 /// The public entry point for input operations.
@@ -110,6 +111,7 @@ pub struct InputService {
   mouse_held_buttons: HashSet<MouseButton>,
   mouse_position: Option<(u16, u16)>,
   focused: bool,
+  focus_confirmed: bool,
   system_bindings: Vec<KeyBinding>,
   bindings: Vec<KeyBinding>,
   action_map_dispatch_enabled: bool,
@@ -151,6 +153,7 @@ impl InputService {
       mouse_held_buttons: HashSet::new(),
       mouse_position: None,
       focused: true,
+      focus_confirmed: false,
       system_bindings: Vec::new(),
       bindings: Vec::new(),
       action_map_dispatch_enabled: true,
@@ -285,6 +288,11 @@ impl InputService {
     }
     if let SystemEvent::TerminalKey(key) = event {
       let _ = self.sender.send(QueuedInput::TerminalKey(key));
+    }
+    if let SystemEvent::Mouse(mouse) = event
+      && matches!(mouse.kind, MouseEventKind::Press | MouseEventKind::Scroll)
+    {
+      let _ = self.sender.send(QueuedInput::TerminalActivity);
     }
     if self.system_sender.send(event).is_err() {
       log.warn_operation_failed(
@@ -450,6 +458,7 @@ impl InputService {
         QueuedInput::Focus(focus) => self.apply_focus(focus),
         QueuedInput::Text(event) => {
           if self.focused && !event.text.is_empty() {
+            self.focus_confirmed = true;
             self
               .notifications
               .push(InputNotification::Text { text: event.text });
@@ -457,7 +466,13 @@ impl InputService {
         }
         QueuedInput::TerminalKey(key) => {
           if self.focused {
+            self.focus_confirmed = true;
             self.notifications.push(InputNotification::TerminalKey(key));
+          }
+        }
+        QueuedInput::TerminalActivity => {
+          if self.focused {
+            self.focus_confirmed = true;
           }
         }
         QueuedInput::Key(event) => {
@@ -507,6 +522,16 @@ impl InputService {
   /// Report whether this input service is focused.
   pub fn is_focused(&self) -> bool {
     self.focused
+  }
+
+  /// Return whether terminal focus or terminal input has confirmed foreground ownership.
+  ///
+  /// Start unconfirmed because focus reporting may not emit an initial event. Global keyboard
+  /// events and resize events do not establish ownership. Use this check before restricting
+  /// resources such as the system input method; [`Self::is_focused`] retains its optimistic
+  /// initial state for keyboard dispatch compatibility.
+  pub fn has_confirmed_focus(&self) -> bool {
+    self.focused && self.focus_confirmed
   }
 
   /// Drain the raw keyboard events collected while key capture was enabled.
@@ -804,6 +829,7 @@ impl InputService {
   }
 
   fn apply_focus(&mut self, focus: FocusEvent) {
+    self.focus_confirmed = true;
     if self.focused == focus.gained {
       return;
     }
@@ -1278,6 +1304,95 @@ mod tests {
       ),
     ] {
       assert!(committed_text_from_crossterm(event(code, modifiers, kind)).is_none());
+    }
+  }
+
+  #[test]
+  fn foreground_ownership_requires_terminal_evidence_and_survives_frame_cleanup() {
+    let mut input = InputService::new();
+    let mut log = LogService::new();
+    assert!(input.is_focused());
+    assert!(!input.has_confirmed_focus());
+    input.queue_key_event(
+      KeyEvent {
+        key: Key::A,
+        kind: KeyEventKind::Press,
+      },
+      &mut log,
+    );
+    input.queue_system_event(
+      SystemEvent::Resize(ResizeEvent {
+        width: 80,
+        height: 24,
+      }),
+      &mut log,
+    );
+    input.queue_committed_text(CommittedTextEvent {
+      text: String::new(),
+    });
+    input.poll();
+    input.poll_resize_events(|_, _| {});
+    assert!(!input.has_confirmed_focus());
+    // A terminal may report only changes, so its first gained event can match the optimistic state.
+    input.queue_system_event(SystemEvent::Focus(FocusEvent { gained: true }), &mut log);
+    input.poll();
+    assert!(input.has_confirmed_focus());
+    input.begin_frame();
+    input.clear();
+    assert!(input.has_confirmed_focus());
+    input.queue_system_event(SystemEvent::Focus(FocusEvent { gained: false }), &mut log);
+    input.queue_committed_text(CommittedTextEvent {
+      text: "stale".into(),
+    });
+    input.queue_system_event(
+      SystemEvent::Mouse(MouseEvent {
+        kind: MouseEventKind::Press,
+        button: Some(MouseButton::Left),
+        scroll: None,
+        x: 0,
+        y: 0,
+      }),
+      &mut log,
+    );
+    input.poll();
+    input.drain_system_events();
+    input.begin_frame();
+    input.clear();
+    assert!(!input.is_focused());
+    assert!(!input.has_confirmed_focus());
+    input.queue_system_event(SystemEvent::Focus(FocusEvent { gained: true }), &mut log);
+    input.poll();
+    assert!(input.has_confirmed_focus());
+  }
+
+  #[test]
+  fn terminal_input_confirms_initial_focus_when_no_gained_event_is_sent() {
+    for activity in 0..3 {
+      let mut input = InputService::new();
+      let mut log = LogService::new();
+      match activity {
+        0 => input.queue_committed_text(CommittedTextEvent { text: "中".into() }),
+        1 => input.queue_system_event(
+          SystemEvent::TerminalKey(TerminalKeyEvent {
+            code: TerminalKeyCode::Up,
+            ctrl: false,
+            shift: false,
+          }),
+          &mut log,
+        ),
+        _ => input.queue_system_event(
+          SystemEvent::Mouse(MouseEvent {
+            kind: MouseEventKind::Press,
+            button: Some(MouseButton::Left),
+            scroll: None,
+            x: 0,
+            y: 0,
+          }),
+          &mut log,
+        ),
+      }
+      input.poll();
+      assert!(input.has_confirmed_focus());
     }
   }
 

@@ -785,11 +785,12 @@ impl LuaSession {
       ));
     }
     let commands = self.take_draw_commands();
+    canvas.begin_cell_source_tracking();
     if !commands
       .iter()
       .any(|command| matches!(command, LuaDrawCommand::Effect(_)))
     {
-      return self
+      let result = self
         .with_objects_mut(|objects| objects.replay_draw_commands(render, canvas, commands))
         .unwrap_or_else(|| {
           Err(mlua::Error::RuntimeError(
@@ -797,6 +798,10 @@ impl LuaSession {
           ))
         })
         .map_err(|error| self.error(LuaErrorStage::Callback, Some("Effect"), error));
+      if result.is_ok() {
+        self.record_completed_frame(canvas);
+      }
+      return result;
     }
     let steps = self
       .with_objects_mut(|objects| objects.prepare_draw_commands(canvas, commands))
@@ -828,7 +833,8 @@ impl LuaSession {
                 crate::LuaDrawTarget::Slice(id) => Some(id),
               };
               if let Some((buffer, offset)) = canvas.cell_effect_buffer(target) {
-                api::process_effect_buffer(lua, &request, buffer, offset)?;
+                let changes = api::process_effect_buffer(lua, &request, buffer, offset)?;
+                canvas.project_cell_changes(&changes, false);
               }
             }
           } else {
@@ -843,7 +849,8 @@ impl LuaSession {
           let mut buffer =
             tg_service_render_pipeline::FrameCompositor::new().compose_canvas(canvas);
           for request in canvas_effects {
-            api::process_effect_buffer(lua, &request, &mut buffer, (0, 0))?;
+            let changes = api::process_effect_buffer(lua, &request, &mut buffer, (0, 0))?;
+            canvas.project_cell_changes(&changes, true);
           }
           canvas.set_composed_canvas(buffer);
         }
@@ -870,8 +877,20 @@ impl LuaSession {
     };
     if result.is_err() {
       self.mark_faulted();
+    } else {
+      self.record_completed_frame(canvas);
     }
     result
+  }
+
+  fn record_completed_frame(&self, canvas: &mut tg_service_canvas::CanvasService) {
+    let buffer = canvas
+      .composed_canvas()
+      .cloned()
+      .unwrap_or_else(|| tg_service_render_pipeline::FrameCompositor::new().compose_canvas(canvas));
+    let snapshot = canvas.snapshot_cells(&buffer);
+    self.api_state.borrow_mut().completed_frame = Some(Rc::new(snapshot));
+    canvas.set_composed_canvas(buffer);
   }
 
   /// Drain host commands produced by the session callbacks.
@@ -948,6 +967,7 @@ impl LuaSession {
       return;
     }
     self.state = LuaSessionState::Stopped;
+    self.api_state.borrow_mut().completed_frame = None;
     self.api_state.borrow_mut().input = crate::input::LuaInputState::default();
     for (_, callback) in self.event_callbacks.drain() {
       let _ = self.lua.remove_registry_value(callback.key);
@@ -1133,6 +1153,7 @@ impl LuaSession {
 
   fn mark_faulted(&mut self) {
     self.state = LuaSessionState::Faulted;
+    self.api_state.borrow_mut().completed_frame = None;
     self.api_state.borrow_mut().input = crate::input::LuaInputState::default();
     self.objects.take();
   }

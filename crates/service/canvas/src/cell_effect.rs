@@ -3,6 +3,7 @@
 use tg_core_style::CanvasCell;
 use tg_core_unicode::graphemes;
 
+use crate::CellSource;
 use crate::buffer::CanvasBuffer;
 
 /// A signed rectangular selection in buffer coordinates.
@@ -33,6 +34,7 @@ pub struct CellEffectRegion {
 /// * `x`, `y` - The original or destination coordinates.
 /// * `cell` - One grapheme and its style, or empty text for an unwritten cell.
 /// * `written` - Whether the cell contributes to composition.
+/// * `source` - The original owning surface and its current cell coordinates, when tracked.
 #[derive(Clone, Debug)]
 pub struct CellEffectCell {
   /// The original or destination column.
@@ -43,6 +45,22 @@ pub struct CellEffectCell {
   pub cell: CanvasCell,
   /// Whether this cell contributes to surface composition.
   pub written: bool,
+  /// The current position of this character in its original owning surface.
+  pub source: Option<CellSource>,
+}
+
+/// An original shader sample and its optionally clipped transformed write.
+///
+/// # Fields
+///
+/// * `original` - The original cell, including its source identity.
+/// * `output` - The transformed write, or `None` when clipped outside the target buffer.
+#[derive(Clone, Debug)]
+pub struct CellEffectChange {
+  /// The original sample before the shader.
+  pub original: CellEffectCell,
+  /// The transformed sample when it fits within the target buffer.
+  pub output: Option<CellEffectCell>,
 }
 
 impl CanvasBuffer {
@@ -58,8 +76,15 @@ impl CanvasBuffer {
   pub fn transform_region<E>(
     &mut self,
     region: CellEffectRegion,
-    mut process: impl FnMut(CellEffectCell) -> Result<CellEffectCell, E>,
+    process: impl FnMut(CellEffectCell) -> Result<CellEffectCell, E>,
   ) -> Result<(), E> {
+    self
+      .transform_region_with_sources(region, process)
+      .map(|_| ())
+  }
+
+  /// Return selected original graphemes and unwritten cells in row order without mutating them.
+  pub fn select_region(&self, region: CellEffectRegion) -> Vec<CellEffectCell> {
     let start_x = i64::from(region.x).clamp(0, i64::from(self.width())) as u16;
     let start_y = i64::from(region.y).clamp(0, i64::from(self.height())) as u16;
     let end_x =
@@ -97,23 +122,50 @@ impl CanvasBuffer {
           y: i32::from(y),
           cell,
           written,
+          source: self.cell_source(head, y),
         });
       }
     }
+    originals
+  }
+
+  /// Transform selected cells and report source-preserving changes for frame snapshots.
+  ///
+  /// # Errors
+  ///
+  /// Propagate processing errors without changing the buffer.
+  pub fn transform_region_with_sources<E>(
+    &mut self,
+    region: CellEffectRegion,
+    mut process: impl FnMut(CellEffectCell) -> Result<CellEffectCell, E>,
+  ) -> Result<Vec<CellEffectChange>, E> {
+    let originals = self.select_region(region);
     let mut writes = Vec::with_capacity(originals.len());
     for original in &originals {
-      writes.push(process(original.clone())?);
+      let mut output = process(original.clone())?;
+      output.source = original.source.map(|mut source| {
+        source.x = source.x.saturating_add(output.x.saturating_sub(original.x));
+        source.y = source.y.saturating_add(output.y.saturating_sub(original.y));
+        source
+      });
+      writes.push(output);
     }
     for original in &originals {
       self.erase_grapheme(original.x as u16, original.y as u16);
     }
-    for write in writes {
-      self.write_effect_cell(write);
+    let mut changes = Vec::with_capacity(originals.len());
+    for (original, write) in originals.into_iter().zip(writes) {
+      let visible = self.effect_write_fits(&write);
+      self.write_effect_cell(write.clone());
+      changes.push(CellEffectChange {
+        original,
+        output: visible.then_some(write),
+      });
     }
-    Ok(())
+    Ok(changes)
   }
 
-  fn erase_grapheme(&mut self, x: u16, y: u16) {
+  pub(crate) fn erase_grapheme(&mut self, x: u16, y: u16) {
     let Some(cell) = self.get(x, y) else {
       return;
     };
@@ -125,11 +177,11 @@ impl CanvasBuffer {
     }
     let width = self.get(head, y).map_or(1, |cell| cell_width(&cell.text));
     for column in u32::from(head)..(u32::from(head) + width as u32).min(u32::from(self.width())) {
-      self.erase(column as u16, y);
+      self.erase_visual(column as u16, y);
     }
   }
 
-  fn write_effect_cell(&mut self, mut write: CellEffectCell) {
+  pub(crate) fn write_effect_cell(&mut self, write: CellEffectCell) {
     let (Ok(x), Ok(y)) = (u16::try_from(write.x), u16::try_from(write.y)) else {
       return;
     };
@@ -143,14 +195,22 @@ impl CanvasBuffer {
     if !write.written {
       return;
     }
-    // A written empty result needs a physical space to erase previous terminal output.
-    if write.cell.text.is_empty() {
-      write.cell.text.push(' ');
-    }
-    self.set(x, y, write.cell);
+    self.set_composited(x, y, write.cell, write.source);
     for offset in 1..width {
-      self.set(x + offset as u16, y, CanvasCell::continuation());
+      self.set_composited(
+        x + offset as u16,
+        y,
+        CanvasCell::continuation(),
+        write.source,
+      );
     }
+  }
+
+  fn effect_write_fits(&self, write: &CellEffectCell) -> bool {
+    write.x >= 0
+      && write.y >= 0
+      && write.y < i32::from(self.height())
+      && i64::from(write.x) + cell_width(&write.cell.text) as i64 <= i64::from(self.width())
   }
 }
 

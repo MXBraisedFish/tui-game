@@ -1046,17 +1046,27 @@ pub fn run_exception(services: &mut EngineServices, world: &mut RuntimeWorld) ->
 }
 
 fn sync_input_method_policy(world: &RuntimeWorld, services: &mut EngineServices) {
-  let policy = if !services.input.is_focused()
-    || services.text_input.is_active()
-    || (world.state.is_game_mode()
-      && world.state.current_overlay_kind().is_none()
-      && !services.game.input_method_locked())
-  {
+  let unrestricted_game = world.state.is_game_mode()
+    && world.state.current_overlay_kind().is_none()
+    && !services.game.input_method_locked();
+  let policy = input_method_policy(
+    &services.input,
+    services.text_input.is_active(),
+    unrestricted_game,
+  );
+  let _ = services.input_method.borrow_mut().set_policy(policy);
+}
+
+fn input_method_policy(
+  input: &crate::host_engine::services::InputService,
+  text_input_active: bool,
+  unrestricted_game: bool,
+) -> ImPolicy {
+  if !input.has_confirmed_focus() || text_input_active || unrestricted_game {
     ImPolicy::Free
   } else {
     ImPolicy::ForceAscii
-  };
-  let _ = services.input_method.borrow_mut().set_policy(policy);
+  }
 }
 
 fn cursor_when_terminal_focused(
@@ -3942,6 +3952,60 @@ mod tests {
         ..
       }
     ));
+  }
+
+  #[test]
+  fn input_method_stays_free_through_unconfirmed_boot_and_focus_loss() {
+    use crate::host_engine::services::{
+      ImPolicy, InputService, Key, KeyEvent, KeyEventKind, LogService,
+    };
+    use tg_service_input::FocusEvent;
+    let mut input = InputService::new();
+    let mut log = LogService::new();
+    assert_eq!(
+      super::input_method_policy(&input, false, false),
+      ImPolicy::Free
+    );
+    input.queue_key_event(
+      KeyEvent {
+        key: Key::A,
+        kind: KeyEventKind::Press,
+      },
+      &mut log,
+    );
+    input.poll();
+    assert_eq!(
+      super::input_method_policy(&input, false, false),
+      ImPolicy::Free
+    );
+    input.queue_system_event(SystemEvent::Focus(FocusEvent { gained: false }), &mut log);
+    input.poll();
+    input.clear();
+    input.begin_frame();
+    assert_eq!(
+      super::input_method_policy(&input, false, false),
+      ImPolicy::Free
+    );
+    input.queue_system_event(SystemEvent::Focus(FocusEvent { gained: true }), &mut log);
+    input.poll();
+    assert_eq!(
+      super::input_method_policy(&input, false, false),
+      ImPolicy::ForceAscii
+    );
+    assert_eq!(
+      super::input_method_policy(&input, true, false),
+      ImPolicy::Free
+    );
+    assert_eq!(
+      super::input_method_policy(&input, false, true),
+      ImPolicy::Free
+    );
+    input.queue_system_event(SystemEvent::Focus(FocusEvent { gained: false }), &mut log);
+    input.poll();
+    assert_eq!(
+      super::input_method_policy(&input, false, false),
+      ImPolicy::Free
+    );
   }
 
   #[test]

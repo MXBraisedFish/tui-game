@@ -24,6 +24,43 @@ pub(super) fn effect(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
   let source = lua.create_table()?;
   source.raw_set("CANVAS", "canvas")?;
   source.raw_set("SLICE", "slice")?;
+  let chars_state = state.clone();
+  source.raw_set(
+    "chars",
+    lua.create_function(move |lua, values: MultiValue| {
+      let method = "effect.chars";
+      let table = positional_table(
+        lua,
+        method,
+        values,
+        &["x", "y", "width", "height"],
+        &["include_continuation", "scope", "slice_layer"],
+      )?;
+      let region = tg_service_canvas::CellEffectRegion {
+        x: coordinate(&table, method, "x")?,
+        y: coordinate(&table, method, "y")?,
+        width: positive_u16(&table, method, "width")?,
+        height: positive_u16(&table, method, "height")?,
+        include_continuation: args::optional_bool(&table, method, "include_continuation", false)?,
+      };
+      let surface = if scope(&table, method, LuaEffectScope::Canvas)? == LuaEffectScope::Slice {
+        Some(match parse_draw_target(&table, method, &chars_state)? {
+          LuaDrawTarget::Base => tg_service_canvas::CellSurface::Base,
+          LuaDrawTarget::Slice(id) => tg_service_canvas::CellSurface::Slice(id),
+        })
+      } else {
+        None
+      };
+      let snapshot = chars_state.borrow().completed_frame.clone();
+      let result = lua.create_table()?;
+      let cells = snapshot.map_or_else(Vec::new, |snapshot| snapshot.cells(surface, region));
+      result.raw_set("n", cells.len())?;
+      for (index, cell) in cells.iter().enumerate() {
+        result.raw_set(index + 1, process::cell_table(lua, cell, (0, 0))?)?;
+      }
+      Ok(result)
+    })?,
+  )?;
   let create_state = state.clone();
   source.raw_set(
     "create",
@@ -167,14 +204,7 @@ fn configuration(
     Value::Function(function) => binding.process = function,
     value => return Err(args::invalid(method, "process", "function or nil", &value)),
   }
-  binding.scope = match args::optional_string(table, method, "scope", Some(binding.scope.as_str()))?
-    .unwrap()
-    .as_str()
-  {
-    "canvas" => LuaEffectScope::Canvas,
-    "slice" => LuaEffectScope::Slice,
-    _ => return Err(args::message(method, "invalid scope constant")),
-  };
+  binding.scope = scope(table, method, binding.scope)?;
   binding.include_continuation = args::optional_bool(
     table,
     method,
@@ -195,24 +225,36 @@ fn enqueue(
   } else {
     LuaDrawTarget::Base
   };
-  let coordinate = |name| {
-    i32::try_from(args::integer(
-      args::required(table, method, name)?,
-      method,
-      name,
-    )?)
-    .map_err(|_| args::message(method, format!("{name} is out of i32 range")))
-  };
   draw::enqueue_draw(
     state,
     method,
     LuaDrawCommand::Effect(LuaEffectRequest {
       effect,
       target,
-      x: coordinate("x")?,
-      y: coordinate("y")?,
+      x: coordinate(table, method, "x")?,
+      y: coordinate(table, method, "y")?,
     }),
   )
+}
+
+fn scope(table: &Table, method: &str, default: LuaEffectScope) -> mlua::Result<LuaEffectScope> {
+  match args::optional_string(table, method, "scope", Some(default.as_str()))?
+    .unwrap()
+    .as_str()
+  {
+    "canvas" => Ok(LuaEffectScope::Canvas),
+    "slice" => Ok(LuaEffectScope::Slice),
+    _ => Err(args::message(method, "invalid scope constant")),
+  }
+}
+
+fn coordinate(table: &Table, method: &str, name: &str) -> mlua::Result<i32> {
+  i32::try_from(args::integer(
+    args::required(table, method, name)?,
+    method,
+    name,
+  )?)
+  .map_err(|_| args::message(method, format!("{name} is out of i32 range")))
 }
 
 fn table_id(table: &Table, method: &str) -> mlua::Result<u64> {

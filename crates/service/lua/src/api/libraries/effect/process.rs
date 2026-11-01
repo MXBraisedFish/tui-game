@@ -3,7 +3,7 @@
 use super::super::*;
 use crate::LuaEffectRequest;
 use tg_core_style::TextStyle;
-use tg_service_canvas::{CellEffectCell, CellEffectRegion, buffer::CanvasBuffer};
+use tg_service_canvas::{CellEffectCell, CellEffectChange, CellEffectRegion, buffer::CanvasBuffer};
 
 const METHOD: &str = "effect.process";
 const FIELDS: &[&str] = &[
@@ -29,7 +29,7 @@ pub(crate) fn process_buffer(
   request: &LuaEffectRequest,
   buffer: &mut CanvasBuffer,
   offset: (i32, i32),
-) -> mlua::Result<()> {
+) -> mlua::Result<Vec<CellEffectChange>> {
   let region = CellEffectRegion {
     x: request.x.saturating_sub(offset.0),
     y: request.y.saturating_sub(offset.1),
@@ -37,30 +37,13 @@ pub(crate) fn process_buffer(
     height: request.effect.height,
     include_continuation: request.effect.include_continuation,
   };
-  buffer.transform_region(region, |original| {
+  buffer.transform_region_with_sources(region, |original| {
     let x = original.x + offset.0;
     let y = original.y + offset.1;
     let relative_x = i64::from(x) - i64::from(request.x);
     let relative_y = i64::from(y) - i64::from(request.y);
-    let input = lua.create_table()?;
-    input.raw_set("char", original.cell.text.as_str())?;
-    for (name, value) in [
-      ("x", i64::from(x)),
-      ("y", i64::from(y)),
-      ("relative_x", relative_x),
-      ("relative_y", relative_y),
-    ] {
-      input.raw_set(name, value)?;
-    }
-    input.raw_set(
-      "fg",
-      slice::background_name(original.cell.style.foreground.clone()),
-    )?;
-    input.raw_set(
-      "bg",
-      slice::background_name(original.cell.style.background.clone()),
-    )?;
-    for (name, value) in flags(&original.cell.style) {
+    let input = cell_table(lua, &original, offset)?;
+    for (name, value) in [("relative_x", relative_x), ("relative_y", relative_y)] {
       input.raw_set(name, value)?;
     }
     let returned = request.effect.process.call::<Value>(input)?;
@@ -118,8 +101,32 @@ pub(crate) fn process_buffer(
       y: new_y.saturating_sub(offset.1),
       cell,
       written,
+      source: original.source,
     })
   })
+}
+
+pub(super) fn cell_table(
+  lua: &Lua,
+  original: &CellEffectCell,
+  offset: (i32, i32),
+) -> mlua::Result<Table> {
+  let result = lua.create_table()?;
+  result.raw_set("char", original.cell.text.as_str())?;
+  result.raw_set("x", original.x + offset.0)?;
+  result.raw_set("y", original.y + offset.1)?;
+  result.raw_set(
+    "fg",
+    slice::background_name(original.cell.style.foreground.clone()),
+  )?;
+  result.raw_set(
+    "bg",
+    slice::background_name(original.cell.style.background.clone()),
+  )?;
+  for (name, value) in flags(&original.cell.style) {
+    result.raw_set(name, value)?;
+  }
+  Ok(result)
 }
 
 fn position(
