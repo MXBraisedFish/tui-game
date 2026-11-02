@@ -49,6 +49,7 @@
 
 mod easing;
 mod effect;
+mod parameter_track;
 mod pool;
 mod service;
 mod types;
@@ -67,6 +68,9 @@ pub use types::{
   TweenDefinition, UiObjectKind, UiObjectRef, UiPoolId,
 };
 
+pub use parameter_track::{
+  ParameterKeyframe, ParameterSegment, ParameterTrack, ParameterTrackError,
+};
 pub use pool::AnimationObjects;
 
 #[cfg(test)]

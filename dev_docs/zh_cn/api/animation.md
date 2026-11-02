@@ -1,6 +1,6 @@
 # animation 库
 
-`animation` 提供插值轨道引擎。（编辑中）
+`animation` 提供插值轨道引擎。
 
 ---
 
@@ -33,10 +33,10 @@
 | `list`     | 获取所有插值轨道引擎信息         | [list](#list)         |
 | `count`    | 返回当前插值轨道引擎的总数       | [count](#count)       |
 | `sample`   | 获取当前帧插值计算的结果         | [sample](#sample)     |
-| `start`    | 开始或继续插值计算               | [start](#start)       |
+| `play`     | 开始或继续插值计算               | [play](#play)         |
 | `pause`    | 暂停插值计算，保留已经走过的进度 | [pause](#pause)       |
 | `reset`    | 清零插值计算进度，回到未启动状态 | [reset](#reset)       |
-| `restart`  | 清零插值计算进度，然后重新开始   | [restart](#restart)   |
+| `replay`   | 清零插值计算进度，然后重新开始   | [replay](#replay)     |
 | `set`      | 修改插值轨道引擎的参数           | [set](#set)           |
 | `get_info` | 获取插值轨道引擎的完整信息表     | [get_info](#get_info) |
 | `exists`   | 检查插值轨道引擎是否存在         | [exists](#exists)     |
@@ -452,7 +452,7 @@ animation.BACKWARDS
 ### 等值
 
 ```text
-"forwards"
+"backwards"
 ```
 
 ---
@@ -530,7 +530,7 @@ function Init(ctx)
 end
 
 function Render()
-  local pos = math.floor(animation.sample({ key = "pos" }))
+  local pos = math.floor(animation.sample(an, { key = "pos" }))
   draw.text(pos, 1, "@", { fg = color.BRIGHT_BLUE })
 end
 ```
@@ -541,9 +541,11 @@ end
 
 ### 额外说明
 
-- 必填参数 `width` 取值范围为 $[1, 65535]$。
-- 必填参数 `height` 取值范围为 $[1, 65535]$。
-- 选填参数 `repeat_fill_mode` 在选填参数为 `loop` 为 `false` 是恒为 `animation.FORWARDS`，传递 `animation.BACKWARDS` 不会生效。
+- 必填参数 `duration` 取值范围为 $[0, 18446744073709551616]$；单位秒。
+- 选填参数 `delay` 取值范围为 $[0, 18446744073709551616]$；单位秒。
+- 选填参数 `interval` 取值范围为 $[0, 18446744073709551616]$；单位秒。
+- 选填参数 `repeat` 取值范围为 $[1, 4294967295]$；常量 `math.POSITIVE_INFINITE` 表示无限循环。
+- 选填参数 `repeat_fill_mode` 在选填参数为 `loop` 为 `false` 时恒为 `animation.FORWARDS`，传递 `animation.BACKWARDS` 不会生效。
 
 ---
 
@@ -679,7 +681,11 @@ debug.print(table.pretty(animation.list()))
     interval = 0,
     repeat = nil,
     play_direction = "normal",
-    repeat_fill_mode = "forwards"
+    repeat_fill_mode = "forwards",
+    state = "idle",
+    elapsed = 0,
+    executed_count = 0,
+    remaining = 1
   },
   n = 1
 }
@@ -692,19 +698,23 @@ debug.print(table.pretty(animation.list()))
 ```lua
 {
   {
-    id = "animation_001",         -- string（插值轨道引擎 ID）
-    duration = 1,                 -- integer（总时长）
-    track = {},                   -- table（参数轨道）
-    easing = "step",              -- string / table / function（插值函数）
-    default_easing = "step",      -- string / table / function（默认回退插值函数）
-    delay = 0,                    -- integer（首次启动延迟时长）
-    loop = false,                 -- boolean（是否循环）
-    interval = 0,                 -- integer（循环之间间隔时长）
-    repeat = nil,                 -- integer / string / nil（循环次数）
-    play_direction = "normal",    -- string（播放方向）
-    repeat_fill_mode = "forwards" -- string（播放结束后的取值位置）
+    id = "animation_001",          -- string（插值轨道引擎 ID）
+    duration = 1,                  -- integer（总时长）
+    track = {},                    -- table（参数轨道）
+    easing = "step",               -- string / table / function（插值函数）
+    default_easing = "step",       -- string / table / function（默认回退插值函数）
+    delay = 0,                     -- integer（首次启动延迟时长）
+    loop = false,                  -- boolean（是否循环）
+    interval = 0,                  -- integer（循环之间间隔时长）
+    repeat = nil,                  -- integer / string / nil（循环次数）
+    play_direction = "normal",     -- string（播放方向）
+    repeat_fill_mode = "forwards", -- string（播放结束后的取值位置）
+    state = "idle"                 -- string（当前计时器状态）
+    elapsed = 0,                   -- integer（当轮计时已过时长）
+    executed_count = 0,            -- integer（当前计时器已循环次数）
+    remaining = 1,                 -- integer / float（距离下次触发还剩多久）
   },
-  n = 1,                          -- integer（插值轨道引擎数量）
+  n = 1,                           -- integer（插值轨道引擎数量）
 }
 ```
 
@@ -752,7 +762,7 @@ debug.print(animation.count())
 ### 调用
 
 ```lua
-timer.sample
+animation.sample
 ```
 
 ### 参数
@@ -765,60 +775,80 @@ timer.sample
 
 #### 选填参数
 
-| 参数名 | 类型         | 默认值 | 说明               |
-| ------ | ------------ | ------ | ------------------ |
-| `key`  | string / nil | `nil`  | 获取指定的参数插值 |
+| 参数名 | 类型         | 默认值 | 说明                   |
+| ------ | ------------ | ------ | ---------------------- |
+| `key`  | string / nil | `nil`  | 获取指定的参数插值结果 |
 
 ### 返回值
 
 **若未填写选填参数 `key`**，返回一个值。
 
-| 类型 | 说明 |
-| ---- | ---- |
+| 类型   | 说明                                   |
+| ------ | -------------------------------------- |
+| table` | 所有参数在当前帧插值计算后的结果对象表 |
+
+**若填写选填参数 `key`**，返回一个值。
+
+| 类型 | 说明                             |
+| ---- | -------------------------------- |
+| any  | 指定参数在当前帧插值计算后的结果 |
+
+**若轨道无任何定义或指定不存在的键**，返回一个值。
+
+| 类型 | 说明           |
+| ---- | -------------- |
+| nil  | 无插值计算结果 |
 
 ### 示例
 
 ```lua
 function Init(ctx)
-  local id = timer.create(1, { tip = "Get!" })
-  debug.print(timer.start(id))
+  local duration = 3
+  an = animation.create(duration,
+    {
+      [1] = {
+        timestamp = 0,
+        key = {
+          pos = 0
+        }
+      },
+      [2] = {
+        timestamp = duration,
+        key = {
+          pos = 10
+        }
+      }
+    },
+    {
+      easing = animation.EASE_IN_OUT_CUBIC,
+      loop = true,
+      interval = 0.5,
+      play_direction = animation.ALTERNATE
+    }
+  )
+  animation.play(an)
 end
 
-function HandleEvent(event)
-  if event.type == "timer" then
-    debug.print(table.pretty(event))
-  end
+function Render()
+  local pos = math.floor(animation.sample(an, { key = "pos" }))
+  draw.text(pos, 1, "@", { fg = color.BRIGHT_BLUE })
 end
 ```
 
 **输出：**
 
-```lua
-true
-{
-  type = "timer",
-  frame = X,    -- 占位符
-  sequence = X, -- 占位符
-  data = {
-    id = X,     -- 占位符
-    kind = "finished",
-    timer_kind = "timer",
-    executed_count = 1,
-    tip = "Get!"
-  }
-}
-```
+![animation_create_example](../image/animation_create_example.gif)
 
 ---
 
-## `start`
+## `play`
 
 开始或继续插值计算。
 
 ### 调用
 
 ```lua
-timer.start
+animation.play
 ```
 
 ### 参数
@@ -840,34 +870,18 @@ timer.start
 ### 示例
 
 ```lua
-function Init(ctx)
-  local id = timer.create(1, { tip = "Get!" })
-  debug.print(timer.start(id))
-end
-
-function HandleEvent(event)
-  if event.type == "timer" then
-    debug.print(table.pretty(event))
-  end
-end
+local duration = 3
+local an = animation.create(duration, {})
+debug.print(animation.play(an))
+local info = animation.get_info(an)
+debug.print(info.state)
 ```
 
 **输出：**
 
 ```lua
 true
-{
-  type = "timer",
-  frame = X,    -- 占位符
-  sequence = X, -- 占位符
-  data = {
-    id = X,     -- 占位符
-    kind = "finished",
-    timer_kind = "timer",
-    executed_count = 1,
-    tip = "Get!"
-  }
-}
+running
 ```
 
 ---
@@ -879,7 +893,7 @@ true
 ### 调用
 
 ```lua
-timer.pause
+animation.pause
 ```
 
 ### 参数
@@ -901,15 +915,19 @@ timer.pause
 ### 示例
 
 ```lua
-local id = timer.create(1)
-timer.start(id)
-debug.print(timer.pause(id))
+local duration = 3
+local an = animation.create(duration, {})
+animation.play(an)
+debug.print(animation.pause(an))
+local info = animation.get_info(an)
+debug.print(info.state)
 ```
 
 **输出：**
 
 ```lua
 true
+paused
 ```
 
 ---
@@ -921,7 +939,7 @@ true
 ### 调用
 
 ```lua
-timer.reset
+animation.reset
 ```
 
 ### 参数
@@ -943,27 +961,31 @@ timer.reset
 ### 示例
 
 ```lua
-local id = timer.create(1)
-timer.start(id)
-debug.print(timer.reset(id))
+local duration = 3
+local an = animation.create(duration, {})
+animation.play(an)
+debug.print(animation.reset(an))
+local info = animation.get_info(an)
+debug.print(info.state)
 ```
 
 **输出：**
 
 ```lua
 true
+idle
 ```
 
 ---
 
-## `restart`
+## `replay`
 
 清零插值计算进度，然后重新开始。
 
 ### 调用
 
 ```lua
-timer.restart
+animation.replay
 ```
 
 ### 参数
@@ -985,14 +1007,19 @@ timer.restart
 ### 示例
 
 ```lua
-local id = timer.create(1)
-debug.print(timer.restart(id))
+local duration = 3
+local an = animation.create(duration, {})
+animation.play(an)
+debug.print(animation.replay(an))
+local info = animation.get_info(an)
+debug.print(info.state)
 ```
 
 **输出：**
 
 ```lua
 true
+running
 ```
 
 ---
@@ -1017,13 +1044,18 @@ animation.set
 
 #### 选填参数
 
-| 参数                   | 类型           | 默认值   | 含义                 |
-| ---------------------- | -------------- | -------- | -------------------- |
-| `width`                | integer        | 保持原值 | 作用区域宽度         |
-| `height`               | integer        | 保持原值 | 作用区域高度         |
-| `process`              | function / nil | 保持原值 | 处理函数             |
-| `scope`                | const-effect   | 保持原值 | 作用层级             |
-| `include_continuation` | boolean        | 保持原值 | 占位符是否命中宽字符 |
+| 参数名             | 类型                               | 默认值   | 说明                   |
+| ------------------ | ---------------------------------- | -------- | ---------------------- |
+| `duration`         | integer / float                    | 保持原值 | 总时长（秒）           |
+| `track`            | table                              | 保持原值 | 参数轨道               |
+| `easing`           | table / function / const-animation | 保持原值 | 插值函数               |
+| `default_easing`   | table / function / const-animation | 保持原值 | 默认回退插值函数       |
+| `delay`            | integer / float                    | 保持原值 | 首次启动延迟时长（秒） |
+| `loop`             | boolean                            | 保持原值 | 是否循环               |
+| `interval`         | integer / float                    | 保持原值 | 循环之间间隔时长（秒） |
+| `repeat`           | integer / const-math / nil         | 保持原值 | 循环次数               |
+| `play_direction`   | const-animation                    | 保持原值 | 播放方向               |
+| `repeat_fill_mode` | const-animation                    | 保持原值 | 播放结束后的取值位置   |
 
 ### 返回值
 
@@ -1036,11 +1068,11 @@ animation.set
 ### 示例
 
 ```lua
-local ef = animation.create(20, 10)
+local an = animation.create(10, {})
 
-debug.print(animation.set(ef, { width = 25, height = 5 }))
+debug.print(animation.set(an, { duration = 5 }))
 
-debug.print(table.pretty(animation.get_info(ef)))
+debug.print(table.pretty(animation.get_info(an)))
 ```
 
 **输出：**
@@ -1048,19 +1080,31 @@ debug.print(table.pretty(animation.get_info(ef)))
 ```lua
 true
 {
-  id = "effect_001",
-  width = 25,
-  height = 5,
-  process = function,
-  scope = "canvas",
-  include_continuation = false
+  id = "animation_001",
+  duration = 5,
+  track = {},
+  easing = "step",
+  default_easing = "step",
+  delay = 0,
+  loop = false,
+  interval = 0,
+  repeat = nil,
+  play_direction = "normal",
+  repeat_fill_mode = "forwards",
+  state = "idle",
+  elapsed = 0,
+  executed_count = 0,
+  remaining = 1
 }
 ```
 
 ### 额外说明
 
-- 选填参数 `width` 取值范围为 $[1, 65535]$。
-- 选填参数 `height` 取值范围为 $[1, 65535]$。
+- 选填参数 `duration` 取值范围为 $[0, 18446744073709551616]$；单位秒。
+- 选填参数 `delay` 取值范围为 $[0, 18446744073709551616]$；单位秒。
+- 选填参数 `interval` 取值范围为 $[0, 18446744073709551616]$；单位秒。
+- 选填参数 `repeat` 取值范围为 $[1, 4294967295]$；常量 `math.POSITIVE_INFINITE` 表示无限循环。
+- 选填参数 `repeat_fill_mode` 在选填参数为 `loop` 为 `false` 时恒为 `animation.FORWARDS`，传递 `animation.BACKWARDS` 不会生效。
 
 ---
 
@@ -1099,21 +1143,30 @@ animation.get_info
 ### 示例
 
 ```lua
-local ef = animation.create(20, 10)
+local an = animation.create(10, {})
 
-debug.print(table.pretty(animation.get_info(ef)))
+debug.print(table.pretty(animation.get_info(an)))
 ```
 
 **输出：**
 
 ```lua
 {
-  id = "effect_001",
-  width = 20,
-  height = 10,
-  process = function,
-  scope = "canvas",
-  include_continuation = false
+  id = "animation_001",
+  duration = 10,
+  track = {},
+  easing = "step",
+  default_easing = "step",
+  delay = 0,
+  loop = false,
+  interval = 0,
+  repeat = nil,
+  play_direction = "normal",
+  repeat_fill_mode = "forwards",
+  state = "idle",
+  elapsed = 0,
+  executed_count = 0,
+  remaining = 1
 }
 ```
 
@@ -1123,12 +1176,21 @@ debug.print(table.pretty(animation.get_info(ef)))
 
 ```lua
 {
-  id = "effect_001",           -- string（插值轨道引擎 ID）
-  width = 20,                  -- integer（作用区域宽度）
-  height = 10,                 -- integer（作用区域高度）
-  process = function,          -- function（处理函数）
-  scope = "canvas",            -- string（作用层级）
-  include_continuation = false -- boolean（占位符是否命中宽字符）
+  id = "animation_001",          -- string（插值轨道引擎 ID）
+  duration = 10,                  -- integer（总时长）
+  track = {},                    -- table（参数轨道）
+  easing = "step",               -- string / table / function（插值函数）
+  default_easing = "step",       -- string / table / function（默认回退插值函数）
+  delay = 0,                     -- integer（首次启动延迟时长）
+  loop = false,                  -- boolean（是否循环）
+  interval = 0,                  -- integer（循环之间间隔时长）
+  repeat = nil,                  -- integer / string / nil（循环次数）
+  play_direction = "normal",     -- string（播放方向）
+  repeat_fill_mode = "forwards", -- string（播放结束后的取值位置）
+  state = "idle"                 -- string（当前计时器状态）
+  elapsed = 0,                   -- integer（当轮计时已过时长）
+  executed_count = 0,            -- integer（当前计时器已循环次数）
+  remaining = 1,                 -- integer / float（距离下次触发还剩多久）
 }
 ```
 
@@ -1163,11 +1225,11 @@ animation.exists
 ### 示例
 
 ```lua
-local ef = animation.create(20, 10)
-debug.print(animation.exists(ef))
+local an = animation.create(10, {})
+debug.print(animation.exists(an))
 
-animation.delete(ef)
-debug.print(animation.exists(ef))
+animation.delete(an)
+debug.print(animation.exists(an))
 ```
 
 **输出：**

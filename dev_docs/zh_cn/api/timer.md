@@ -81,7 +81,7 @@ timer.start(id)
 
 - 必填参数 `duration` 取值范围为 $[0, 18446744073709551616]$；单位秒。
 - 选填参数 `delay` 取值范围为 $[0, 18446744073709551616]$；单位秒。
-- 选填参数 `interval` 取值范围为 $(-\infty, +\infty)$；必须为有限数，单位秒。
+- 选填参数 `interval` 取值范围为 $[0, 18446744073709551616]$；单位秒。
 - 选填参数 `repeat` 取值范围为 $[1, 4294967295]$；常量 `math.POSITIVE_INFINITE` 表示无限循环。
 - 创建后状态为 idle。
 
@@ -326,6 +326,8 @@ timer.start
 function Init(ctx)
   local id = timer.create(1, { tip = "Get!" })
   debug.print(timer.start(id))
+  local info = timer.get_info(id)
+  debug.print(info.state)
 end
 
 function HandleEvent(event)
@@ -339,6 +341,7 @@ end
 
 ```lua
 true
+running
 {
   type = "timer",
   frame = X,    -- 占位符
@@ -387,12 +390,15 @@ timer.pause
 local id = timer.create(1)
 timer.start(id)
 debug.print(timer.pause(id))
+local info = animation.get_info(id)
+debug.print(info.state)
 ```
 
 **输出：**
 
 ```lua
 true
+pause
 ```
 
 ---
@@ -429,12 +435,15 @@ timer.reset
 local id = timer.create(1)
 timer.start(id)
 debug.print(timer.reset(id))
+local info = animation.get_info(id)
+debug.print(info.state)
 ```
 
 **输出：**
 
 ```lua
 true
+idle
 ```
 
 ---
@@ -469,13 +478,17 @@ timer.restart
 
 ```lua
 local id = timer.create(1)
+timer.start(id)
 debug.print(timer.restart(id))
+local info = animation.get_info(id)
+debug.print(info.state)
 ```
 
 **输出：**
 
 ```lua
 true
+running
 ```
 
 ---
@@ -561,9 +574,9 @@ debug.print(table.pretty(timer.get_info(id)))
 
 ### 额外说明
 
-- 必填参数 `duration` 取值范围为 $[0, 18446744073709551616]$；单位秒。
+- 选填参数 `duration` 取值范围为 $[0, 18446744073709551616]$；单位秒。
 - 选填参数 `delay` 取值范围为 $[0, 18446744073709551616]$；单位秒。
-- 选填参数 `interval` 取值范围为 $(-\infty, +\infty)$；必须为有限数，单位秒。
+- 选填参数 `interval` 取值范围为 $[0, 18446744073709551616]$；单位秒。
 - 选填参数 `repeat` 取值范围为 $[1, 4294967295]$；常量 `math.POSITIVE_INFINITE` 表示无限循环。
 - 修改后计时器状态会强制改为 idle。
 

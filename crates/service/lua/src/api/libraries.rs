@@ -24,6 +24,7 @@ use tg_service_rich_text::TextMode;
 use tg_service_text_layout::{DrawTextParams, TextAlign, TextWrapMode};
 
 mod align;
+mod animation;
 mod base;
 #[path = "libraries/char.rs"]
 mod chars;
@@ -110,6 +111,7 @@ pub fn install(lua: &Lua, environment: &Table, state: SharedApiState) -> mlua::R
   environment.set("random", random::random(lua, state.clone())?)?;
   environment.set("slice", slice::slice(lua, state.clone())?)?;
   environment.set("timer", timer::timer(lua, state.clone())?)?;
+  environment.set("animation", animation::animation(lua, state.clone())?)?;
   environment.set("effect", effect::effect(lua, state.clone())?)?;
   let widget = lua.create_table()?;
   widget.raw_set("hitbox", hitbox::hitbox(lua, state.clone())?)?;

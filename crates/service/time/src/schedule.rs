@@ -148,13 +148,33 @@ impl Schedule {
     }
   }
 
+  fn wait(&self) -> Duration {
+    if self.info.executed_count == 0 {
+      self.info.options.delay
+    } else {
+      self.info.options.gap
+    }
+  }
+
   fn threshold(&self) -> Duration {
-    self.info.options.duration
-      + if self.info.executed_count == 0 {
-        self.info.options.delay
-      } else {
-        self.info.options.gap
-      }
+    self.wait() + self.info.options.duration
+  }
+
+  fn active_state(&self) -> TimerState {
+    if self.info.elapsed >= self.wait() {
+      TimerState::Running
+    } else if self.info.executed_count == 0 {
+      TimerState::Delay
+    } else {
+      TimerState::Interval
+    }
+  }
+
+  fn is_active(&self) -> bool {
+    matches!(
+      self.info.state,
+      TimerState::Delay | TimerState::Running | TimerState::Interval
+    )
   }
 }
 
@@ -234,30 +254,31 @@ impl TimeService {
 
   /// Start an idle schedule, resume a paused one, or reset and start a finished one.
   ///
-  /// Return `false` for a missing or already running schedule.
+  /// Enter the initial delay, active countdown, or repeat interval according to retained progress.
+  /// Return `false` for a missing or already active schedule, including either wait phase.
   pub fn start_scheduled_timer(&self, pool: &mut TimeObjects, id: ScheduledTimerId) -> bool {
     let Some(timer) = pool.scheduled.timers.get_mut(&id) else {
       return false;
     };
-    if timer.info.state == TimerState::Running {
+    if timer.is_active() {
       return false;
     }
     if matches!(timer.info.state, TimerState::Finished | TimerState::Stopped) {
       *timer = Schedule::new(timer.info.options, timer.info.revision.saturating_add(1));
       pool.scheduled.events.retain(|event| event.id != id);
     }
-    timer.info.state = TimerState::Running;
+    timer.info.state = timer.active_state();
     true
   }
 
-  /// Pause a running schedule without discarding its elapsed time.
+  /// Pause a countdown or either wait phase without discarding its elapsed time.
   ///
-  /// Invalidate undelivered events. Return `false` for missing or non-running schedules.
+  /// Invalidate undelivered events. Return `false` for missing or inactive schedules.
   pub fn pause_scheduled_timer(&self, pool: &mut TimeObjects, id: ScheduledTimerId) -> bool {
     let Some(timer) = pool.scheduled.timers.get_mut(&id) else {
       return false;
     };
-    if timer.info.state != TimerState::Running {
+    if !timer.is_active() {
       return false;
     }
     timer.info.state = TimerState::Paused;
@@ -289,13 +310,14 @@ impl TimeService {
 
   pub(crate) fn update_scheduled_timers(&self, pool: &mut TimeObjects, delta: Duration) {
     for (&id, timer) in &mut pool.scheduled.timers {
-      if timer.info.state != TimerState::Running {
+      if !timer.is_active() {
         continue;
       }
       timer.info.elapsed = timer.info.elapsed.saturating_add(delta);
       let threshold = timer.threshold();
       if timer.info.elapsed < threshold {
         timer.info.remaining = threshold - timer.info.elapsed;
+        timer.info.state = timer.active_state();
         continue;
       }
       // Emit at most one execution per update, retaining overrun for subsequent updates.
@@ -314,6 +336,8 @@ impl TimeService {
       if finished {
         timer.info.state = TimerState::Finished;
         timer.info.elapsed = threshold;
+      } else {
+        timer.info.state = timer.active_state();
       }
       pool.scheduled.events.push_back(ScheduledTimerEvent {
         id,
@@ -366,6 +390,80 @@ mod tests {
   }
 
   #[test]
+  fn wait_states_preserve_progress_across_pause_resume_and_reset() {
+    let service = TimeService::new();
+    let mut pool = TimeObjects::new();
+    let id = service
+      .create_scheduled_timer(&mut pool, options())
+      .unwrap();
+    let state = |pool: &TimeObjects| service.scheduled_timer_info(pool, id).unwrap().state;
+
+    assert!(service.start_scheduled_timer(&mut pool, id));
+    assert_eq!(state(&pool), TimerState::Delay);
+    assert!(!service.start_scheduled_timer(&mut pool, id));
+    service.update(&mut pool, Duration::from_secs(1));
+    assert_eq!(state(&pool), TimerState::Delay);
+    let before_pause = service.scheduled_timer_info(&pool, id).unwrap();
+    assert!(service.pause_scheduled_timer(&mut pool, id));
+    assert!(!service.pause_scheduled_timer(&mut pool, id));
+    service.update(&mut pool, Duration::from_secs(100));
+    let paused = service.scheduled_timer_info(&pool, id).unwrap();
+    assert_eq!(paused.state, TimerState::Paused);
+    assert_eq!(paused.elapsed, before_pause.elapsed);
+    assert_eq!(paused.remaining, before_pause.remaining);
+    assert!(service.start_scheduled_timer(&mut pool, id));
+    assert_eq!(state(&pool), TimerState::Delay);
+    service.update(&mut pool, Duration::from_secs(1));
+    assert_eq!(state(&pool), TimerState::Running);
+    assert!(service.pause_scheduled_timer(&mut pool, id));
+    assert!(service.start_scheduled_timer(&mut pool, id));
+    assert_eq!(state(&pool), TimerState::Running);
+    service.update(&mut pool, Duration::from_secs(1));
+    assert_eq!(state(&pool), TimerState::Interval);
+    assert_eq!(service.take_scheduled_timer_events(&mut pool).len(), 1);
+    assert!(!service.start_scheduled_timer(&mut pool, id));
+    service.update(&mut pool, Duration::from_secs(1));
+    assert_eq!(state(&pool), TimerState::Interval);
+    let before_pause = service.scheduled_timer_info(&pool, id).unwrap();
+    assert!(service.pause_scheduled_timer(&mut pool, id));
+    service.update(&mut pool, Duration::from_secs(100));
+    let paused = service.scheduled_timer_info(&pool, id).unwrap();
+    assert_eq!(paused.state, TimerState::Paused);
+    assert_eq!(paused.elapsed, before_pause.elapsed);
+    assert_eq!(paused.remaining, before_pause.remaining);
+    assert!(service.start_scheduled_timer(&mut pool, id));
+    assert_eq!(state(&pool), TimerState::Interval);
+    service.update(&mut pool, Duration::from_secs(3));
+    assert_eq!(state(&pool), TimerState::Running);
+    service.update(&mut pool, Duration::from_secs(1));
+    assert_eq!(state(&pool), TimerState::Finished);
+    assert!(service.start_scheduled_timer(&mut pool, id));
+    assert_eq!(state(&pool), TimerState::Delay);
+    assert!(service.reset_scheduled_timer(&mut pool, id));
+    assert_eq!(state(&pool), TimerState::Idle);
+  }
+
+  #[test]
+  fn long_frames_report_the_phase_after_retained_overrun() {
+    let service = TimeService::new();
+    let mut pool = TimeObjects::new();
+    let id = service
+      .create_scheduled_timer(&mut pool, options())
+      .unwrap();
+    service.start_scheduled_timer(&mut pool, id);
+    service.update(&mut pool, Duration::from_secs(7));
+    let info = service.scheduled_timer_info(&pool, id).unwrap();
+    assert_eq!(info.executed_count, 1);
+    assert_eq!(info.state, TimerState::Running);
+    assert_eq!(info.remaining, Duration::from_secs(1));
+    service.update(&mut pool, Duration::from_secs(1));
+    assert_eq!(
+      service.scheduled_timer_info(&pool, id).unwrap().state,
+      TimerState::Finished
+    );
+  }
+
+  #[test]
   fn invalid_changes_are_atomic_and_reset_invalidates_events() {
     let service = TimeService::new();
     let mut pool = TimeObjects::new();
@@ -410,10 +508,18 @@ mod tests {
       )
       .unwrap();
     service.start_scheduled_timer(&mut pool, zero);
+    assert_eq!(
+      service.scheduled_timer_info(&pool, zero).unwrap().state,
+      TimerState::Running
+    );
     service.update(&mut pool, Duration::from_secs(100));
     assert_eq!(service.take_scheduled_timer_events(&mut pool).len(), 1);
     service.update(&mut pool, Duration::ZERO);
     assert_eq!(service.take_scheduled_timer_events(&mut pool).len(), 1);
+    assert_eq!(
+      service.scheduled_timer_info(&pool, zero).unwrap().state,
+      TimerState::Running
+    );
     let finite = service
       .create_scheduled_timer(
         &mut pool,

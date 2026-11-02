@@ -34,15 +34,17 @@ pub fn prepare(deployment_root: PathBuf) -> io::Result<BootOutput> {
       terminal_profile.color.as_deref(),
       terminal_profile.mouse,
     );
-    with_fault_domain(HostFaultDomain::Terminal, || services.terminal.enter()).map_err(
-      |error| {
-        HostFault::error(
-          HostFaultPhase::Boot,
-          HostFaultDomain::Terminal,
-          format!("failed to enter terminal mode: {error}"),
-        )
-      },
-    )?;
+    with_fault_domain(HostFaultDomain::Terminal, || {
+      services.terminal.enter()?;
+      services.terminal.set_title("Tui Game")
+    })
+    .map_err(|error| {
+      HostFault::error(
+        HostFaultPhase::Boot,
+        HostFaultDomain::Terminal,
+        format!("failed to enter terminal mode: {error}"),
+      )
+    })?;
     // Capture focus changes throughout package scanning and other potentially slow boot work.
     services
       .input

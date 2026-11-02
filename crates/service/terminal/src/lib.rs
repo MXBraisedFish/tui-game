@@ -23,7 +23,7 @@ use crossterm::event::{
 use crossterm::execute;
 
 use crossterm::terminal::{
-  EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode,
+  EnterAlternateScreen, LeaveAlternateScreen, SetTitle, disable_raw_mode, enable_raw_mode,
 };
 
 mod capabilities;
@@ -173,6 +173,20 @@ impl TerminalService {
   /// Return mutable access to the owned writer.
   pub fn writer_mut(&mut self) -> Option<&mut Stdout> {
     self.surface.as_mut().map(|surface| surface.writer())
+  }
+
+  /// Set the active terminal window or tab title.
+  ///
+  /// The terminal emulator controls whether application title changes are displayed.
+  ///
+  /// # Errors
+  ///
+  /// Return [`io::ErrorKind::NotConnected`] before terminal entry, or propagate output failures.
+  pub fn set_title(&mut self, title: &str) -> io::Result<()> {
+    let stdout = self
+      .writer_mut()
+      .ok_or_else(|| io::Error::new(io::ErrorKind::NotConnected, "terminal is not active"))?;
+    execute!(stdout, SetTitle(title))
   }
 
   /// Clear terminal content and move the output cursor to the origin.

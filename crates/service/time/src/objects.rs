@@ -59,13 +59,17 @@ pub enum TimerMode {
   },
 }
 
-/// The stopped, running, paused, or finished timer lifecycle state.
+/// The lifecycle state of a timer, including countdown schedule waits.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TimerState {
   /// The operation is idle.
   Idle,
-  /// The operation is running.
+  /// A countdown schedule is waiting for its initial delay to end.
+  Delay,
+  /// The operation is actively counting time outside a schedule wait.
   Running,
+  /// A countdown schedule is waiting between executions.
+  Interval,
   /// The operation is paused.
   Paused,
   /// The operation is finished.

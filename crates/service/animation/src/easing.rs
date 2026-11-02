@@ -25,6 +25,13 @@ pub(crate) fn sample(easing: AnimationEasing, t: f64) -> f64 {
         1.0 - (-2.0 * t + 2.0).powi(3) / 2.0
       }
     }
+    AnimationEasing::OutInCubic => {
+      if t < 0.5 {
+        0.5 * (1.0 - (1.0 - 2.0 * t).powi(3))
+      } else {
+        0.5 + 0.5 * (2.0 * t - 1.0).powi(3)
+      }
+    }
     AnimationEasing::InSine => 1.0 - (t * std::f64::consts::FRAC_PI_2).cos(),
     AnimationEasing::OutSine => (t * std::f64::consts::FRAC_PI_2).sin(),
     AnimationEasing::InOutSine => (1.0 - (std::f64::consts::PI * t).cos()) / 2.0,
@@ -47,5 +54,12 @@ pub(crate) fn sample(easing: AnimationEasing, t: f64) -> f64 {
         ((2.0 * t - 2.0).powi(2) * ((C2 + 1.0) * (t * 2.0 - 2.0) + C2) + 2.0) / 2.0
       }
     }
+  }
+}
+
+impl AnimationEasing {
+  /// Map normalized progress to an interpolation weight, clamping input to zero through one.
+  pub fn sample(self, progress: f64) -> f64 {
+    sample(self, progress)
   }
 }

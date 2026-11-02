@@ -4,7 +4,9 @@ use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
 use std::rc::{Rc, Weak};
 
+mod animation;
 mod input;
+pub(crate) use animation::LuaAnimationBinding;
 mod link;
 mod markdown;
 mod progressbar;
@@ -98,6 +100,9 @@ pub struct LuaObjectPool {
   runtime: RuntimeObjectPool,
   /// The timer parameters and callbacks retained by this session.
   pub(crate) timers: BTreeMap<ScheduledTimerId, LuaTimerBinding>,
+  /// The parameter animations using schedules separate from the public timer registry.
+  pub(crate) animations: BTreeMap<u64, LuaAnimationBinding>,
+  pub(crate) next_animation_id: u64,
   /// The hitbox configurations indexed by their pool-local native identity.
   pub(crate) hitboxes: BTreeMap<u64, LuaHitboxBinding>,
   /// The script input configurations and presentation options.
@@ -126,6 +131,8 @@ impl LuaObjectPool {
       ui: UiObjectPool::new(),
       runtime: RuntimeObjectPool::new(),
       timers: BTreeMap::new(),
+      animations: BTreeMap::new(),
+      next_animation_id: 0,
       hitboxes: BTreeMap::new(),
       inputs: BTreeMap::new(),
       links: BTreeMap::new(),

@@ -1,4 +1,7 @@
 //! Independent time smoke entry exercising the public API and checking its results.
+//!
+//! Run `cargo run -p tg-service-time --example time_smoke --locked`.
+//! No external resources are required; the async sleep uses a worker thread.
 
 use std::time::{Duration, Instant};
 
@@ -49,13 +52,50 @@ fn main() {
     )
     .expect("valid countdown schedule");
   assert!(time.start_scheduled_timer(&mut objects, scheduled));
-  time.update(&mut objects, Duration::from_millis(15));
+  assert_eq!(
+    time
+      .scheduled_timer_info(&objects, scheduled)
+      .unwrap()
+      .state,
+    TimerState::Delay
+  );
+  time.update(&mut objects, Duration::from_millis(5));
+  assert_eq!(
+    time
+      .scheduled_timer_info(&objects, scheduled)
+      .unwrap()
+      .state,
+    TimerState::Running
+  );
+  time.update(&mut objects, Duration::from_millis(10));
   assert!(!time.take_scheduled_timer_events(&mut objects)[0].finished);
+  assert_eq!(
+    time
+      .scheduled_timer_info(&objects, scheduled)
+      .unwrap()
+      .state,
+    TimerState::Interval
+  );
   assert!(time.pause_scheduled_timer(&mut objects, scheduled));
   time.update(&mut objects, Duration::from_secs(1));
   assert!(time.take_scheduled_timer_events(&mut objects).is_empty());
   assert!(time.start_scheduled_timer(&mut objects, scheduled));
-  time.update(&mut objects, Duration::from_millis(13));
+  assert_eq!(
+    time
+      .scheduled_timer_info(&objects, scheduled)
+      .unwrap()
+      .state,
+    TimerState::Interval
+  );
+  time.update(&mut objects, Duration::from_millis(3));
+  assert_eq!(
+    time
+      .scheduled_timer_info(&objects, scheduled)
+      .unwrap()
+      .state,
+    TimerState::Running
+  );
+  time.update(&mut objects, Duration::from_millis(10));
   assert!(time.take_scheduled_timer_events(&mut objects)[0].finished);
   assert_eq!(
     time

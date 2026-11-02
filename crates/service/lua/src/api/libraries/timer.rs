@@ -292,7 +292,9 @@ fn info_table(
     "state",
     match info.state {
       TimerState::Idle => "idle",
+      TimerState::Delay => "delay",
       TimerState::Running => "running",
+      TimerState::Interval => "interval",
       TimerState::Paused => "paused",
       TimerState::Finished => "finished",
       TimerState::Stopped => "stopped",

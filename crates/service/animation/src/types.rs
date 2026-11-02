@@ -473,6 +473,8 @@ pub enum AnimationEasing {
   OutCubic,
   /// The in out cubic setting for animation easing.
   InOutCubic,
+  /// Ease out through the first half, then ease in through the second half.
+  OutInCubic,
   /// The in sine setting for animation easing.
   InSine,
   /// The out sine setting for animation easing.

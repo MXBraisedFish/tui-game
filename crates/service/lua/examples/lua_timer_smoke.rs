@@ -22,7 +22,7 @@ impl Drop for Deployment {
   }
 }
 
-fn main() {
+pub(crate) fn main() {
   let nonce = SystemTime::now()
     .duration_since(UNIX_EPOCH)
     .expect("system clock")
@@ -49,6 +49,12 @@ fn main() {
       local unchanged = timer.get_info(regular)
       debug.assert(unchanged.duration == 0.1 and unchanged.loop and unchanged["repeat"] == 2)
       timer.start(regular)
+      phased = timer.create(0.05, {delay = 0.05, interval = 0.05, loop = true, ["repeat"] = 2,
+        callback = function(event) end})
+      debug.assert(timer.start(phased) and timer.get_info(phased).state == "delay")
+      debug.assert(not timer.start(phased))
+      debug.assert(timer.pause(phased) and timer.get_info(phased).state == "paused")
+      debug.assert(timer.start(phased) and timer.get_info(phased).state == "delay")
     end
     function HandleEvent(event)
       debug.assert(event.data.id == regular and event.data.executed_count == handled + 1)
@@ -58,6 +64,18 @@ fn main() {
     function Update(dt) end
     function UpdateFrame(dt, alpha)
       frame = frame + 1
+      if frame <= 4 then
+        local expected = ({"running", "interval", "running", "finished"})[frame]
+        debug.assert(timer.get_info(phased).state == expected)
+        for _, info in ipairs(timer.list()) do
+          if info.id == phased then debug.assert(info.state == expected) end
+        end
+        if frame == 2 then
+          debug.assert(not timer.start(phased))
+          debug.assert(timer.pause(phased) and timer.get_info(phased).state == "paused")
+          debug.assert(timer.start(phased) and timer.get_info(phased).state == "interval")
+        end
+      end
       if frame == 1 then debug.assert(count == 128 and handled == 0) end
       if frame == 2 then debug.assert(count == 130 and handled == 0) end
       if frame == 3 or frame == 4 then debug.assert(count == 130 and handled == 1) end
