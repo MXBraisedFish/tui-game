@@ -515,7 +515,7 @@ function Init(ctx)
       [2] = {
         timestamp = duration,
         key = {
-          pos = 10
+          pos = 20
         }
       }
     },
@@ -530,8 +530,9 @@ function Init(ctx)
 end
 
 function Render()
-  local pos = math.floor(animation.sample(an, { key = "pos" }))
+  local pos = math.round(animation.sample(an, { key = "pos" }))
   draw.text(pos, 1, "@", { fg = color.BRIGHT_BLUE })
+  draw.text(0, 2, pos)
 end
 ```
 
@@ -815,7 +816,7 @@ function Init(ctx)
       [2] = {
         timestamp = duration,
         key = {
-          pos = 10
+          pos = 20
         }
       }
     },
@@ -830,8 +831,9 @@ function Init(ctx)
 end
 
 function Render()
-  local pos = math.floor(animation.sample(an, { key = "pos" }))
+  local pos = math.round(animation.sample(an, { key = "pos" }))
   draw.text(pos, 1, "@", { fg = color.BRIGHT_BLUE })
+  draw.text(0, 2, pos)
 end
 ```
 
