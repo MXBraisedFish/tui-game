@@ -39,17 +39,13 @@ pub(super) fn align(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
           "vertical_align"
         };
         let offset_name = if axis == 0 { "offset_x" } else { "offset_y" };
-        let relative_name = if axis == 0 {
-          "relative_x"
-        } else {
-          "relative_y"
-        };
+        let anchor_name = if axis == 0 { "anchor_x" } else { "anchor_y" };
         let parameters = args::positional(
           lua,
           method,
           values,
           &[dimension, align_name],
-          &[offset_name, relative_name, "slice_layer"],
+          &[offset_name, anchor_name, "slice_layer"],
         )?;
         let options = parameters.options();
         let target = parse_draw_target(options, method, &state)?;
@@ -67,7 +63,7 @@ pub(super) fn align(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
           size,
           available,
           &align,
-          args::optional_integer(options, method, relative_name, None)?,
+          args::optional_integer(options, method, anchor_name, None)?,
           offset,
           axis == 0,
         )
@@ -87,8 +83,8 @@ pub(super) fn align(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
         &[
           "offset_x",
           "offset_y",
-          "relative_x",
-          "relative_y",
+          "anchor_x",
+          "anchor_y",
           "slice_layer",
         ],
       )?;
@@ -104,7 +100,7 @@ pub(super) fn align(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
         width,
         target_size.width as i64,
         &horizontal,
-        args::optional_integer(options, method, "relative_x", None)?,
+        args::optional_integer(options, method, "anchor_x", None)?,
         args::optional_integer(options, method, "offset_x", Some(0))?.unwrap(),
         true,
       )?;
@@ -113,7 +109,7 @@ pub(super) fn align(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
         height,
         target_size.height as i64,
         &vertical,
-        args::optional_integer(options, method, "relative_y", None)?,
+        args::optional_integer(options, method, "anchor_y", None)?,
         args::optional_integer(options, method, "offset_y", Some(0))?.unwrap(),
         false,
       )?;
@@ -143,7 +139,7 @@ fn resolve_alignment_axis(
   size: i64,
   available: i64,
   alignment: &str,
-  relative: Option<i64>,
+  anchor_override: Option<i64>,
   offset: i64,
   horizontal: bool,
 ) -> mlua::Result<i64> {
@@ -154,7 +150,7 @@ fn resolve_alignment_axis(
     "vertical_center"
   };
   let end = if horizontal { "right" } else { "bottom" };
-  let anchor = relative.unwrap_or_else(|| match alignment {
+  let anchor = anchor_override.unwrap_or_else(|| match alignment {
     value if value == start => 0,
     value if value == center || value == "center" || value == "auto" => available / 2,
     value if value == end => available,

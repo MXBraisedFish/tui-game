@@ -134,6 +134,7 @@ local function draw_controls(session)
   local options = { max_width = session.viewport_width, horizontal_align = align.CENTER }
   -- The displayed width and height of the text block.
   local w, h = measurement.get_text_size(text, options)
+  if w == 0 or h == 0 then return end
   -- The column and row where the current content is drawn.
   local x, y = align.resolve_rect(w, h, align.CENTER, align.BOTTOM)
   draw.text(x, y, text, options)
@@ -147,7 +148,7 @@ function view.render(session)
   -- The top-left corner of the board frame.
   local stroke_x, stroke_y = align.resolve_rect(width, height, align.CENTER, align.CENTER)
   draw.stroke_rect(stroke_x, stroke_y, width, height,
-    { border_char = char.DOUBLE_LINE, fg = color.BRIGHT_BLUE })
+    { border_chars = char.DOUBLE_LINE, fg = color.BRIGHT_BLUE })
   draw_board(session, stroke_x, stroke_y)
   draw_statistics(session, stroke_x)
   draw_right_panel(session, stroke_x)

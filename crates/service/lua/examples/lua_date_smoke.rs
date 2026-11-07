@@ -40,7 +40,7 @@ fn main() {
         date.timestamp_diff(1000, 999)
       end)))
       debug.assert(type(date.now()) == 'number')
-      debug.assert(type(date.now({time_type = date.DATE})) == 'table')
+      debug.assert(type(date.now({return_type = date.DATETIME})) == 'table')
       debug.assert(not select(1, debug.pcall(function() date.now({unexpected = true}) end)))
     end
     function HandleEvent(event) end

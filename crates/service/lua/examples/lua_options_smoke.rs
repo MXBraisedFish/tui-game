@@ -10,7 +10,10 @@ use std::{
 };
 
 use tg_service_layout::Size;
-use tg_service_lua::{LuaService, LuaSessionKind, LuaSessionSpec};
+use tg_service_lua::{
+  LuaApiConfig, LuaDrawCommand, LuaHostCommand, LuaService, LuaSessionKind, LuaSessionSpec,
+};
+use tg_service_render::BorderStyle;
 
 /// The temporary deployment tree owned by this smoke run.
 struct SmokeDeployment(PathBuf);
@@ -40,6 +43,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     &entry,
     r##"
     function Init(ctx)
+      for _, case in ipairs({
+        {char.LINE,"┌","┐","└","┘"}, {char.BOLD_LINE,"┏","┓","┗","┛"},
+        {char.DOUBLE_LINE,"╔","╗","╚","╝"}, {char.ROUNDED_LINE,"╭","╮","╰","╯"},
+      }) do
+        local border = case[1]
+        debug.assert(border.top_left == case[2] and border.top_right == case[3])
+        debug.assert(border.bottom_left == case[4] and border.bottom_right == case[5])
+        debug.assert(border.left_top == nil and border.right_top == nil and border.left_bottom == nil and border.right_bottom == nil)
+      end
+      debug.print("plain log")
+      debug.print("unset log headers", {title=nil, level=nil})
+      debug.print("configured log", {title="Options", level=debug.INFO, show_time=true, show_session_type=true})
+      for _, options in ipairs({{time=true}, {type_head=true}}) do
+        debug.assert(not debug.pcall(debug.print, "legacy log options", options))
+      end
       debug.assert(tonumber("ff", {base = 16}) == 255)
       local payload = {pos = "data"}
       local list = {"a", "c"}
@@ -84,26 +102,102 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     function HandleEvent(event) end
     function Update(dt) end
     function UpdateFrame(dt, alpha) end
-    function Render() end
+    function Render()
+      draw.text(0,0,"unlimited",{max_width=math.POSITIVE_INFINITE,max_height=math.INFINITE})
+      draw.text(0,1,"default")
+      draw.text(0,2,"f%{value:word}",{rich_params={word="value"},max_width=3,max_height=1})
+      draw.fill_rect(0,3,2,1)
+      draw.stroke_rect(0,4,4,3,{border_chars=char.ROUNDED_LINE})
+      draw.stroke_rect(5,4,4,3,{border_chars={top="T",bottom="B",left="L",right="R",
+        top_left="A",top_right="C",bottom_left="D",bottom_right="E"}})
+      for _, value in ipairs({0,-1,1.5,65536,math.NEGATIVE_INFINITE,0/0,false,"infinite"}) do
+        debug.assert(not debug.pcall(draw.text,0,0,"invalid",{max_width=value}))
+        debug.assert(not debug.pcall(draw.text,0,0,"invalid",{max_height=value}))
+      end
+      debug.assert(not debug.pcall(draw.text,0,0,"invalid",{rich_params=false}))
+      debug.assert(not debug.pcall(draw.stroke_rect,0,0,2,2,{border_char=char.LINE}))
+      for _, value in ipairs({"","ab","我"}) do
+        debug.assert(not debug.pcall(draw.fill_rect,0,0,1,1,{char=value}))
+      end
+    end
     "##,
   )?;
   for session_kind in [LuaSessionKind::Game, LuaSessionKind::Screensaver] {
-    let mut session = LuaService::new().create_session(LuaSessionSpec {
-      package_id: "options_smoke".to_string(),
-      session_kind,
-      entry_path: entry.clone(),
-      fixed_delta: Duration::from_secs_f64(1.0 / 60.0),
-      base_size: Size {
-        width: 80,
-        height: 24,
+    let mut session = LuaService::new().create_session_with_api(
+      LuaSessionSpec {
+        package_id: "options_smoke".to_string(),
+        session_kind,
+        entry_path: entry.clone(),
+        fixed_delta: Duration::from_secs_f64(1.0 / 60.0),
+        base_size: Size {
+          width: 80,
+          height: 24,
+        },
+        continue_data: None,
+        best_data: None,
+        save_game_enabled: false,
+        save_best_enabled: false,
       },
-      continue_data: None,
-      best_data: None,
-      save_game_enabled: false,
-      save_best_enabled: false,
-    })?;
+      LuaApiConfig {
+        debug_enabled: true,
+        ..LuaApiConfig::default()
+      },
+    )?;
+    let commands = session.take_host_commands();
+    for expected in ["plain log", "unset log headers"] {
+      assert!(commands.iter().any(|command| matches!(command,
+        LuaHostCommand::Print {message, title:None, level:None, time:false, type_head:false}
+          if message == expected)));
+    }
+    assert!(commands.iter().any(|command| matches!(command,
+      LuaHostCommand::Print {message, title:Some(title), level:Some(level), time:true, type_head:true}
+        if message == "configured log" && title == "Options" && level == "info")));
     session.update()?;
     session.render()?;
+    let drawings = session.take_draw_commands();
+    assert_eq!(drawings.len(), 6);
+    for command in &drawings[..2] {
+      let LuaDrawCommand::Text { params, .. } = command else {
+        panic!("expected text drawing");
+      };
+      assert!(params.max_width.is_none() && params.max_height.is_none());
+      let rich = params
+        .params
+        .as_ref()
+        .expect("default rich parameter table");
+      assert!(
+        rich.values.is_empty()
+          && rich.key_actions.is_empty()
+          && rich.key_default_actions.is_empty()
+      );
+    }
+    assert!(matches!(&drawings[2], LuaDrawCommand::Text {params,..}
+      if params.max_width == Some(3) && params.max_height == Some(1)
+        && params.params.as_ref().unwrap().values.get("word").map(String::as_str) == Some("value")));
+    assert!(
+      matches!(&drawings[3], LuaDrawCommand::FillRect {fill_char:Some(value),..} if value == " ")
+    );
+    for (command, expected) in drawings[4..]
+      .iter()
+      .zip([['╭', '╮', '╰', '╯'], ['A', 'C', 'D', 'E']])
+    {
+      let LuaDrawCommand::StrokeRect {
+        border: BorderStyle::Custom(border),
+        ..
+      } = command
+      else {
+        panic!("expected custom border drawing");
+      };
+      assert_eq!(
+        [
+          border.left_top.char,
+          border.right_top.char,
+          border.left_bottom.char,
+          border.right_bottom.char
+        ],
+        expected.map(Some)
+      );
+    }
   }
   println!("Lua options ok: game and screensaver calls, payloads, iteration and strict errors");
   Ok(())

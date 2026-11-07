@@ -684,7 +684,7 @@ setmetatable
 | 参数名      | 类型        | 说明                     |
 | ----------- | ----------- | ------------------------ |
 | `table`     | table       | 要设置元表的表           |
-| `metatable` | table / nil | 新元表；`nil` 会移除元表 |
+| `metatable` | table / nil | 新元表；`nil` 为移除元表 |
 
 ### 返回值
 

@@ -83,7 +83,7 @@ function HandleEvent(event)
     local action = event.data.action
     if action == "write_probe" then
       probes = probes + 1
-      debug.print("write probe #" .. probes, { title = "permissions_lab", level = debug.INFO, time = true })
+      debug.print("write probe #" .. probes, { title = "permissions_lab", level = debug.INFO, show_time = true })
       file.write(PROBE_PATH, "probe=" .. probes .. "\n", {
         encoding = file.UTF_8,
         end_of_line = file.LF,
@@ -119,7 +119,7 @@ end
 -- Draw the current package state in terminal-cell coordinates.
 function Render()
   draw.fill_rect(0, 0, width, height, { char = " ", bg = color.BLACK })
-  draw.stroke_rect(0, 0, width, height, { fg = color.BRIGHT_RED, border_char = char.DOUBLE_LINE })
+  draw.stroke_rect(0, 0, width, height, { fg = color.BRIGHT_RED, border_chars = char.DOUBLE_LINE })
   draw.text(2, 1, "Permissions Lab", { fg = color.BRIGHT_RED, bold = true })
   draw.text(2, 3, "Probes requested: " .. probes .. "   Best: " .. best_probes, { fg = color.BRIGHT_YELLOW })
   for line_number = 1, #log_lines do

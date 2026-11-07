@@ -41,27 +41,27 @@ draw.text
 
 #### 选填参数
 
-| 参数名             | 类型                 | 默认值        | 说明                               |
-| ------------------ | -------------------- | ------------- | ---------------------------------- |
-| `fg`               | string / const-color | `color.NONE`  | 前景色                             |
-| `bg`               | string / const-color | `color.NONE`  | 背景色                             |
-| `horizontal_align` | const-align          | `align.LEFT`  | 各行相对于最长显示行的水平对齐方式 |
-| `auto_wrap`        | boolean              | `true`        | 是否自动换行                       |
-| `word_wrap`        | boolean              | `true`        | 是否按完整单词换行                 |
-| `max_width`        | integer / nil        | `nil`         | 最大绘制宽度                       |
-| `max_height`       | integer / nil        | `nil`         | 最大绘制高度                       |
-| `overflow_marker`  | string               | `"..."`       | 文本溢出时使用的省略标记           |
-| `text_mode`        | const-string         | `string.AUTO` | 文本解析模式                       |
-| `rich_params`      | table / nil          | `nil`         | 富文本参数对象表                   |
-| `bold`             | boolean              | `false`       | 粗体                               |
-| `italic`           | boolean              | `false`       | 斜体                               |
-| `underline`        | boolean              | `false`       | 下划线                             |
-| `strike`           | boolean              | `false`       | 删除线                             |
-| `blink`            | boolean              | `false`       | 闪烁                               |
-| `reverse`          | boolean              | `false`       | 反显                               |
-| `hidden`           | boolean              | `false`       | 隐藏                               |
-| `dim`              | boolean              | `false`       | 暗淡                               |
-| `slice_layer`      | string               | `"base"`      | 绘制目标图层切片                   |
+| 参数名             | 类型                 | 默认值                   | 说明                               |
+| ------------------ | -------------------- | ------------------------ | ---------------------------------- |
+| `fg`               | string / const-color | `color.NONE`             | 前景色                             |
+| `bg`               | string / const-color | `color.NONE`             | 背景色                             |
+| `horizontal_align` | const-align          | `align.LEFT`             | 各行相对于最长显示行的水平对齐方式 |
+| `auto_wrap`        | boolean              | `true`                   | 是否自动换行                       |
+| `word_wrap`        | boolean              | `true`                   | 是否按完整单词换行                 |
+| `max_width`        | integer / const-math | `math.POSITIVE_INFINITE` | 最大绘制宽度                       |
+| `max_height`       | integer / const-math | `math.POSITIVE_INFINITE` | 最大绘制高度                       |
+| `overflow_marker`  | string               | `"..."`                  | 文本溢出时使用的省略标记           |
+| `text_mode`        | const-string         | `string.AUTO`            | 文本解析模式                       |
+| `rich_params`      | table                | `{}`                     | 富文本参数对象表                   |
+| `bold`             | boolean              | `false`                  | 粗体                               |
+| `italic`           | boolean              | `false`                  | 斜体                               |
+| `underline`        | boolean              | `false`                  | 下划线                             |
+| `strike`           | boolean              | `false`                  | 删除线                             |
+| `blink`            | boolean              | `false`                  | 闪烁                               |
+| `reverse`          | boolean              | `false`                  | 反显                               |
+| `hidden`           | boolean              | `false`                  | 隐藏                               |
+| `dim`              | boolean              | `false`                  | 暗淡                               |
+| `slice_layer`      | string               | `"base"`                 | 绘制目标图层切片                   |
 
 ### 返回值
 
@@ -83,8 +83,8 @@ draw.text(2, 2, "Hello TUI GAME", { fg = color.WHITE, italic = true })
 - 坐标原点为 $(0, 0)$。
 - 必填参数 `x` 取值范围为 $[-2147483648, 2147483647]$。
 - 必填参数 `y` 取值范围为 $[-2147483648, 2147483647]$。
-- 选填参数 `max_width` 取值范围为 $[1, 65535]$。
-- 选填参数 `max_height` 取值范围为 $[1, 65535]$。
+- 选填参数 `max_width` 取值范围为 $[1, 65535] \cup \{+\infty\}$。
+- 选填参数 `max_height` 取值范围为 $[1, 65535] \cup \{+\infty\}$。
 
 ---
 
@@ -113,7 +113,7 @@ draw.fill_rect
 
 | 参数名        | 类型                 | 默认值       | 说明             |
 | ------------- | -------------------- | ------------ | ---------------- |
-| `char`        | string / nil         | `nil`        | 填充字符         |
+| `char`        | string               | `" "`         | 填充字符         |
 | `fg`          | string / const-color | `color.NONE` | 前景色           |
 | `bg`          | string / const-color | `color.NONE` | 背景色           |
 | `slice_layer` | string               | `"base"`     | 绘制目标图层切片 |
@@ -171,7 +171,7 @@ draw.stroke_rect
 | ------------- | -------------------- | ------------ | ---------------- |
 | `fg`          | string / const-color | `color.NONE` | 边框前景色       |
 | `bg`          | string / const-color | `color.NONE` | 边框背景色       |
-| `border_char` | table / const-char   | `char.LINE`  | 边框字符对象表   |
+| `border_chars` | table / const-char   | `char.LINE`  | 边框字符对象表   |
 | `slice_layer` | string               | `"base"`     | 绘制目标图层切片 |
 
 ### 返回值
@@ -183,17 +183,17 @@ draw.stroke_rect
 ```lua
 local custom_border = {
   top = "-",
-  left_top = "+",
+  top_left = "+",
   left = "|",
-  left_bottom = "+",
+  bottom_left = "+",
   bottom = "-",
-  right_bottom = "+",
+  bottom_right = "+",
   right = "|",
-  right_top = "+",
+  top_right = "+",
 }
 
-draw.stroke_rect(2, 1, 12, 5, { fg = color.WHITE, border_char = char.ROUNDED_LINE })
-draw.stroke_rect(15, 1, 12, 5, { fg = color.YELLOW, border_char = custom_border })
+draw.stroke_rect(2, 1, 12, 5, { fg = color.WHITE, border_chars = char.ROUNDED_LINE })
+draw.stroke_rect(15, 1, 12, 5, { fg = color.YELLOW, border_chars = custom_border })
 ```
 
 **输出：**
@@ -202,22 +202,22 @@ draw.stroke_rect(15, 1, 12, 5, { fg = color.YELLOW, border_char = custom_border 
 
 ### 额外说明
 
-- 选填参数 `border_char` 对象表结构：
+- 选填参数 `border_chars` 对象表结构：
 
 ```lua
 {
   top = "─",          -- string / const-char（上边框字符）
-  left_top = "┌",     -- string / const-char（左上角字符）
+  top_left = "┌",     -- string / const-char（左上角字符）
   left = "│",         -- string / const-char（左边框字符）
-  left_bottom = "└",  -- string / const-char（左下角字符）
+  bottom_left = "└",  -- string / const-char（左下角字符）
   bottom = "─",       -- string / const-char（下边框字符）
-  right_bottom = "┘", -- string / const-char（右下角字符）
+  bottom_right = "┘", -- string / const-char（右下角字符）
   right = "│",        -- string / const-char（右边框字符）
-  right_top = "┐",    -- string / const-char（右上角字符）
+  top_right = "┐",    -- string / const-char（右上角字符）
 }
 ```
 
-- 选填参数 `border_char` 填写时每个字段必须宽度为 `1` 的字符。
+- 选填参数 `border_chars` 填写时每个字段必须宽度为 `1` 的字符。
 - 坐标原点为 $(0, 0)$。
 - 必填参数 `x` 取值范围为 $[-2147483648, 2147483647]$。
 - 必填参数 `y` 取值范围为 $[-2147483648, 2147483647]$。

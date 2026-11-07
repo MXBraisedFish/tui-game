@@ -37,12 +37,12 @@ char.LINE
 
 ### 可用于
 
-- 参数 `border_char`
+- 参数 `border_chars`
 
 ### 示例
 
 ```lua
-draw.stroke_rect(15, 1, 12, 5, { border_char = char.LINE })
+draw.stroke_rect(15, 1, 12, 5, { border_chars = char.LINE })
 ```
 
 **输出：**
@@ -54,13 +54,13 @@ draw.stroke_rect(15, 1, 12, 5, { border_char = char.LINE })
 ```lua
 {
   top = "─",
-  left_top = "┌",
+  top_left = "┌",
   left = "│",
-  left_bottom = "└",
+  bottom_left = "└",
   bottom = "─",
-  right_bottom = "┘",
+  bottom_right = "┘",
   right = "│",
-  right_top = "┐",
+  top_right = "┐",
   t_left = "├",
   t_bottom = "┴",
   t_right = "┤",
@@ -83,12 +83,12 @@ char.BOLD_LINE
 
 ### 可用于
 
-- 参数 `border_char`
+- 参数 `border_chars`
 
 ### 示例
 
 ```lua
-draw.stroke_rect(15, 1, 12, 5, { border_char = char.BOLD_LINE })
+draw.stroke_rect(15, 1, 12, 5, { border_chars = char.BOLD_LINE })
 ```
 
 **输出：**
@@ -100,13 +100,13 @@ draw.stroke_rect(15, 1, 12, 5, { border_char = char.BOLD_LINE })
 ```lua
 {
   top = "━",
-  left_top = "┏",
+  top_left = "┏",
   left = "┃",
-  left_bottom = "┗",
+  bottom_left = "┗",
   bottom = "━",
-  right_bottom = "┛",
+  bottom_right = "┛",
   right = "┃",
-  right_top = "┓",
+  top_right = "┓",
   t_left = "┣",
   t_bottom = "┻",
   t_right = "┫",
@@ -129,12 +129,12 @@ char.DOUBLE_LINE
 
 ### 可用于
 
-- 参数 `border_char`
+- 参数 `border_chars`
 
 ### 示例
 
 ```lua
-draw.stroke_rect(15, 1, 12, 5, { border_char = char.DOUBLE_LINE })
+draw.stroke_rect(15, 1, 12, 5, { border_chars = char.DOUBLE_LINE })
 ```
 
 **输出：**
@@ -146,13 +146,13 @@ draw.stroke_rect(15, 1, 12, 5, { border_char = char.DOUBLE_LINE })
 ```lua
 {
   top = "═",
-  left_top = "╔",
+  top_left = "╔",
   left = "║",
-  left_bottom = "╚",
+  bottom_left = "╚",
   bottom = "═",
-  right_bottom = "╝",
+  bottom_right = "╝",
   right = "║",
-  right_top = "╗",
+  top_right = "╗",
   t_left = "╠",
   t_bottom = "╩",
   t_right = "╣",
@@ -175,12 +175,12 @@ char.ROUNDED_LINE
 
 ### 可用于
 
-- 参数 `border_char`
+- 参数 `border_chars`
 
 ### 示例
 
 ```lua
-draw.stroke_rect(15, 1, 12, 5, { border_char = char.ROUNDED_LINE })
+draw.stroke_rect(15, 1, 12, 5, { border_chars = char.ROUNDED_LINE })
 ```
 
 **输出：**
@@ -192,13 +192,13 @@ draw.stroke_rect(15, 1, 12, 5, { border_char = char.ROUNDED_LINE })
 ```lua
 {
   top = "─",
-  left_top = "╭",
+  top_left = "╭",
   left = "│",
-  left_bottom = "╰",
+  bottom_left = "╰",
   bottom = "─",
-  right_bottom = "╯",
+  bottom_right = "╯",
   right = "│",
-  right_top = "╮",
+  top_right = "╮",
   t_left = "├",
   t_bottom = "┴",
   t_right = "┤",

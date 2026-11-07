@@ -47,7 +47,7 @@ pub(super) fn debug(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
             method,
             values,
             &["message"],
-            &["title", "level", "time", "type_head"],
+            &["title", "level", "show_time", "show_session_type"],
           )?;
           let table = parameters.options();
           let message = args::dynamic_text(
@@ -56,8 +56,8 @@ pub(super) fn debug(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
             "message",
           )?;
           let title = args::optional_dynamic_text(table, method, "title", None)?;
-          let time = args::optional_bool(table, method, "time", false)?;
-          let type_head = args::optional_bool(table, method, "type_head", false)?;
+          let show_time = args::optional_bool(table, method, "show_time", false)?;
+          let show_session_type = args::optional_bool(table, method, "show_session_type", false)?;
           let level = args::optional_string(table, method, "level", None)?;
           let level = level
             .map(|level| level.to_ascii_lowercase())
@@ -65,7 +65,7 @@ pub(super) fn debug(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
               "trace" | "debug" | "info" | "warn" | "error" | "fatal" => Ok(level),
               _ => Err(args::message(
                 method,
-                "level must be trace, debug, info, warn, error, fatal, or nil",
+                "level must be trace, debug, info, warn, error, or fatal",
               )),
             })
             .transpose()?;
@@ -73,9 +73,9 @@ pub(super) fn debug(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
             &mut state.borrow_mut(),
             message,
             title,
-            time,
+            show_time,
             level,
-            type_head,
+            show_session_type,
           );
         } else {
           let parameters = args::positional(lua, method, values, &["message"], &[])?;

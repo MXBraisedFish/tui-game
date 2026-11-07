@@ -21,13 +21,13 @@ pub(crate) struct LuaAnimationBinding {
   /// The optional total cycle limit.
   pub repetitions: Option<u32>,
   /// The sorted, normalized parameter tracks retained across callbacks.
-  pub track: Rc<ParameterTrack<Value>>,
+  pub keyframes: Rc<ParameterTrack<Value>>,
   /// The validated easing selector, copied independently of the caller's tables.
   pub easing: Value,
   /// The validated fallback selector.
-  pub default_easing: Value,
+  pub callback_easing: Value,
   /// The configured playback direction.
   pub direction: String,
   /// The configured value retained between repeated cycles.
-  pub fill: String,
+  pub fill_mode: String,
 }

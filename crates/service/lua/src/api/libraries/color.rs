@@ -39,21 +39,19 @@ pub(super) fn color(lua: &Lua) -> mlua::Result<Table> {
       name,
       lua.create_function(move |lua, values: MultiValue| {
         let method = if hex { "color.hex" } else { "color.rgb" };
-        let parsed = args::positional(lua, method, values, &["r", "g", "b"], &[])?;
-        let channel = |n| -> mlua::Result<u8> {
-          let index = match n {
-            "r" => 0,
-            "g" => 1,
-            _ => 2,
-          };
-          let v = args::integer(parsed.required(index, method, n)?, method, n)?;
-          u8::try_from(v).map_err(|_| args::message(method, format!("{n} must be in 0..=255")))
+        let parsed = args::positional(lua, method, values, &["red", "green", "blue"], &[])?;
+        let channel = |index, name| -> mlua::Result<u8> {
+          let value = args::integer(parsed.required(index, method, name)?, method, name)?;
+          u8::try_from(value)
+            .map_err(|_| args::message(method, format!("{name} must be in 0..=255")))
         };
-        let (r, g, b) = (channel("r")?, channel("g")?, channel("b")?);
+        let red = channel(0, "red")?;
+        let green = channel(1, "green")?;
+        let blue = channel(2, "blue")?;
         Ok(if hex {
-          format!("#{r:02x}{g:02x}{b:02x}")
+          format!("#{red:02x}{green:02x}{blue:02x}")
         } else {
-          format!("rgb({r},{g},{b})")
+          format!("rgb({red},{green},{blue})")
         })
       })?,
     )?;

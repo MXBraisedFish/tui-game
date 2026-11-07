@@ -304,12 +304,12 @@ debug.print
 
 #### 选填参数
 
-| 参数名      | 类型              | 默认值  | 说明             |
-| ----------- | ----------------- | ------- | ---------------- |
-| `title`     | string / nil      | `nil`   | 日志标题         |
-| `level`     | const-debug / nil | `nil`   | 日志等级         |
-| `time`      | boolean           | `false` | 是否显示时间     |
-| `type_head` | boolean           | `false` | 是否显示会话类型 |
+| 参数名      | 类型        | 默认值  | 说明             |
+| ----------- | ----------- | ------- | ---------------- |
+| `title`     | string      | 无      | 日志标题         |
+| `level`     | const-debug | 无      | 日志等级         |
+| `show_time`      | boolean     | `false` | 是否显示时间     |
+| `show_session_type` | boolean     | `false` | 是否显示会话类型 |
 
 ### 返回值
 
@@ -320,7 +320,7 @@ debug.print
 ```lua
 debug.print("A message")
 debug.print("A warning", { level = debug.WARN })
-debug.print("A titled message", { title = "Game", time = true, type_head = true })
+debug.print("A titled message", { title = "Game", show_time = true, show_session_type = true })
 ```
 
 **输出：**
@@ -672,5 +672,4 @@ xpcall
 
 ### 额外说明
 
-- 必填参数 `error_callback` 回调函数接收一个值，为错误信息。
-- 必填参数 `error_callback` 回调函数返回值仅保留第一个。
+- 必填参数 `error_callback` 回调函数接收一个值，为错误信息；返回值仅保留第一个。

@@ -16,6 +16,19 @@ pub(super) fn draw(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
     lua.create_function(move |lua, values: MultiValue| {
       let method = "draw.text";
       let table = draw_text_parameters(lua, method, values)?;
+      // The renderer represents unlimited dimensions as absent bounds.
+      for name in ["max_width", "max_height"] {
+        if let Value::Number(value) = table.raw_get::<Value>(name)?
+          && value == f64::INFINITY
+        {
+          table.raw_set(name, Value::Nil)?;
+        }
+      }
+      match table.raw_get::<Value>("rich_params")? {
+        Value::Nil => table.raw_set("rich_params", lua.create_table()?)?,
+        Value::Table(_) => {}
+        value => return Err(args::invalid(method, "rich_params", "table", &value)),
+      }
       let target = parse_draw_target(&table, method, &text_state)?;
       let params = {
         let state = text_state.borrow();
@@ -48,14 +61,14 @@ pub(super) fn draw(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
         &["char", "fg", "bg", "slice_layer"],
       )?;
       let target = parse_draw_target(&table, method, &fill_state)?;
-      let fill_char = optional_single_char(&table, method, "char")?;
+      let fill_char = fill_character(&table, method, "char")?;
       let command = LuaDrawCommand::FillRect {
         target,
         x: signed_coordinate(&table, method, "x")?,
         y: signed_coordinate(&table, method, "y")?,
         width: positive_u16(&table, method, "width")?,
         height: positive_u16(&table, method, "height")?,
-        fill_char,
+        fill_char: Some(fill_char),
         fg: parse_color(table.get::<Value>("fg")?, method, "fg", false)?,
         bg: parse_color(table.get::<Value>("bg")?, method, "bg", true)?,
       };
@@ -72,7 +85,7 @@ pub(super) fn draw(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
         method,
         values,
         &["x", "y", "width", "height"],
-        &["fg", "bg", "border_char", "slice_layer"],
+        &["fg", "bg", "border_chars", "slice_layer"],
       )?;
       let target = parse_draw_target(&table, method, &stroke_state)?;
       let command = LuaDrawCommand::StrokeRect {
@@ -81,7 +94,7 @@ pub(super) fn draw(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
         y: signed_coordinate(&table, method, "y")?,
         width: positive_u16(&table, method, "width")?,
         height: positive_u16(&table, method, "height")?,
-        border: parse_border(table.get::<Value>("border_char")?, method)?,
+        border: parse_border(table.get::<Value>("border_chars")?, method)?,
         fg: parse_color(table.get::<Value>("fg")?, method, "fg", false)?,
         bg: parse_color(table.get::<Value>("bg")?, method, "bg", true)?,
       };
@@ -166,12 +179,8 @@ fn checked_i32(value: i64, method: &str, name: &str) -> mlua::Result<i32> {
   i32::try_from(value).map_err(|_| args::message(method, format!("{name} is out of i32 range")))
 }
 
-fn optional_single_char(table: &Table, method: &str, name: &str) -> mlua::Result<Option<String>> {
-  let value = table.get::<Value>(name)?;
-  if matches!(value, Value::Nil) {
-    return Ok(None);
-  }
-  let text = args::string(value, method, name)?;
+fn fill_character(table: &Table, method: &str, name: &str) -> mlua::Result<String> {
+  let text = args::optional_string(table, method, name, Some(" "))?.unwrap();
   let mut chars = text.chars();
   let Some(ch) = chars.next() else {
     return Err(args::message(
@@ -185,7 +194,7 @@ fn optional_single_char(table: &Table, method: &str, name: &str) -> mlua::Result
       format!("{name} must contain one display-cell character"),
     ));
   }
-  Ok(Some(ch.to_string()))
+  Ok(ch.to_string())
 }
 
 fn parse_border(value: Value, method: &str) -> mlua::Result<BorderStyle> {
@@ -193,7 +202,7 @@ fn parse_border(value: Value, method: &str) -> mlua::Result<BorderStyle> {
     return Ok(BorderStyle::Line);
   }
   let Value::Table(table) = value else {
-    return Err(args::invalid(method, "border_char", "table or nil", &value));
+    return Err(args::invalid(method, "border_chars", "table", &value));
   };
   let table = readonly::backing(&table)?;
   let get = |name: &str| -> mlua::Result<BorderCharacter> {
@@ -201,7 +210,7 @@ fn parse_border(value: Value, method: &str) -> mlua::Result<BorderStyle> {
     if matches!(value, Value::Nil) {
       return Ok(BorderCharacter::default());
     }
-    let text = args::string(value, method, "border_char")?;
+    let text = args::string(value, method, "border_chars")?;
     let mut chars = text.chars();
     let Some(ch) = chars.next() else {
       return Ok(BorderCharacter::default());
@@ -219,12 +228,12 @@ fn parse_border(value: Value, method: &str) -> mlua::Result<BorderStyle> {
   };
   Ok(BorderStyle::Custom(CustomBorder {
     top: get("top")?,
-    left_top: get("left_top")?,
+    left_top: get("top_left")?,
     left: get("left")?,
-    left_bottom: get("left_bottom")?,
+    left_bottom: get("bottom_left")?,
     bottom: get("bottom")?,
-    right_bottom: get("right_bottom")?,
+    right_bottom: get("bottom_right")?,
     right: get("right")?,
-    right_top: get("right_top")?,
+    right_top: get("top_right")?,
   }))
 }

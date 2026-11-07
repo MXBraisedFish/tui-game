@@ -269,7 +269,7 @@ animation.NORMAL
 
 ### 可用于
 
-- 参数 `play_direction`
+- 参数 `direction`
 
 ### 示例
 
@@ -301,7 +301,7 @@ animation.REVERSE
 
 ### 可用于
 
-- 参数 `play_direction`
+- 参数 `direction`
 
 ### 示例
 
@@ -333,7 +333,7 @@ animation.ALTERNATE
 
 ### 可用于
 
-- 参数 `play_direction`
+- 参数 `direction`
 
 ### 示例
 
@@ -369,7 +369,7 @@ animation.ALTERNATE_REVERSE
 
 ### 可用于
 
-- 参数 `play_direction`
+- 参数 `direction`
 
 ### 示例
 
@@ -405,7 +405,7 @@ animation.FORWARDS
 
 ### 可用于
 
-- 参数 `repeat_fill_mode`
+- 参数 `fill_mode`
 
 ### 示例
 
@@ -437,7 +437,7 @@ animation.BACKWARDS
 
 ### 可用于
 
-- 参数 `repeat_fill_mode`
+- 参数 `fill_mode`
 
 ### 示例
 
@@ -476,20 +476,20 @@ animation.create
 | 参数名     | 类型            | 说明         |
 | ---------- | --------------- | ------------ |
 | `duration` | integer / float | 总时长（秒） |
-| `track`    | table           | 参数轨道     |
+| `keyframes`    | table           | 参数关键帧轨道     |
 
 #### 选填参数
 
 | 参数名             | 类型                               | 默认值               | 说明                   |
 | ------------------ | ---------------------------------- | -------------------- | ---------------------- |
 | `easing`           | table / function / const-animation | `animation.STEP`     | 插值函数               |
-| `default_easing`   | table / function / const-animation | `animation.STEP`     | 默认回退插值函数       |
+| `callback_easing`   | table / function / const-animation | `animation.STEP`     | 默认回退插值函数       |
 | `delay`            | integer / float                    | `0`                  | 首次启动延迟时长（秒） |
 | `loop`             | boolean                            | `false`              | 是否循环               |
 | `interval`         | integer / float                    | `0`                  | 循环之间间隔时长（秒） |
 | `repeat`           | integer / const-math / nil         | `nil`                | 循环次数               |
-| `play_direction`   | const-animation                    | `animation.NORMAL`   | 播放方向               |
-| `repeat_fill_mode` | const-animation                    | `animation.FORWARDS` | 播放结束后的取值位置   |
+| `direction`   | const-animation                    | `animation.NORMAL`   | 播放方向               |
+| `fill_mode` | const-animation                    | `animation.FORWARDS` | 播放结束后的取值位置   |
 
 ### 返回值
 
@@ -508,13 +508,13 @@ function Init(ctx)
     {
       [1] = {
         timestamp = 0,
-        key = {
+        values = {
           pos = 0
         }
       },
       [2] = {
         timestamp = duration,
-        key = {
+        values = {
           pos = 20
         }
       }
@@ -523,7 +523,7 @@ function Init(ctx)
       easing = animation.EASE_IN_OUT_CUBIC,
       loop = true,
       interval = 0.5,
-      play_direction = animation.ALTERNATE
+      direction = animation.ALTERNATE
     }
   )
   animation.play(an)
@@ -546,7 +546,7 @@ end
 - 选填参数 `delay` 取值范围为 $[0, 18446744073709551616]$；单位秒。
 - 选填参数 `interval` 取值范围为 $[0, 18446744073709551616]$；单位秒。
 - 选填参数 `repeat` 取值范围为 $[1, 4294967295]$；常量 `math.POSITIVE_INFINITE` 表示无限循环。
-- 选填参数 `repeat_fill_mode` 在选填参数为 `loop` 为 `false` 时恒为 `animation.FORWARDS`，传递 `animation.BACKWARDS` 不会生效。
+- 选填参数 `fill_mode` 在选填参数为 `loop` 为 `false` 时恒为 `animation.FORWARDS`，传递 `animation.BACKWARDS` 不会生效。
 
 ---
 
@@ -674,15 +674,15 @@ debug.print(table.pretty(animation.list()))
   [1] = {
     id = "animation_001",
     duration = 1,
-    track = {},
+    keyframes = {},
     easing = "step",
-    default_easing = "step",
+    callback_easing = "step",
     delay = 0,
     loop = false,
     interval = 0,
     repeat = nil,
-    play_direction = "normal",
-    repeat_fill_mode = "forwards",
+    direction = "normal",
+    fill_mode = "forwards",
     state = "idle",
     elapsed = 0,
     executed_count = 0,
@@ -701,15 +701,15 @@ debug.print(table.pretty(animation.list()))
   {
     id = "animation_001",          -- string（插值轨道引擎 ID）
     duration = 1,                  -- integer（总时长）
-    track = {},                    -- table（参数轨道）
+    keyframes = {},                -- table（参数关键帧轨道）
     easing = "step",               -- string / table / function（插值函数）
-    default_easing = "step",       -- string / table / function（默认回退插值函数）
+    callback_easing = "step",      -- string / table / function（默认回退插值函数）
     delay = 0,                     -- integer（首次启动延迟时长）
     loop = false,                  -- boolean（是否循环）
     interval = 0,                  -- integer（循环之间间隔时长）
     repeat = nil,                  -- integer / string / nil（循环次数）
-    play_direction = "normal",     -- string（播放方向）
-    repeat_fill_mode = "forwards", -- string（播放结束后的取值位置）
+    direction = "normal",          -- string（播放方向）
+    fill_mode = "forwards",        -- string（播放结束后的取值位置）
     state = "idle"                 -- string（当前计时器状态）
     elapsed = 0,                   -- integer（当轮计时已过时长）
     executed_count = 0,            -- integer（当前计时器已循环次数）
@@ -782,11 +782,11 @@ animation.sample
 
 ### 返回值
 
-**若未填写选填参数 `key`**，返回一个值。
+I**若未填写选填参数 `key`**，返回一个值。
 
 | 类型   | 说明                                   |
 | ------ | -------------------------------------- |
-| table` | 所有参数在当前帧插值计算后的结果对象表 |
+| table | 所有参数在当前帧插值计算后的结果对象表 |
 
 **若填写选填参数 `key`**，返回一个值。
 
@@ -809,13 +809,13 @@ function Init(ctx)
     {
       [1] = {
         timestamp = 0,
-        key = {
+        values = {
           pos = 0
         }
       },
       [2] = {
         timestamp = duration,
-        key = {
+        values = {
           pos = 20
         }
       }
@@ -824,7 +824,7 @@ function Init(ctx)
       easing = animation.EASE_IN_OUT_CUBIC,
       loop = true,
       interval = 0.5,
-      play_direction = animation.ALTERNATE
+      direction = animation.ALTERNATE
     }
   )
   animation.play(an)
@@ -1049,15 +1049,15 @@ animation.set
 | 参数名             | 类型                               | 默认值   | 说明                   |
 | ------------------ | ---------------------------------- | -------- | ---------------------- |
 | `duration`         | integer / float                    | 保持原值 | 总时长（秒）           |
-| `track`            | table                              | 保持原值 | 参数轨道               |
+| `keyframes`            | table                              | 保持原值 | 参数关键帧轨道               |
 | `easing`           | table / function / const-animation | 保持原值 | 插值函数               |
-| `default_easing`   | table / function / const-animation | 保持原值 | 默认回退插值函数       |
+| `callback_easing`   | table / function / const-animation | 保持原值 | 默认回退插值函数       |
 | `delay`            | integer / float                    | 保持原值 | 首次启动延迟时长（秒） |
 | `loop`             | boolean                            | 保持原值 | 是否循环               |
 | `interval`         | integer / float                    | 保持原值 | 循环之间间隔时长（秒） |
 | `repeat`           | integer / const-math / nil         | 保持原值 | 循环次数               |
-| `play_direction`   | const-animation                    | 保持原值 | 播放方向               |
-| `repeat_fill_mode` | const-animation                    | 保持原值 | 播放结束后的取值位置   |
+| `direction`   | const-animation                    | 保持原值 | 播放方向               |
+| `fill_mode` | const-animation                    | 保持原值 | 播放结束后的取值位置   |
 
 ### 返回值
 
@@ -1084,15 +1084,15 @@ true
 {
   id = "animation_001",
   duration = 5,
-  track = {},
+  keyframes = {},
   easing = "step",
-  default_easing = "step",
+  callback_easing = "step",
   delay = 0,
   loop = false,
   interval = 0,
   repeat = nil,
-  play_direction = "normal",
-  repeat_fill_mode = "forwards",
+  direction = "normal",
+  fill_mode = "forwards",
   state = "idle",
   elapsed = 0,
   executed_count = 0,
@@ -1106,7 +1106,7 @@ true
 - 选填参数 `delay` 取值范围为 $[0, 18446744073709551616]$；单位秒。
 - 选填参数 `interval` 取值范围为 $[0, 18446744073709551616]$；单位秒。
 - 选填参数 `repeat` 取值范围为 $[1, 4294967295]$；常量 `math.POSITIVE_INFINITE` 表示无限循环。
-- 选填参数 `repeat_fill_mode` 在选填参数为 `loop` 为 `false` 时恒为 `animation.FORWARDS`，传递 `animation.BACKWARDS` 不会生效。
+- 选填参数 `fill_mode` 在选填参数为 `loop` 为 `false` 时恒为 `animation.FORWARDS`，传递 `animation.BACKWARDS` 不会生效。
 
 ---
 
@@ -1130,17 +1130,11 @@ animation.get_info
 
 ### 返回值
 
-**该插值轨道引擎存在时**，返回一个值。
+返回一个值。
 
 | 类型  | 说明                     |
 | ----- | ------------------------ |
 | table | 该插值轨道引擎信息对象表 |
-
-**该插值轨道引擎不存在时**，返回一个值。
-
-| 类型 | 说明                 |
-| ---- | -------------------- |
-| nil  | 不存在该插值轨道引擎 |
 
 ### 示例
 
@@ -1156,15 +1150,15 @@ debug.print(table.pretty(animation.get_info(an)))
 {
   id = "animation_001",
   duration = 10,
-  track = {},
+  keyframes = {},
   easing = "step",
-  default_easing = "step",
+  callback_easing = "step",
   delay = 0,
   loop = false,
   interval = 0,
   repeat = nil,
-  play_direction = "normal",
-  repeat_fill_mode = "forwards",
+  direction = "normal",
+  fill_mode = "forwards",
   state = "idle",
   elapsed = 0,
   executed_count = 0,
@@ -1179,16 +1173,16 @@ debug.print(table.pretty(animation.get_info(an)))
 ```lua
 {
   id = "animation_001",          -- string（插值轨道引擎 ID）
-  duration = 10,                  -- integer（总时长）
-  track = {},                    -- table（参数轨道）
+  duration = 10,                 -- integer（总时长）
+  keyframes = {},                -- table（参数关键帧轨道）
   easing = "step",               -- string / table / function（插值函数）
-  default_easing = "step",       -- string / table / function（默认回退插值函数）
+  callback_easing = "step",      -- string / table / function（默认回退插值函数）
   delay = 0,                     -- integer（首次启动延迟时长）
   loop = false,                  -- boolean（是否循环）
   interval = 0,                  -- integer（循环之间间隔时长）
   repeat = nil,                  -- integer / string / nil（循环次数）
-  play_direction = "normal",     -- string（播放方向）
-  repeat_fill_mode = "forwards", -- string（播放结束后的取值位置）
+  direction = "normal",          -- string（播放方向）
+  fill_mode = "forwards",        -- string（播放结束后的取值位置）
   state = "idle"                 -- string（当前计时器状态）
   elapsed = 0,                   -- integer（当轮计时已过时长）
   executed_count = 0,            -- integer（当前计时器已循环次数）

@@ -44,13 +44,13 @@ pub(super) fn char_lib(lua: &Lua) -> mlua::Result<Table> {
     let table = lua.create_table()?;
     for (key, value) in [
       "top",
-      "left_top",
+      "top_left",
       "left",
-      "left_bottom",
+      "bottom_left",
       "bottom",
-      "right_bottom",
+      "bottom_right",
       "right",
-      "right_top",
+      "top_right",
       "t_left",
       "t_bottom",
       "t_right",

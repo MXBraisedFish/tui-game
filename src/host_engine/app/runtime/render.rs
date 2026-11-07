@@ -961,10 +961,10 @@ mod tests {
           draw.text(0, 0, "abcdefghij", { slice_layer = layer })
           draw.fill_rect(0, 1, 10, 1, { char = "F", slice_layer = layer })
           draw.stroke_rect(0, 2, 10, 3, {
-            border_char = {
-              left_top = "A", top = "T", right_top = "C",
+            border_chars = {
+              top_left = "A", top = "T", top_right = "C",
               left = "L", right = "R",
-              left_bottom = "D", bottom = "B", right_bottom = "E",
+              bottom_left = "D", bottom = "B", bottom_right = "E",
             },
             slice_layer = layer,
           })

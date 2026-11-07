@@ -2,7 +2,8 @@
 
 use super::*;
 use tg_core_date::{
-  DateFields, DateTimeZone, date_to_timestamp, now_timestamp, timestamp_diff, timestamp_to_date,
+  DateError, DateFields, DateTimeZone, date_to_timestamp, now_timestamp, timestamp_diff,
+  timestamp_to_date,
 };
 
 /// Build the date library with shared time-zone and output-format constants.
@@ -16,7 +17,7 @@ pub(super) fn date(lua: &Lua) -> mlua::Result<Table> {
     ("LOCAL", "local"),
     ("UTC", "utc"),
     ("TIMESTAMP", "timestamp"),
-    ("DATE", "date"),
+    ("DATETIME", "datetime"),
   ] {
     source.raw_set(name, value)?;
   }
@@ -34,21 +35,21 @@ pub(super) fn date(lua: &Lua) -> mlua::Result<Table> {
     "now",
     lua.create_function(|lua, values: MultiValue| {
       let method = "date.now";
-      let parsed = args::positional(lua, method, values, &[], &["timezone", "time_type"])?;
+      let parsed = args::positional(lua, method, values, &[], &["timezone", "return_type"])?;
       let timezone = parse_timezone(parsed.options(), method)?;
-      let time_type =
-        args::optional_string(parsed.options(), method, "time_type", Some("timestamp"))?
+      let return_type =
+        args::optional_string(parsed.options(), method, "return_type", Some("timestamp"))?
           .unwrap_or_else(|| "timestamp".to_string());
-      match time_type.as_str() {
+      match return_type.as_str() {
         "timestamp" => Ok(Value::Integer(now_timestamp())),
-        "date" => {
+        "datetime" => {
           let date = timestamp_to_date(now_timestamp(), timezone)
             .map_err(|error| args::message(method, error.to_string()))?;
           Ok(Value::Table(date_table(lua, date)?))
         }
         _ => Err(args::message(
           method,
-          "time_type must be date.TIMESTAMP or date.DATE",
+          "return_type must be date.TIMESTAMP or date.DATETIME",
         )),
       }
     })?,
@@ -102,23 +103,31 @@ pub(super) fn date(lua: &Lua) -> mlua::Result<Table> {
         lua,
         method,
         values,
-        &["early_timestamp", "later_timestamp"],
+        &["start_time", "end_time"],
         &["timezone"],
       )?;
       let timezone = parse_timezone(parsed.options(), method)?;
-      let early = parse_timestamp_or_date(
-        parsed.required(0, method, "early_timestamp")?,
+      let start_time = parse_timestamp_or_date(
+        parsed.required(0, method, "start_time")?,
         timezone,
         method,
-        "early_timestamp",
+        "start_time",
       )?;
-      let later = parse_timestamp_or_date(
-        parsed.required(1, method, "later_timestamp")?,
+      let end_time = parse_timestamp_or_date(
+        parsed.required(1, method, "end_time")?,
         timezone,
         method,
-        "later_timestamp",
+        "end_time",
       )?;
-      timestamp_diff(early, later).map_err(|error| args::message(method, error.to_string()))
+      timestamp_diff(start_time, end_time).map_err(|error| {
+        let message = match error {
+          DateError::InvalidTimestampOrder => {
+            "end_time must be greater than or equal to start_time".to_string()
+          }
+          _ => error.to_string(),
+        };
+        args::message(method, message)
+      })
     })?,
   )?;
   readonly::proxy(lua, source)
@@ -179,7 +188,7 @@ fn parse_date_fields(
 /// * `value` - The timestamp or date supplied by the script.
 /// * `timezone` - The time zone used only for a calendar date.
 /// * `method` - The public method name included in errors.
-/// * `name` - The early or later argument name included in errors.
+/// * `name` - The start or end argument name included in errors.
 ///
 /// # Errors
 ///
@@ -251,7 +260,9 @@ mod tests {
 
   #[test]
   fn timestamp_diff_returns_one_non_negative_integer_and_rejects_invalid_input() {
-    vm().load(r#"
+    vm()
+      .load(
+        r#"
       local function fails(fn, expected)
         local ok, message = pcall(fn)
         assert(not ok and tostring(message):find(expected, 1, true), tostring(message))
@@ -271,18 +282,21 @@ mod tests {
       end
       fails(function() date.timestamp_diff(2, 1) end, 'greater than')
       fails(function() date.timestamp_diff(math.mininteger, math.maxinteger) end, 'range')
-      fails(function() date.timestamp_diff() end, 'early_timestamp')
-      fails(function() date.timestamp_diff(0) end, 'later_timestamp')
-      fails(function() date.timestamp_diff(nil, 1) end, 'early_timestamp')
-      fails(function() date.timestamp_diff(0, nil) end, 'later_timestamp')
-      fails(function() date.timestamp_diff('0', 1) end, 'early_timestamp')
-      fails(function() date.timestamp_diff(0, 1.5) end, 'later_timestamp')
-      fails(function() date.timestamp_diff(0, math.huge) end, 'later_timestamp')
+      fails(function() date.timestamp_diff() end, 'start_time')
+      fails(function() date.timestamp_diff(0) end, 'end_time')
+      fails(function() date.timestamp_diff(nil, 1) end, 'start_time')
+      fails(function() date.timestamp_diff(0, nil) end, 'end_time')
+      fails(function() date.timestamp_diff('0', 1) end, 'start_time')
+      fails(function() date.timestamp_diff(0, 1.5) end, 'end_time')
+      fails(function() date.timestamp_diff(0, math.huge) end, 'end_time')
       assert(date.timestamp_diff(0, 1, {}) == 1)
       assert(date.timestamp_diff(0, 1, nil) == 1)
-      fails(function() date.timestamp_diff({early_timestamp = 0, later_timestamp = 1}) end, 'later_timestamp')
-      fails(function() date.timestamp_diff({}, 1) end, 'early_timestamp')
-    "#).exec().unwrap();
+      fails(function() date.timestamp_diff({start_time = 0, end_time = 1}) end, 'end_time')
+      fails(function() date.timestamp_diff({}, 1) end, 'start_time')
+    "#,
+      )
+      .exec()
+      .unwrap();
   }
 
   #[test]
@@ -320,7 +334,7 @@ mod tests {
       local leap = {year = 2000, month = 2, day = 29, hour = 23, minute = 59, second = 59, millisecond = 999}
       local next_day = {year = 2000, month = 3, day = 1, hour = 0, minute = 0, second = 0, millisecond = 0}
       assert(date.timestamp_diff(leap, next_day, {timezone = date.UTC}) == 1)
-      local current = date.now({time_type = date.DATE})
+      local current = date.now({return_type = date.DATETIME})
       assert(date.timestamp_diff(current, current) == 0)
     "#).exec().unwrap();
   }
@@ -338,11 +352,11 @@ mod tests {
         local saved = early[field]
         for _, invalid in ipairs({'1', false, 1.5, math.huge}) do
           early[field] = invalid
-          fails(function() date.timestamp_diff(early, 1, {timezone = date.UTC}) end, 'early_timestamp.' .. field)
-          fails(function() date.timestamp_diff(0, early, {timezone = date.UTC}) end, 'later_timestamp.' .. field)
+          fails(function() date.timestamp_diff(early, 1, {timezone = date.UTC}) end, 'start_time.' .. field)
+          fails(function() date.timestamp_diff(0, early, {timezone = date.UTC}) end, 'end_time.' .. field)
         end
         early[field] = nil
-        fails(function() date.timestamp_diff(early, 1, {timezone = date.UTC}) end, 'early_timestamp.' .. field)
+        fails(function() date.timestamp_diff(early, 1, {timezone = date.UTC}) end, 'start_time.' .. field)
         early[field] = saved
       end
       for _, case in ipairs({
@@ -352,13 +366,13 @@ mod tests {
       }) do
         local field, saved = case[1], early[case[1]]
         early[field] = case[2]
-        fails(function() date.timestamp_diff(early, 1, {timezone = date.UTC}) end, 'early_timestamp')
+        fails(function() date.timestamp_diff(early, 1, {timezone = date.UTC}) end, 'start_time')
         early[field] = saved
       end
       early.year = 1900; early.month = 2; early.day = 29
       fails(function() date.timestamp_diff(early, 1, {timezone = date.UTC}) end, 'invalid calendar')
-      fails(function() date.timestamp_diff(later, 0, {timezone = date.UTC}) end, 'later_timestamp must')
-      fails(function() date.timestamp_diff(1, date.timestamp_to_date(0, {timezone = date.UTC}), {timezone = date.UTC}) end, 'later_timestamp must')
+      fails(function() date.timestamp_diff(later, 0, {timezone = date.UTC}) end, 'end_time must')
+      fails(function() date.timestamp_diff(1, date.timestamp_to_date(0, {timezone = date.UTC}), {timezone = date.UTC}) end, 'end_time must')
       fails(function() date.timestamp_diff(0, 1, {unknown = true}) end, 'unknown option')
       fails(function() date.timestamp_diff(0, 1, {[1] = date.UTC}) end, 'option names')
       fails(function() date.timestamp_diff(0, 1, setmetatable({}, {})) end, 'metatable')
@@ -366,7 +380,7 @@ mod tests {
       fails(function() date.timestamp_diff(0, 1, {timezone = 'utc+15'}) end, 'timezone')
       fails(function() date.timestamp_diff(0, 1, date.UTC) end, 'table or nil')
       fails(function() date.timestamp_diff(0, 1, {}, {}) end, 'arguments')
-      fails(function() date.timestamp_diff(false, 1) end, 'early_timestamp')
+      fails(function() date.timestamp_diff(false, 1) end, 'start_time')
     "#).exec().unwrap();
   }
 
@@ -378,9 +392,9 @@ mod tests {
       .load(
         r#"
       assert(select('#', date.now()) == 1)
-      assert(select('#', date.now({time_type = date.DATE})) == 1)
+      assert(select('#', date.now({return_type = date.DATETIME})) == 1)
       assert(type(date.now({})) == 'number' and type(date.now(nil)) == 'number')
-      local t = date.now({timezone = date.UTC, time_type = date.DATE})
+      local t = date.now({timezone = date.UTC, return_type = date.DATETIME})
       local count = 0
       for _, value in pairs(t) do
         assert(math.type(value) == 'integer')
@@ -445,11 +459,13 @@ mod tests {
         assert(not ok and tostring(message):find(expected, 1, true), tostring(message))
       end
       fails(function() date.now({unknown = true}) end, 'unknown option')
-      fails(function() date.now({time_type = 'invalid'}) end, 'time_type')
+      fails(function() date.now({return_type = 'invalid'}) end, 'return_type')
+      fails(function() date.now({return_type = 'date'}) end, 'return_type')
+      fails(function() date.now({time_type = date.DATETIME}) end, 'unknown option')
       fails(function() date.now({timezone = 'utc+15'}) end, 'timezone')
       fails(function() date.now({timezone = 'utc-13'}) end, 'timezone')
       fails(function() date.now({timezone = false}) end, 'timezone')
-      fails(function() date.now({time_type = 1}) end, 'time_type')
+      fails(function() date.now({return_type = 1}) end, 'return_type')
       fails(function() date.now({}, {}) end, 'arguments')
       fails(function() date.now({[1] = date.UTC}) end, 'option names')
       fails(function() date.now(setmetatable({}, {})) end, 'metatable')
@@ -464,7 +480,7 @@ mod tests {
       fails(function() date.timestamp_to_date(math.huge) end, 'timestamp')
       fails(function() date.timestamp_to_date(math.maxinteger) end, 'supported range')
       fails(function() date.timestamp_to_date(math.mininteger) end, 'supported range')
-      fails(function() date.timestamp_to_date(0, {time_type = date.DATE}) end, 'unknown option')
+      fails(function() date.timestamp_to_date(0, {return_type = date.DATETIME}) end, 'unknown option')
       fails(function() date.timestamp_to_date(0, {timestamp = 0}) end, 'unknown option')
       fails(function() date.timestamp_to_date(0, {[1] = date.UTC}) end, 'option names')
       fails(function() date.timestamp_to_date(0, setmetatable({}, {})) end, 'metatable')
@@ -512,7 +528,8 @@ mod tests {
       assert(a ~= b and b.year == 1970)
       assert(not pcall(function() date.UTC = 'other' end))
       assert(not pcall(function() date.extra = true end))
-      assert(date.UTC == 'utc' and date.TIMESTAMP == 'timestamp' and date.DATE == 'date')
+      assert(date.UTC == 'utc' and date.TIMESTAMP == 'timestamp' and date.DATETIME == 'datetime')
+      assert(date.DATE == nil)
     "#,
       )
       .exec()

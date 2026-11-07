@@ -193,7 +193,7 @@ function Render()
   local board_height = board.SIZE * CELL_HEIGHT + 1
   local origin_x, origin_y = align.resolve_rect(
     board_width, board_height, align.HORIZONTAL_CENTER, align.TOP, { offset_y = 5 })
-  draw.stroke_rect(origin_x, origin_y, board_width, board_height, { fg = color.BRIGHT_GRAY, border_char = char.ROUNDED_LINE })
+  draw.stroke_rect(origin_x, origin_y, board_width, board_height, { fg = color.BRIGHT_GRAY, border_chars = char.ROUNDED_LINE })
   draw_board(origin_x, origin_y)
 
   local status_color = color.GRAY

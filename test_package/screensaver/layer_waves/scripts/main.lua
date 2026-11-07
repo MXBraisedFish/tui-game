@@ -24,7 +24,7 @@ end
 -- Fill and outline one slice, then draw its animated wave positions.
 local function draw_waves(panel, panel_width, panel_height, speed, fg)
   draw.fill_rect(0, 0, panel_width, panel_height, { char = " ", slice_layer = panel })
-  draw.stroke_rect(0, 0, panel_width, panel_height, { fg = fg, border_char = char.ROUNDED_LINE, slice_layer = panel })
+  draw.stroke_rect(0, 0, panel_width, panel_height, { fg = fg, border_chars = char.ROUNDED_LINE, slice_layer = panel })
   for row = 1, panel_height - 2 do
     local wave = math.sin(phase * speed + row * 0.6)
     local x = math.floor((wave + 1) * (panel_width - 4) / 2) + 1

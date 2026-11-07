@@ -2960,7 +2960,7 @@ mod tests {
           })
           debug.assert(color.rgb(12, 34, 56) == "rgb(12,34,56)")
           debug.assert(color.hex(12, 34, 56) == '#0c2238')
-          local named_color_args = debug.pcall(function() color.rgb{ r = 12, g = 34, b = 56 } end)
+          local named_color_args = debug.pcall(function() color.rgb{ red = 12, green = 34, blue = 56 } end)
           local extra_color_arg = debug.pcall(function() color.rgb(12, 34, 56, {}) end)
           local bad_color_channel = debug.pcall(function() color.rgb(12, 34, 256) end)
           local traversal = debug.pcall(function() image.load("../outside.png") end)
@@ -3218,7 +3218,7 @@ mod tests {
           debug.assert(date.timestamp_diff(-1, later, {timezone = date.UTC}) == 124)
           debug.assert(date.timestamp_diff(t, -1, {timezone = date.UTC}) == 0)
           debug.assert(type(date.now()) == "number")
-          debug.assert(type(date.now({time_type = date.DATE})) == "table")
+          debug.assert(type(date.now({return_type = date.DATETIME})) == "table")
           debug.assert(not select(1, debug.pcall(function() date.UTC = "invalid" end)))
           debug.assert(not select(1, debug.pcall(function() rawset(date, "UTC", "invalid") end)))
           debug.assert(not select(1, debug.pcall(function() date.now({unknown = true}) end)))
@@ -3532,7 +3532,25 @@ mod tests {
           debug.assert(right_x == 110 and bottom_y == 34)
           debug.assert(select('#', align.resolve_rect(10, 4, align.LEFT, align.TOP)) == 2)
           debug.assert(align.resolve_x(10, align.RIGHT, { offset_x = -2 }) == 108)
-          debug.assert(align.resolve_y(4, align.BOTTOM, { relative_y = 20 }) == 16)
+          debug.assert(align.resolve_y(4, align.BOTTOM, { anchor_y = 20 }) == 16)
+          debug.assert(align.resolve_x(10, align.RIGHT, { anchor_x = 60 }) == 50)
+          debug.assert(align.resolve_x(10, align.RIGHT, { anchor_x = nil }) == 110)
+          debug.assert(align.resolve_y(4, align.BOTTOM, { anchor_y = nil }) == 34)
+          local anchored_x, anchored_y = align.resolve_rect(10, 4, align.CENTER, align.BOTTOM,
+            { anchor_x = 60, anchor_y = 20, offset_x = -2, offset_y = 3 })
+          debug.assert(anchored_x == 53 and anchored_y == 19)
+          local panel = slice.create(31, 13)
+          local panel_x, panel_y = align.resolve_rect(10, 4, align.AUTO, align.AUTO, { slice_layer = panel })
+          debug.assert(panel_x == 10 and panel_y == 4)
+          debug.assert(slice.set(panel, { width = 41, height = 17 }))
+          debug.assert(align.resolve_x(10, align.RIGHT, { slice_layer = panel }) == 31)
+          debug.assert(align.resolve_y(4, align.BOTTOM, { slice_layer = panel }) == 13)
+          debug.assert(fails(function() align.resolve_x(10, align.RIGHT, { relative_x = 60 }) end))
+          debug.assert(fails(function() align.resolve_y(4, align.BOTTOM, { relative_y = 20 }) end))
+          debug.assert(fails(function() align.resolve_rect(10, 4, align.LEFT, align.TOP, { relative_x = 0 }) end))
+          debug.assert(fails(function() align.resolve_rect(10, 4, align.LEFT, align.TOP, { relative_y = 0 }) end))
+          debug.assert(fails(function() align.resolve_x(10, align.RIGHT, { anchor_x = false }) end))
+          debug.assert(fails(function() align.resolve_y(4, align.BOTTOM, { anchor_y = 1.5 }) end))
           debug.assert(fails(function() align.resolve_rect(10, 4, align.LEFT, align.TOP, { typo = 1 }) end))
         end
       "#,
@@ -3714,7 +3732,10 @@ mod tests {
       })
       .collect::<Vec<_>>();
     assert_eq!(params.len(), 4);
-    assert!(params[0].params.is_none());
+    let plain = params[0].params.as_ref().unwrap();
+    assert!(plain.values.is_empty());
+    assert!(plain.key_actions.is_empty());
+    assert!(plain.key_default_actions.is_empty());
     let user = params[1].params.as_ref().unwrap();
     assert!(user.key_actions.contains_key("jump"));
     assert!(user.key_default_actions.is_empty());
@@ -4665,6 +4686,8 @@ mod tests {
       r#"
         function Init(ctx)
           debug.print("plain")
+          debug.print("empty options", {})
+          debug.print("omitted headers", { title = nil, level = nil })
         end
       "#,
     );
@@ -4677,16 +4700,19 @@ mod tests {
       },
     )
     .unwrap();
-    assert!(session.take_host_commands().iter().any(|command| matches!(
-      command,
-      LuaHostCommand::Print {
-        message,
-        title: None,
-        time: false,
-        level: None,
-        type_head: false,
-      } if message == "plain"
-    )));
+    let commands = session.take_host_commands();
+    for expected_message in ["plain", "empty options", "omitted headers"] {
+      assert!(commands.iter().any(|command| matches!(
+        command,
+        LuaHostCommand::Print {
+          message,
+          title: None,
+          time: false,
+          level: None,
+          type_head: false,
+        } if message == expected_message
+      )));
+    }
   }
 
   #[test]
@@ -4854,7 +4880,10 @@ mod tests {
               and debug.ERROR == "error"
               and debug.FATAL == "fatal")
           debug.assert(debug.assert("value") == "value")
-          debug.print("custom", { title = "Title", level = debug.WARN, time = true, type_head = true })
+          debug.print("custom", { title = "Title", level = debug.WARN, show_time = true, show_session_type = true })
+          for _, options in ipairs({{time=true}, {type_head=true}}) do
+            debug.assert(not debug.pcall(debug.print, "legacy options", options))
+          end
           debug.info("positional")
           local extra_skip_argument = debug.pcall(function() events.skip_action("extra") end)
           debug.assert(not extra_skip_argument)

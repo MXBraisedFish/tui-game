@@ -8,47 +8,47 @@
 
 ## 常量
 
-| 常量           | 说明                                    | 定位                          |
-| -------------- | --------------------------------------- | ----------------------------- |
-| `LOCAL`        | 使用程序运行时的本机时区                | [LOCAL](#local)               |
-| `UTC`          | 使用 UTC 固定时区                       | [UTC](#utc)                   |
-| `UTC_MINUS_12` | 使用在 UTC 时间上减去 12 小时的固定时区 | [UTC_MINUS_12](#utc_minus_12) |
-| `UTC_MINUS_11` | 使用在 UTC 时间上减去 11 小时的固定时区 | [UTC_MINUS_11](#utc_minus_11) |
-| `UTC_MINUS_10` | 使用在 UTC 时间上减去 10 小时的固定时区 | [UTC_MINUS_10](#utc_minus_10) |
-| `UTC_MINUS_9`  | 使用在 UTC 时间上减去 9 小时的固定时区  | [UTC_MINUS_9](#utc_minus_9)   |
-| `UTC_MINUS_8`  | 使用在 UTC 时间上减去 8 小时的固定时区  | [UTC_MINUS_8](#utc_minus_8)   |
-| `UTC_MINUS_7`  | 使用在 UTC 时间上减去 7 小时的固定时区  | [UTC_MINUS_7](#utc_minus_7)   |
-| `UTC_MINUS_6`  | 使用在 UTC 时间上减去 6 小时的固定时区  | [UTC_MINUS_6](#utc_minus_6)   |
-| `UTC_MINUS_5`  | 使用在 UTC 时间上减去 5 小时的固定时区  | [UTC_MINUS_5](#utc_minus_5)   |
-| `UTC_MINUS_4`  | 使用在 UTC 时间上减去 4 小时的固定时区  | [UTC_MINUS_4](#utc_minus_4)   |
-| `UTC_MINUS_3`  | 使用在 UTC 时间上减去 3 小时的固定时区  | [UTC_MINUS_3](#utc_minus_3)   |
-| `UTC_MINUS_2`  | 使用在 UTC 时间上减去 2 小时的固定时区  | [UTC_MINUS_2](#utc_minus_2)   |
-| `UTC_MINUS_1`  | 使用在 UTC 时间上减去 1 小时的固定时区  | [UTC_MINUS_1](#utc_minus_1)   |
-| `UTC_PLUS_1`   | 使用在 UTC 时间上加上 1 小时的固定时区  | [UTC_PLUS_1](#utc_plus_1)     |
-| `UTC_PLUS_2`   | 使用在 UTC 时间上加上 2 小时的固定时区  | [UTC_PLUS_2](#utc_plus_2)     |
-| `UTC_PLUS_3`   | 使用在 UTC 时间上加上 3 小时的固定时区  | [UTC_PLUS_3](#utc_plus_3)     |
-| `UTC_PLUS_4`   | 使用在 UTC 时间上加上 4 小时的固定时区  | [UTC_PLUS_4](#utc_plus_4)     |
-| `UTC_PLUS_5`   | 使用在 UTC 时间上加上 5 小时的固定时区  | [UTC_PLUS_5](#utc_plus_5)     |
-| `UTC_PLUS_6`   | 使用在 UTC 时间上加上 6 小时的固定时区  | [UTC_PLUS_6](#utc_plus_6)     |
-| `UTC_PLUS_7`   | 使用在 UTC 时间上加上 7 小时的固定时区  | [UTC_PLUS_7](#utc_plus_7)     |
-| `UTC_PLUS_8`   | 使用在 UTC 时间上加上 8 小时的固定时区  | [UTC_PLUS_8](#utc_plus_8)     |
-| `UTC_PLUS_9`   | 使用在 UTC 时间上加上 9 小时的固定时区  | [UTC_PLUS_9](#utc_plus_9)     |
-| `UTC_PLUS_10`  | 使用在 UTC 时间上加上 10 小时的固定时区 | [UTC_PLUS_10](#utc_plus_10)   |
-| `UTC_PLUS_11`  | 使用在 UTC 时间上加上 11 小时的固定时区 | [UTC_PLUS_11](#utc_plus_11)   |
-| `UTC_PLUS_12`  | 使用在 UTC 时间上加上 12 小时的固定时区 | [UTC_PLUS_12](#utc_plus_12)   |
-| `UTC_PLUS_13`  | 使用在 UTC 时间上加上 13 小时的固定时区 | [UTC_PLUS_13](#utc_plus_13)   |
-| `UTC_PLUS_14`  | 使用在 UTC 时间上加上 14 小时的固定时区 | [UTC_PLUS_14](#utc_plus_14)   |
-| `TIMESTAMP`    | 返回毫秒时间戳                          | [TIMESTAMP](#timestamp)       |
-| `DATE`         | 返回包含年月日和时间的对象表            | [DATE](#date)                 |
+| 常量           | 说明                         | 定位                          |
+| -------------- | ---------------------------- | ----------------------------- |
+| `LOCAL`        | 使用程序运行时的本机时区     | [LOCAL](#local)               |
+| `UTC`          | 使用 UTC 固定时区            | [UTC](#utc)                   |
+| `UTC_MINUS_12` | 使用 UTC-12 固定时区         | [UTC_MINUS_12](#utc_minus_12) |
+| `UTC_MINUS_11` | 使用 UTC-11 固定时区         | [UTC_MINUS_11](#utc_minus_11) |
+| `UTC_MINUS_10` | 使用 UTC-10 固定时区         | [UTC_MINUS_10](#utc_minus_10) |
+| `UTC_MINUS_9`  | 使用 UTC-9 固定时区          | [UTC_MINUS_9](#utc_minus_9)   |
+| `UTC_MINUS_8`  | 使用 UTC-8 固定时区          | [UTC_MINUS_8](#utc_minus_8)   |
+| `UTC_MINUS_7`  | 使用 UTC-7 固定时区          | [UTC_MINUS_7](#utc_minus_7)   |
+| `UTC_MINUS_6`  | 使用 UTC-6 固定时区          | [UTC_MINUS_6](#utc_minus_6)   |
+| `UTC_MINUS_5`  | 使用 UTC-5 固定时区          | [UTC_MINUS_5](#utc_minus_5)   |
+| `UTC_MINUS_4`  | 使用 UTC-4 固定时区          | [UTC_MINUS_4](#utc_minus_4)   |
+| `UTC_MINUS_3`  | 使用 UTC-3 固定时区          | [UTC_MINUS_3](#utc_minus_3)   |
+| `UTC_MINUS_2`  | 使用 UTC-2 固定时区          | [UTC_MINUS_2](#utc_minus_2)   |
+| `UTC_MINUS_1`  | 使用 UTC-1 固定时区          | [UTC_MINUS_1](#utc_minus_1)   |
+| `UTC_PLUS_1`   | 使用 UTC+1 固定时区          | [UTC_PLUS_1](#utc_plus_1)     |
+| `UTC_PLUS_2`   | 使用 UTC+2 固定时区          | [UTC_PLUS_2](#utc_plus_2)     |
+| `UTC_PLUS_3`   | 使用 UTC+3 固定时区          | [UTC_PLUS_3](#utc_plus_3)     |
+| `UTC_PLUS_4`   | 使用 UTC+4 固定时区          | [UTC_PLUS_4](#utc_plus_4)     |
+| `UTC_PLUS_5`   | 使用 UTC+5 固定时区          | [UTC_PLUS_5](#utc_plus_5)     |
+| `UTC_PLUS_6`   | 使用 UTC+6 固定时区          | [UTC_PLUS_6](#utc_plus_6)     |
+| `UTC_PLUS_7`   | 使用 UTC+7 固定时区          | [UTC_PLUS_7](#utc_plus_7)     |
+| `UTC_PLUS_8`   | 使用 UTC+8 固定时区          | [UTC_PLUS_8](#utc_plus_8)     |
+| `UTC_PLUS_9`   | 使用 UTC+9 固定时区          | [UTC_PLUS_9](#utc_plus_9)     |
+| `UTC_PLUS_10`  | 使用 UTC+10 固定时区         | [UTC_PLUS_10](#utc_plus_10)   |
+| `UTC_PLUS_11`  | 使用 UTC+11 固定时区         | [UTC_PLUS_11](#utc_plus_11)   |
+| `UTC_PLUS_12`  | 使用 UTC+12 固定时区         | [UTC_PLUS_12](#utc_plus_12)   |
+| `UTC_PLUS_13`  | 使用 UTC+13 固定时区         | [UTC_PLUS_13](#utc_plus_13)   |
+| `UTC_PLUS_14`  | 使用 UTC+14 固定时区         | [UTC_PLUS_14](#utc_plus_14)   |
+| `TIMESTAMP`    | 返回毫秒时间戳               | [TIMESTAMP](#timestamp)       |
+| `DATETIME`     | 返回包含年月日和时间的对象表 | [DATETIME](#datetime)         |
 
 ## 方法
 
-| 方法                | 说明                                                             | 定位                                    |
-| ------------------- | ---------------------------------------------------------------- | --------------------------------------- |
-| `now`               | 获取当前时间                                                     | [now](#now)                             |
-| `date_to_timestamp` | 把年月日、时分秒和毫秒转为时间戳                                 | [date_to_timestamp](#date_to_timestamp) |
-| `timestamp_to_date` | 把毫秒时间戳转为指定时区的年月日、时分秒和毫秒                   | [timestamp_to_date](#timestamp_to_date) |
-| `timestamp_diff`    | 计算两个时间点之间相差多少毫秒 | [timestamp_diff](#timestamp_diff)       |
+| 方法                | 说明                                           | 定位                                    |
+| ------------------- | ---------------------------------------------- | --------------------------------------- |
+| `now`               | 获取当前时间                                   | [now](#now)                             |
+| `date_to_timestamp` | 把年月日、时分秒和毫秒转为时间戳               | [date_to_timestamp](#date_to_timestamp) |
+| `timestamp_to_date` | 把毫秒时间戳转为指定时区的年月日、时分秒和毫秒 | [timestamp_to_date](#timestamp_to_date) |
+| `timestamp_diff`    | 计算两个时间点之间相差多少毫秒                 | [timestamp_diff](#timestamp_diff)       |
 
 ---
 
@@ -73,7 +73,7 @@ date.LOCAL
 > 2000/1/1 00:00:00 UTC
 
 ```lua
-debug.print(table.pretty(date.now({ timezone = date.LOCAL, time_type = date.DATE })))
+debug.print(table.pretty(date.now({ timezone = date.LOCAL, return_type = date.DATETIME })))
 ```
 
 **输出：**
@@ -121,7 +121,7 @@ date.UTC
 > 2000/1/1 00:00:00 UTC
 
 ```lua
-debug.print(table.pretty(date.now({ timezone = date.UTC, time_type = date.DATE })))
+debug.print(table.pretty(date.now({ timezone = date.UTC, return_type = date.DATETIME })))
 ```
 
 **输出：**
@@ -152,7 +152,7 @@ debug.print(table.pretty(date.now({ timezone = date.UTC, time_type = date.DATE }
 
 ## `UTC_MINUS_12`
 
-使用在 UTC 时间上减去 12 小时的固定时区。
+使用 UTC-12 固定时区。
 
 ### 调用
 
@@ -169,7 +169,7 @@ date.UTC_MINUS_12
 > 2000/1/1 00:00:00 UTC
 
 ```lua
-debug.print(table.pretty(date.now({ timezone = date.UTC_MINUS_12, time_type = date.DATE })))
+debug.print(table.pretty(date.now({ timezone = date.UTC_MINUS_12, return_type = date.DATETIME })))
 ```
 
 **输出：**
@@ -200,7 +200,7 @@ debug.print(table.pretty(date.now({ timezone = date.UTC_MINUS_12, time_type = da
 
 ## `UTC_MINUS_11`
 
-使用在 UTC 时间上减去 11 小时的固定时区。
+使用 UTC-11 固定时区。
 
 ### 调用
 
@@ -217,7 +217,7 @@ date.UTC_MINUS_11
 > 2000/1/1 00:00:00 UTC
 
 ```lua
-debug.print(table.pretty(date.now({ timezone = date.UTC_MINUS_11, time_type = date.DATE })))
+debug.print(table.pretty(date.now({ timezone = date.UTC_MINUS_11, return_type = date.DATETIME })))
 ```
 
 **输出：**
@@ -248,7 +248,7 @@ debug.print(table.pretty(date.now({ timezone = date.UTC_MINUS_11, time_type = da
 
 ## `UTC_MINUS_10`
 
-使用在 UTC 时间上减去 10 小时的固定时区。
+使用 UTC-10 固定时区。
 
 ### 调用
 
@@ -265,7 +265,7 @@ date.UTC_MINUS_10
 > 2000/1/1 00:00:00 UTC
 
 ```lua
-debug.print(table.pretty(date.now({ timezone = date.UTC_MINUS_10, time_type = date.DATE })))
+debug.print(table.pretty(date.now({ timezone = date.UTC_MINUS_10, return_type = date.DATETIME })))
 ```
 
 **输出：**
@@ -296,7 +296,7 @@ debug.print(table.pretty(date.now({ timezone = date.UTC_MINUS_10, time_type = da
 
 ## `UTC_MINUS_9`
 
-使用在 UTC 时间上减去 9 小时的固定时区。
+使用 UTC-9 固定时区。
 
 ### 调用
 
@@ -313,7 +313,7 @@ date.UTC_MINUS_9
 > 2000/1/1 00:00:00 UTC
 
 ```lua
-debug.print(table.pretty(date.now({ timezone = date.UTC_MINUS_9, time_type = date.DATE })))
+debug.print(table.pretty(date.now({ timezone = date.UTC_MINUS_9, return_type = date.DATETIME })))
 ```
 
 **输出：**
@@ -344,7 +344,7 @@ debug.print(table.pretty(date.now({ timezone = date.UTC_MINUS_9, time_type = dat
 
 ## `UTC_MINUS_8`
 
-使用在 UTC 时间上减去 8 小时的固定时区。
+使用 UTC-8 固定时区。
 
 ### 调用
 
@@ -361,7 +361,7 @@ date.UTC_MINUS_8
 > 2000/1/1 00:00:00 UTC
 
 ```lua
-debug.print(table.pretty(date.now({ timezone = date.UTC_MINUS_8, time_type = date.DATE })))
+debug.print(table.pretty(date.now({ timezone = date.UTC_MINUS_8, return_type = date.DATETIME })))
 ```
 
 **输出：**
@@ -392,7 +392,7 @@ debug.print(table.pretty(date.now({ timezone = date.UTC_MINUS_8, time_type = dat
 
 ## `UTC_MINUS_7`
 
-使用在 UTC 时间上减去 7 小时的固定时区。
+使用 UTC-7 固定时区。
 
 ### 调用
 
@@ -409,7 +409,7 @@ date.UTC_MINUS_7
 > 2000/1/1 00:00:00 UTC
 
 ```lua
-debug.print(table.pretty(date.now({ timezone = date.UTC_MINUS_7, time_type = date.DATE })))
+debug.print(table.pretty(date.now({ timezone = date.UTC_MINUS_7, return_type = date.DATETIME })))
 ```
 
 **输出：**
@@ -440,7 +440,7 @@ debug.print(table.pretty(date.now({ timezone = date.UTC_MINUS_7, time_type = dat
 
 ## `UTC_MINUS_6`
 
-使用在 UTC 时间上减去 6 小时的固定时区。
+使用 UTC-6 固定时区。
 
 ### 调用
 
@@ -457,7 +457,7 @@ date.UTC_MINUS_6
 > 2000/1/1 00:00:00 UTC
 
 ```lua
-debug.print(table.pretty(date.now({ timezone = date.UTC_MINUS_6, time_type = date.DATE })))
+debug.print(table.pretty(date.now({ timezone = date.UTC_MINUS_6, return_type = date.DATETIME })))
 ```
 
 **输出：**
@@ -488,7 +488,7 @@ debug.print(table.pretty(date.now({ timezone = date.UTC_MINUS_6, time_type = dat
 
 ## `UTC_MINUS_5`
 
-使用在 UTC 时间上减去 5 小时的固定时区。
+使用 UTC-5 固定时区。
 
 ### 调用
 
@@ -505,7 +505,7 @@ date.UTC_MINUS_5
 > 2000/1/1 00:00:00 UTC
 
 ```lua
-debug.print(table.pretty(date.now({ timezone = date.UTC_MINUS_5, time_type = date.DATE })))
+debug.print(table.pretty(date.now({ timezone = date.UTC_MINUS_5, return_type = date.DATETIME })))
 ```
 
 **输出：**
@@ -536,7 +536,7 @@ debug.print(table.pretty(date.now({ timezone = date.UTC_MINUS_5, time_type = dat
 
 ## `UTC_MINUS_4`
 
-使用在 UTC 时间上减去 4 小时的固定时区。
+使用 UTC-4 固定时区。
 
 ### 调用
 
@@ -553,7 +553,7 @@ date.UTC_MINUS_4
 > 2000/1/1 00:00:00 UTC
 
 ```lua
-debug.print(table.pretty(date.now({ timezone = date.UTC_MINUS_4, time_type = date.DATE })))
+debug.print(table.pretty(date.now({ timezone = date.UTC_MINUS_4, return_type = date.DATETIME })))
 ```
 
 **输出：**
@@ -584,7 +584,7 @@ debug.print(table.pretty(date.now({ timezone = date.UTC_MINUS_4, time_type = dat
 
 ## `UTC_MINUS_3`
 
-使用在 UTC 时间上减去 3 小时的固定时区。
+使用 UTC-3 固定时区。
 
 ### 调用
 
@@ -601,7 +601,7 @@ date.UTC_MINUS_3
 > 2000/1/1 00:00:00 UTC
 
 ```lua
-debug.print(table.pretty(date.now({ timezone = date.UTC_MINUS_3, time_type = date.DATE })))
+debug.print(table.pretty(date.now({ timezone = date.UTC_MINUS_3, return_type = date.DATETIME })))
 ```
 
 **输出：**
@@ -632,7 +632,7 @@ debug.print(table.pretty(date.now({ timezone = date.UTC_MINUS_3, time_type = dat
 
 ## `UTC_MINUS_2`
 
-使用在 UTC 时间上减去 2 小时的固定时区。
+使用 UTC-2 固定时区。
 
 ### 调用
 
@@ -649,7 +649,7 @@ date.UTC_MINUS_2
 > 2000/1/1 00:00:00 UTC
 
 ```lua
-debug.print(table.pretty(date.now({ timezone = date.UTC_MINUS_2, time_type = date.DATE })))
+debug.print(table.pretty(date.now({ timezone = date.UTC_MINUS_2, return_type = date.DATETIME })))
 ```
 
 **输出：**
@@ -680,7 +680,7 @@ debug.print(table.pretty(date.now({ timezone = date.UTC_MINUS_2, time_type = dat
 
 ## `UTC_MINUS_1`
 
-使用在 UTC 时间上减去 1 小时的固定时区。
+使用 UTC-1 固定时区。
 
 ### 调用
 
@@ -697,7 +697,7 @@ date.UTC_MINUS_1
 > 2000/1/1 00:00:00 UTC
 
 ```lua
-debug.print(table.pretty(date.now({ timezone = date.UTC_MINUS_1, time_type = date.DATE })))
+debug.print(table.pretty(date.now({ timezone = date.UTC_MINUS_1, return_type = date.DATETIME })))
 ```
 
 **输出：**
@@ -728,7 +728,7 @@ debug.print(table.pretty(date.now({ timezone = date.UTC_MINUS_1, time_type = dat
 
 ## `UTC_PLUS_1`
 
-使用在 UTC 时间上加上 1 小时的固定时区。
+使用 UTC+1 固定时区。
 
 ### 调用
 
@@ -745,7 +745,7 @@ date.UTC_PLUS_1
 > 2000/1/1 00:00:00 UTC
 
 ```lua
-debug.print(table.pretty(date.now({ timezone = date.UTC_PLUS_1, time_type = date.DATE })))
+debug.print(table.pretty(date.now({ timezone = date.UTC_PLUS_1, return_type = date.DATETIME })))
 ```
 
 **输出：**
@@ -776,7 +776,7 @@ debug.print(table.pretty(date.now({ timezone = date.UTC_PLUS_1, time_type = date
 
 ## `UTC_PLUS_2`
 
-使用在 UTC 时间上加上 2 小时的固定时区。
+使用 UTC+2 固定时区。
 
 ### 调用
 
@@ -793,7 +793,7 @@ date.UTC_PLUS_2
 > 2000/1/1 00:00:00 UTC
 
 ```lua
-debug.print(table.pretty(date.now({ timezone = date.UTC_PLUS_2, time_type = date.DATE })))
+debug.print(table.pretty(date.now({ timezone = date.UTC_PLUS_2, return_type = date.DATETIME })))
 ```
 
 **输出：**
@@ -824,7 +824,7 @@ debug.print(table.pretty(date.now({ timezone = date.UTC_PLUS_2, time_type = date
 
 ## `UTC_PLUS_3`
 
-使用在 UTC 时间上加上 3 小时的固定时区。
+使用 UTC+3 固定时区。
 
 ### 调用
 
@@ -841,7 +841,7 @@ date.UTC_PLUS_3
 > 2000/1/1 00:00:00 UTC
 
 ```lua
-debug.print(table.pretty(date.now({ timezone = date.UTC_PLUS_3, time_type = date.DATE })))
+debug.print(table.pretty(date.now({ timezone = date.UTC_PLUS_3, return_type = date.DATETIME })))
 ```
 
 **输出：**
@@ -872,7 +872,7 @@ debug.print(table.pretty(date.now({ timezone = date.UTC_PLUS_3, time_type = date
 
 ## `UTC_PLUS_4`
 
-使用在 UTC 时间上加上 4 小时的固定时区。
+使用 UTC+4 固定时区。
 
 ### 调用
 
@@ -889,7 +889,7 @@ date.UTC_PLUS_4
 > 2000/1/1 00:00:00 UTC
 
 ```lua
-debug.print(table.pretty(date.now({ timezone = date.UTC_PLUS_4, time_type = date.DATE })))
+debug.print(table.pretty(date.now({ timezone = date.UTC_PLUS_4, return_type = date.DATETIME })))
 ```
 
 **输出：**
@@ -920,7 +920,7 @@ debug.print(table.pretty(date.now({ timezone = date.UTC_PLUS_4, time_type = date
 
 ## `UTC_PLUS_5`
 
-使用在 UTC 时间上加上 5 小时的固定时区。
+使用 UTC+5 固定时区。
 
 ### 调用
 
@@ -937,7 +937,7 @@ date.UTC_PLUS_5
 > 2000/1/1 00:00:00 UTC
 
 ```lua
-debug.print(table.pretty(date.now({ timezone = date.UTC_PLUS_5, time_type = date.DATE })))
+debug.print(table.pretty(date.now({ timezone = date.UTC_PLUS_5, return_type = date.DATETIME })))
 ```
 
 **输出：**
@@ -968,7 +968,7 @@ debug.print(table.pretty(date.now({ timezone = date.UTC_PLUS_5, time_type = date
 
 ## `UTC_PLUS_6`
 
-使用在 UTC 时间上加上 6 小时的固定时区。
+使用 UTC+6 固定时区。
 
 ### 调用
 
@@ -985,7 +985,7 @@ date.UTC_PLUS_6
 > 2000/1/1 00:00:00 UTC
 
 ```lua
-debug.print(table.pretty(date.now({ timezone = date.UTC_PLUS_6, time_type = date.DATE })))
+debug.print(table.pretty(date.now({ timezone = date.UTC_PLUS_6, return_type = date.DATETIME })))
 ```
 
 **输出：**
@@ -1016,7 +1016,7 @@ debug.print(table.pretty(date.now({ timezone = date.UTC_PLUS_6, time_type = date
 
 ## `UTC_PLUS_7`
 
-使用在 UTC 时间上加上 7 小时的固定时区。
+使用 UTC+7 固定时区。
 
 ### 调用
 
@@ -1033,7 +1033,7 @@ date.UTC_PLUS_7
 > 2000/1/1 00:00:00 UTC
 
 ```lua
-debug.print(table.pretty(date.now({ timezone = date.UTC_PLUS_7, time_type = date.DATE })))
+debug.print(table.pretty(date.now({ timezone = date.UTC_PLUS_7, return_type = date.DATETIME })))
 ```
 
 **输出：**
@@ -1064,7 +1064,7 @@ debug.print(table.pretty(date.now({ timezone = date.UTC_PLUS_7, time_type = date
 
 ## `UTC_PLUS_8`
 
-使用在 UTC 时间上加上 8 小时的固定时区。
+使用 UTC+8 固定时区。
 
 ### 调用
 
@@ -1081,7 +1081,7 @@ date.UTC_PLUS_8
 > 2000/1/1 00:00:00 UTC
 
 ```lua
-debug.print(table.pretty(date.now({ timezone = date.UTC_PLUS_8, time_type = date.DATE })))
+debug.print(table.pretty(date.now({ timezone = date.UTC_PLUS_8, return_type = date.DATETIME })))
 ```
 
 **输出：**
@@ -1112,7 +1112,7 @@ debug.print(table.pretty(date.now({ timezone = date.UTC_PLUS_8, time_type = date
 
 ## `UTC_PLUS_9`
 
-使用在 UTC 时间上加上 9 小时的固定时区。
+使用 UTC+9 固定时区。
 
 ### 调用
 
@@ -1129,7 +1129,7 @@ date.UTC_PLUS_9
 > 2000/1/1 00:00:00 UTC
 
 ```lua
-debug.print(table.pretty(date.now({ timezone = date.UTC_PLUS_9, time_type = date.DATE })))
+debug.print(table.pretty(date.now({ timezone = date.UTC_PLUS_9, return_type = date.DATETIME })))
 ```
 
 **输出：**
@@ -1160,7 +1160,7 @@ debug.print(table.pretty(date.now({ timezone = date.UTC_PLUS_9, time_type = date
 
 ## `UTC_PLUS_10`
 
-使用在 UTC 时间上加上 10 小时的固定时区。
+使用 UTC+10 固定时区。
 
 ### 调用
 
@@ -1177,7 +1177,7 @@ date.UTC_PLUS_10
 > 2000/1/1 00:00:00 UTC
 
 ```lua
-debug.print(table.pretty(date.now({ timezone = date.UTC_PLUS_10, time_type = date.DATE })))
+debug.print(table.pretty(date.now({ timezone = date.UTC_PLUS_10, return_type = date.DATETIME })))
 ```
 
 **输出：**
@@ -1208,7 +1208,7 @@ debug.print(table.pretty(date.now({ timezone = date.UTC_PLUS_10, time_type = dat
 
 ## `UTC_PLUS_11`
 
-使用在 UTC 时间上加上 11 小时的固定时区。
+使用 UTC+11 固定时区。
 
 ### 调用
 
@@ -1225,7 +1225,7 @@ date.UTC_PLUS_11
 > 2000/1/1 00:00:00 UTC
 
 ```lua
-debug.print(table.pretty(date.now({ timezone = date.UTC_PLUS_11, time_type = date.DATE })))
+debug.print(table.pretty(date.now({ timezone = date.UTC_PLUS_11, return_type = date.DATETIME })))
 ```
 
 **输出：**
@@ -1256,7 +1256,7 @@ debug.print(table.pretty(date.now({ timezone = date.UTC_PLUS_11, time_type = dat
 
 ## `UTC_PLUS_12`
 
-使用在 UTC 时间上加上 12 小时的固定时区。
+使用 UTC+12 固定时区。
 
 ### 调用
 
@@ -1273,7 +1273,7 @@ date.UTC_PLUS_12
 > 2000/1/1 00:00:00 UTC
 
 ```lua
-debug.print(table.pretty(date.now({ timezone = date.UTC_PLUS_12, time_type = date.DATE })))
+debug.print(table.pretty(date.now({ timezone = date.UTC_PLUS_12, return_type = date.DATETIME })))
 ```
 
 **输出：**
@@ -1304,7 +1304,7 @@ debug.print(table.pretty(date.now({ timezone = date.UTC_PLUS_12, time_type = dat
 
 ## `UTC_PLUS_13`
 
-使用在 UTC 时间上加上 13 小时的固定时区。
+使用 UTC+13 固定时区。
 
 ### 调用
 
@@ -1321,7 +1321,7 @@ date.UTC_PLUS_13
 > 2000/1/1 00:00:00 UTC
 
 ```lua
-debug.print(table.pretty(date.now({ timezone = date.UTC_PLUS_13, time_type = date.DATE })))
+debug.print(table.pretty(date.now({ timezone = date.UTC_PLUS_13, return_type = date.DATETIME })))
 ```
 
 **输出：**
@@ -1352,7 +1352,7 @@ debug.print(table.pretty(date.now({ timezone = date.UTC_PLUS_13, time_type = dat
 
 ## `UTC_PLUS_14`
 
-使用在 UTC 时间上加上 14 小时的固定时区。
+使用 UTC+14 固定时区。
 
 ### 调用
 
@@ -1369,7 +1369,7 @@ date.UTC_PLUS_14
 > 2000/1/1 00:00:00 UTC
 
 ```lua
-debug.print(table.pretty(date.now({ timezone = date.UTC_PLUS_14, time_type = date.DATE })))
+debug.print(table.pretty(date.now({ timezone = date.UTC_PLUS_14, return_type = date.DATETIME })))
 ```
 
 **输出：**
@@ -1410,14 +1410,14 @@ date.TIMESTAMP
 
 ### 可用于
 
-- 参数 `time_type`
+- 参数 `return_type`
 
 ### 示例
 
 > 2000/1/1 00:00:00 UTC
 
 ```lua
-debug.print(date.now({ timezone = date.UTC, time_type = date.TIMESTAMP }))
+debug.print(date.now({ timezone = date.UTC, return_type = date.TIMESTAMP }))
 ```
 
 **输出：**
@@ -1434,26 +1434,26 @@ debug.print(date.now({ timezone = date.UTC, time_type = date.TIMESTAMP }))
 
 ---
 
-## `DATE`
+## `DATETIME`
 
 返回包含年月日和时间的对象表。
 
 ### 调用
 
 ```lua
-date.DATE
+date.DATETIME
 ```
 
 ### 可用于
 
-- 参数 `time_type`
+- 参数 `return_type`
 
 ### 示例
 
 > 2000/1/1 00:00:00 UTC
 
 ```lua
-debug.print(table.pretty(date.now({ timezone = date.UTC, time_type = date.DATE })))
+debug.print(table.pretty(date.now({ timezone = date.UTC, return_type = date.DATETIME })))
 ```
 
 **输出：**
@@ -1473,7 +1473,7 @@ debug.print(table.pretty(date.now({ timezone = date.UTC, time_type = date.DATE }
 ### 等值
 
 ```text
-"date"
+"datetime"
 ```
 
 ---
@@ -1494,20 +1494,20 @@ date.now
 
 #### 选填参数
 
-| 参数名      | 类型       | 默认值           | 说明     |
-| ----------- | ---------- | ---------------- | -------- |
-| `timezone`  | const-date | `date.LOCAL`     | 时区     |
-| `time_type` | const-date | `date.TIMESTAMP` | 返回格式 |
+| 参数名        | 类型       | 默认值           | 说明     |
+| ------------- | ---------- | ---------------- | -------- |
+| `timezone`    | const-date | `date.LOCAL`     | 时区     |
+| `return_type` | const-date | `date.TIMESTAMP` | 返回格式 |
 
 ### 返回值
 
-**选填参数 `time_type` 为 `date.TIMESTAMP` 时**，返回一个值。
+**选填参数 `return_type` 为 `date.TIMESTAMP` 时**，返回一个值。
 
 | 类型    | 说明       |
 | ------- | ---------- |
 | integer | 毫秒时间戳 |
 
-**选填参数 `time_type` 为 `date.DATE` 时**，返回一个值。
+**选填参数 `return_type` 为 `date.DATETIME` 时**，返回一个值。
 
 | 类型  | 说明       |
 | ----- | ---------- |
@@ -1518,8 +1518,8 @@ date.now
 > 2000/1/1 00:00:00 UTC
 
 ```lua
-debug.print(date.now({ timezone = date.UTC, time_type = date.TIMESTAMP }))
-debug.print(table.pretty(date.now({ timezone = date.UTC, time_type = date.DATE })))
+debug.print(date.now({ timezone = date.UTC, return_type = date.TIMESTAMP }))
+debug.print(table.pretty(date.now({ timezone = date.UTC, return_type = date.DATETIME })))
 ```
 
 **输出：**
@@ -1718,15 +1718,15 @@ date.timestamp_diff
 
 #### 必填参数
 
-| 参数名            | 类型            | 说明                     |
-| ----------------- | --------------- | ------------------------ |
-| `early_timestamp` | integer / table | 较早的毫秒时间戳或日期表 |
-| `later_timestamp` | integer / table | 较晚的毫秒时间戳或日期表 |
+| 参数名       | 类型            | 说明                     |
+| ------------ | --------------- | ------------------------ |
+| `start_time` | integer / table | 较早的毫秒时间戳或日期表 |
+| `end_time`   | integer / table | 较晚的毫秒时间戳或日期表 |
 
 #### 选填参数
 
-| 参数名     | 类型       | 默认值       | 说明                                       |
-| ---------- | ---------- | ------------ | ------------------------------------------ |
+| 参数名     | 类型       | 默认值       | 说明             |
+| ---------- | ---------- | ------------ | ---------------- |
 | `timezone` | const-date | `date.LOCAL` | 日期表所属的时区 |
 
 ### 返回值
@@ -1763,7 +1763,7 @@ debug.print(diff)
 
 ### 额外说明
 
-- 必填参数 `early_timestamp` 和必填参数 `later_timestamp` 为日期表时，日期表字段如下：
+- 必填参数 `start_time` 和必填参数 `end_time` 为日期表时，日期表字段如下：
 
 ```lua
 {
@@ -1783,6 +1783,5 @@ debug.print(diff)
 - 日期表字段 `minute` 取值范围为 $[0, 59]$。
 - 日期表字段 `second` 取值范围为 $[0, 59]$。
 - 日期表字段 `millisecond` 取值范围为 $[0, 999]$。
-- 必填参数 `early_timestamp` 必须小于等于必填参数 `later_timestamp`。
-- 必填参数 `early_timestamp` 和必填参数 `later_timestamp` 为时间戳时，不受选填参数 `timezone` 控制。
-- 返回值取绝对值。
+- 必填参数 `start_time` 必须小于等于必填参数 `end_time`。
+- 必填参数 `start_time` 和必填参数 `end_time` 为时间戳时，不受选填参数 `timezone` 控制。

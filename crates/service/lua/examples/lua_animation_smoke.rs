@@ -55,34 +55,57 @@ pub(crate) fn main() {
       debug.assert(animation.sample(empty) == nil and animation.sample(empty, {key="missing"}) == nil)
       debug.assert(animation.exists(empty) and animation.get_info(empty).state == "idle")
       debug.assert(animation.list().n == 1 and animation.list()[1].id == empty)
-      debug.assert(animation.delete(empty) and not animation.delete(empty))
-      debug.assert(animation.get_info(empty) == nil and animation.sample(empty) == nil)
-      debug.assert(not animation.play(empty) and not animation.pause(empty))
+      debug.assert(animation.delete(empty) and not animation.exists(empty))
+      for _, missing in ipairs({empty, "animation_999999"}) do
+        debug.assert(not animation.exists(missing))
+        for _, method in ipairs({"delete","get_info","sample","play","pause","reset","replay","set"}) do
+          local ok, message = debug.pcall(animation[method], missing)
+          debug.assert(not ok and string.find(message, "animation." .. method, {plain=true}) ~= nil)
+          debug.assert(string.find(message, "does not exist", {plain=true}) ~= nil)
+        end
+      end
       debug.assert(animation.clear() and animation.clear())
       debug.assert(fails(function() animation.LINEAR = "other" end))
+      local valid = animation.create(1, {})
+      for _, name in ipairs({"track","default_easing","defult_easing","play_direction","repeat_fill_mode"}) do
+        local options = {[name] = {}}
+        debug.assert(fails(function() animation.create(1, {}, options) end))
+        debug.assert(fails(function() animation.set(valid, options) end))
+      end
+      debug.assert(fails(function() animation.create(1, {{timestamp=0,key={x=0}}}) end))
+      debug.assert(animation.set(valid, {keyframes={{timestamp=0,values={x=0}},{timestamp=1,values={x=1}}},
+        easing={}, callback_easing={x=animation.LINEAR}, direction=animation.REVERSE,
+        fill_mode=animation.BACKWARDS, loop=true}))
+      local changed = animation.list()[1]
+      debug.assert(changed.keyframes[1].values.x == 0 and changed.keyframes[1].key == nil)
+      debug.assert(changed.callback_easing.x == animation.LINEAR and changed.direction == "reverse" and changed.fill_mode == "backwards")
+      debug.assert(animation.sample(valid,{key="x"}) == 1)
+      debug.assert(animation.delete(valid))
       for _, invalid in ipairs({false, -1, 1/0, 0/0, 18446744073709551616.0}) do
         debug.assert(fails(function() animation.create(invalid, {}) end))
       end
       for _, options in ipairs({{["repeat"]=false}, {["repeat"]=0}, {["repeat"]=2.5},
-        {delay=-1}, {interval=-1}, {play_direction="sideways"}, {repeat_fill_mode="none"},
-        {easing="unknown"}, {default_easing={x={animation.LINEAR}}}, {unknown=1}}) do
+        {delay=-1}, {interval=-1}, {direction="sideways"}, {fill_mode="none"},
+        {easing="unknown"}, {callback_easing={x={animation.LINEAR}}}, {unknown=1}}) do
         debug.assert(fails(function() animation.create(1, {}, options) end))
       end
-      for _, track in ipairs({{{timestamp=-1,key={x=0}}}, {{timestamp=2,key={x=0}}},
-        {{timestamp="0",key={x=0}}}, {{timestamp=0,key={[1]=0}}}}) do
-        debug.assert(fails(function() animation.create(1, track) end))
+      for _, keyframes in ipairs({{{timestamp=-1,values={x=0}}}, {{timestamp=2,values={x=0}}},
+        {{timestamp="0",values={x=0}}}, {{timestamp=0,values={[1]=0}}}}) do
+        debug.assert(fails(function() animation.create(1, keyframes) end))
       end
       local sparse = animation.create(3, {
-        {timestamp=2,key={a=2,b=1}}, {timestamp=0,key={b=3}},
-        {timestamp=1,key={a=1,c=4}}, {timestamp=3,key={}}, {timestamp=1,key={a=99,discarded=1}},
-      }, {easing={b={[1]=animation.LINEAR,[99]=animation.STEP}}, default_easing={a=animation.LINEAR}})
+        {timestamp=2,values={a=2,b=1}}, {timestamp=0,values={b=3}},
+        {timestamp=1,values={a=1,c=4}}, {timestamp=3,values={}}, {timestamp=1,values={a=99,discarded=1}},
+      }, {easing={b={[1]=animation.LINEAR,[99]=animation.STEP}}, callback_easing={a=animation.LINEAR}})
       local info = animation.get_info(sparse)
-      debug.assert(#info.track == 4 and info.track[1].key.a == 1 and info.track[4].key.c == 4)
-      debug.assert(info.track[2].key.b == nil and info.track[2].key.discarded == nil)
+      debug.assert(info.track == nil and info.default_easing == nil and info.play_direction == nil and info.repeat_fill_mode == nil)
+      debug.assert(info.callback_easing.a == animation.LINEAR and info.direction == "normal" and info.fill_mode == "forwards")
+      debug.assert(#info.keyframes == 4 and info.keyframes[1].values.a == 1 and info.keyframes[4].values.c == 4)
+      debug.assert(info.keyframes[2].values.b == nil and info.keyframes[2].values.discarded == nil)
       debug.assert(animation.sample(sparse).b == 3 and animation.sample(sparse).a == 1)
       debug.assert(not debug.pcall(animation.set, sparse, {duration=1}))
       debug.assert(animation.get_info(sparse).duration == 3)
-      debug.assert(animation.set(sparse, {track={{timestamp=0,key={x=0}},{timestamp=3,key={x=6}}}, easing=animation.LINEAR}))
+      debug.assert(animation.set(sparse, {keyframes={{timestamp=0,values={x=0}},{timestamp=3,values={x=6}}}, easing=animation.LINEAR}))
       debug.assert(animation.play(sparse) and not animation.play(sparse))
       debug.assert(animation.pause(sparse) and animation.get_info(sparse).state == "paused")
       debug.assert(animation.play(sparse) and animation.reset(sparse))
@@ -92,32 +115,32 @@ pub(crate) fn main() {
       animations = {}
       for _, direction in ipairs({animation.NORMAL,animation.REVERSE,animation.ALTERNATE,animation.ALTERNATE_REVERSE}) do
         for _, fill in ipairs({animation.FORWARDS,animation.BACKWARDS}) do
-          local id = animation.create(2, {{timestamp=0,key={x=0}},{timestamp=2,key={x=10}}}, {
+          local id = animation.create(2, {{timestamp=0,values={x=0}},{timestamp=2,values={x=10}}}, {
             delay=0.5, interval=0.5, loop=true, ["repeat"]=2, easing=animation.LINEAR,
-            play_direction=direction, repeat_fill_mode=fill,
+            direction=direction, fill_mode=fill,
           })
           debug.assert(animation.play(id) and animation.get_info(id).state == "delay")
           debug.assert(animation.sample(id, {key="x"}) == ((direction == "reverse" or direction == "alternate_reverse") and 10 or 0))
           animations[#animations+1] = {id=id, direction=direction, fill=fill}
         end
       end
-      custom = animation.create(2, {{timestamp=0,key={x=0,label="a"}},{timestamp=2,key={x=10,label="b"}}}, {
+      custom = animation.create(2, {{timestamp=0,values={x=0,label="a"}},{timestamp=2,values={x=10,label="b"}}}, {
         delay=0.5, easing={x=function(t, first, last, a, b)
           debug.assert(first == 0 and last == 2 and a == 0 and b == 10)
           return {current=t}
-        end}, default_easing={label=animation.STEP},
+        end}, callback_easing={label=animation.STEP},
       })
       debug.assert(animation.play(custom))
       debug.assert(animation.sample(custom, {key="label"}) == "a")
-      local bad = animation.create(1, {{timestamp=0,key={x="a"}},{timestamp=1,key={x="b"}}}, {easing=animation.LINEAR})
+      local bad = animation.create(1, {{timestamp=0,values={x="a"}},{timestamp=1,values={x="b"}}}, {easing=animation.LINEAR})
       debug.assert(fails(function() animation.sample(bad) end))
       animation.delete(bad)
       local vector_meta = {}
       vector_meta.__sub = function(a,b) return setmetatable({x=a.x-b.x},vector_meta) end
       vector_meta.__mul = function(a,b) return setmetatable({x=a.x*b},vector_meta) end
       vector_meta.__add = function(a,b) return setmetatable({x=a.x+b.x},vector_meta) end
-      local vector = animation.create(1, {{timestamp=0,key={v=setmetatable({x=2},vector_meta)}},
-        {timestamp=1,key={v=setmetatable({x=4},vector_meta)}}}, {easing=animation.LINEAR})
+      local vector = animation.create(1, {{timestamp=0,values={v=setmetatable({x=2},vector_meta)}},
+        {timestamp=1,values={v=setmetatable({x=4},vector_meta)}}}, {easing=animation.LINEAR})
       debug.assert(animation.sample(vector,{key="v"}).x == 2)
       animation.delete(vector)
       local timed = timer.create(1)
@@ -157,6 +180,7 @@ pub(crate) fn main() {
       if frame == 8 then
         local timed = timer.create(1)
         debug.assert(animation.clear() and animation.count() == 0 and animation.list().n == 0)
+        debug.assert(not animation.exists(custom) and not debug.pcall(animation.sample, custom))
         debug.assert(timer.exists(timed) and timer.delete(timed))
       end
     end
@@ -188,7 +212,7 @@ pub(crate) fn main() {
 
   fs::write(&entry, r#"
     function Init(ctx)
-      local values = {{timestamp=0,key={x=0}},{timestamp=6,key={x=10}}}
+      local values = {{timestamp=0,values={x=0}},{timestamp=6,values={x=10}}}
       local choices = {animation.STEP,animation.LINEAR,animation.EASE_IN_QUAD,animation.EASE_OUT_QUAD,
         animation.EASE_IN_OUT_CUBIC,animation.EASE_IN_OUT_REVERSE_CUBIC}
       eased = {}
@@ -197,16 +221,16 @@ pub(crate) fn main() {
         local id = animation.create(6, values, {easing=options})
         options.x[1] = animation.STEP
         animation.get_info(id).easing.x[1] = animation.STEP
-        animation.get_info(id).track[2].key.x = 999
+        animation.get_info(id).keyframes[2].values.x = 999
         debug.assert(animation.play(id))
         eased[#eased+1] = id
       end
       sparse = animation.create(3, {
-        {timestamp=2,key={a=2,b=1}}, {timestamp=0,key={b=3}},
-        {timestamp=1,key={a=1,c=4}}, {timestamp=3,key={}},
-      }, {easing={b={[1]=animation.LINEAR}}, default_easing={a=animation.LINEAR}})
+        {timestamp=2,values={a=2,b=1}}, {timestamp=0,values={b=3}},
+        {timestamp=1,values={a=1,c=4}}, {timestamp=3,values={}},
+      }, {easing={b={[1]=animation.LINEAR}}, callback_easing={a=animation.LINEAR}})
       animation.play(sparse)
-      removed = animation.create(1, {{timestamp=0,key={x=0}},{timestamp=1,key={x=1}}}, {
+      removed = animation.create(1, {{timestamp=0,values={x=0}},{timestamp=1,values={x=1}}}, {
         easing=function(t, first, last, a, b)
           debug.assert(animation.delete(removed))
           return "removed"
@@ -242,7 +266,7 @@ pub(crate) fn main() {
       format!(
         r#"
       function Init(ctx)
-        id = animation.create(1, {{{{timestamp=0,key={{x=0}}}},{{timestamp=1,key={{x=1}}}}}},
+        id = animation.create(1, {{{{timestamp=0,values={{x=0}}}},{{timestamp=1,values={{x=1}}}}}},
           {{easing=function() {failure} end}})
         animation.play(id)
       end

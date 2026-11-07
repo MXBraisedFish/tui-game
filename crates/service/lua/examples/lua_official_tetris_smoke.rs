@@ -84,6 +84,12 @@ pub fn main() {
       action("pause", "pressed")
       debug.assert(session.phase == "pause")
     end
+    local render_phases = {"stop", "ready", "running", "pause", "end"}
+    local render_index = 0
+    function UpdateFrame(dt, alpha)
+      render_index = render_index + 1
+      session.phase = render_phases[render_index]
+    end
   "#,
   );
   fs::write(&entry, source).unwrap();
@@ -104,9 +110,15 @@ pub fn main() {
     })
     .expect("official Tetris event handling");
   session.update().unwrap();
+  for _ in 0..5 {
+    session.update_frame(Duration::ZERO, 0.0).unwrap();
+    session
+      .render()
+      .expect("render official Tetris phases with automatic slice anchors");
+  }
   session.stop();
   assert!(!session.has_objects());
   println!(
-    "official Tetris ok: i18n completion, action press/hold/release, focus loss and overlay input cleanup"
+    "official Tetris ok: i18n completion, action press/hold/release, focus loss, overlay input cleanup and phase rendering"
   );
 }

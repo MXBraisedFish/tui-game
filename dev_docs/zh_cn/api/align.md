@@ -348,11 +348,11 @@ align.resolve_x
 
 #### 选填参数
 
-| 参数名        | 类型          | 默认值   | 说明             |
-| ------------- | ------------- | -------- | ---------------- |
-| `offset_x`    | integer       | `0`      | 锚点上的水平偏移 |
-| `relative_x`  | integer / nil | `nil`    | 自定义水平锚点   |
-| `slice_layer` | string        | `"base"` | 目标图层切片     |
+| 参数名        | 类型    | 默认值       | 说明             |
+| ------------- | ------- | ------------ | ---------------- |
+| `offset_x`    | integer | `0`          | 锚点上的水平偏移 |
+| `anchor_x`    | integer | 图层切片锚点 | 自定义水平锚点   |
+| `slice_layer` | string  | `"base"`     | 目标图层切片     |
 
 ### 返回值
 
@@ -371,7 +371,7 @@ draw.text(x1, 4, "Hello", { fg = color.BRIGHT_RED })
 local x2 = align.resolve_x(3, align.CENTER, { offset_x = -5 })
 draw.text(x2, 4, "TUI", { fg = color.BRIGHT_BLUE })
 
-local x3 = align.resolve_x(4, align.RIGHT, { relative_x = 60 })
+local x3 = align.resolve_x(4, align.RIGHT, { anchor_x = 60 })
 draw.text(x3, 4, "Game", { fg = color.BRIGHT_GREEN })
 ```
 
@@ -406,11 +406,11 @@ align.resolve_y
 
 #### 选填参数
 
-| 参数名        | 类型          | 默认值   | 说明             |
-| ------------- | ------------- | -------- | ---------------- |
-| `offset_y`    | integer       | `0`      | 锚点上的垂直偏移 |
-| `relative_y`  | integer / nil | `nil`    | 自定义垂直锚点   |
-| `slice_layer` | string        | `"base"` | 目标图层切片     |
+| 参数名        | 类型    | 默认值       | 说明             |
+| ------------- | ------- | ------------ | ---------------- |
+| `offset_y`    | integer | `0`          | 锚点上的垂直偏移 |
+| `anchor_y`    | integer | 图层切片锚点 | 自定义垂直锚点   |
+| `slice_layer` | string  | `"base"`     | 目标图层切片     |
 
 ### 返回值
 
@@ -429,7 +429,7 @@ draw.text(5, y1, "Hello", { fg = color.BRIGHT_RED, max_width = 1 })
 local y2 = align.resolve_y(3, align.CENTER, { offset_y = -2 })
 draw.text(5, y2, "TUI", { fg = color.BRIGHT_BLUE, max_width = 1 })
 
-local y3 = align.resolve_y(4, align.BOTTOM, { relative_y = 23 })
+local y3 = align.resolve_y(4, align.BOTTOM, { anchor_y = 23 })
 draw.text(5, y3, "Game", { fg = color.BRIGHT_GREEN, max_width = 1 })
 ```
 
@@ -466,13 +466,13 @@ align.resolve_rect
 
 #### 选填参数
 
-| 参数名        | 类型          | 默认值   | 说明             |
-| ------------- | ------------- | -------- | ---------------- |
-| `offset_x`    | integer       | `0`      | 锚点上的水平偏移 |
-| `offset_y`    | integer       | `0`      | 锚点上的垂直偏移 |
-| `relative_x`  | integer / nil | `nil`    | 自定义水平锚点   |
-| `relative_y`  | integer / nil | `nil`    | 自定义垂直锚点   |
-| `slice_layer` | string        | `"base"` | 目标图层切片     |
+| 参数名        | 类型    | 默认值       | 说明             |
+| ------------- | ------- | ------------ | ---------------- |
+| `offset_x`    | integer | `0`          | 锚点上的水平偏移 |
+| `offset_y`    | integer | `0`          | 锚点上的垂直偏移 |
+| `anchor_x`    | integer | 图层切片锚点 | 自定义水平锚点   |
+| `anchor_y`    | integer | 图层切片锚点 | 自定义垂直锚点   |
+| `slice_layer` | string  | `"base"`     | 目标图层切片     |
 
 ### 返回值
 

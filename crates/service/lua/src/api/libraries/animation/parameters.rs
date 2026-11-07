@@ -4,17 +4,17 @@ use super::*;
 use std::collections::{BTreeMap, BTreeSet};
 use tg_service_animation::{ParameterKeyframe, ParameterTrack};
 
-pub(super) fn parse_track(
+pub(super) fn parse_keyframes(
   value: Value,
   duration: f64,
   method: &str,
 ) -> mlua::Result<ParameterTrack<Value>> {
-  let rows = args::array_values(value, method, "track")?;
+  let rows = args::array_values(value, method, "keyframes")?;
   let mut frames = Vec::with_capacity(rows.len());
   let mut parameters = BTreeSet::new();
   let mut entries = 0;
   for row in rows {
-    let row = plain_table(row, method, "track entry")?;
+    let row = plain_table(row, method, "keyframe")?;
     let timestamp = seconds_number(
       args::required(&row, method, "timestamp")?,
       method,
@@ -23,12 +23,12 @@ pub(super) fn parse_track(
     if timestamp > duration {
       return Err(args::message(method, "timestamp exceeds duration"));
     }
-    let keys = plain_table(args::required(&row, method, "key")?, method, "key")?;
+    let keys = plain_table(args::required(&row, method, "values")?, method, "values")?;
     let mut values = BTreeMap::new();
     for pair in keys.pairs::<Value, Value>() {
       entries += 1;
       if entries > args::MAX_API_TABLE_ENTRIES {
-        return Err(args::message(method, "track exceeds 16384 values"));
+        return Err(args::message(method, "keyframes exceed 16384 values"));
       }
       let (key, value) = pair?;
       let key = args::string(key, method, "parameter name")?;
@@ -44,23 +44,23 @@ pub(super) fn parse_track(
   if frames.len().saturating_mul(parameters.len()) > args::MAX_API_TABLE_ENTRIES {
     return Err(args::message(
       method,
-      "normalized track exceeds 16384 parameter positions",
+      "normalized keyframes exceed 16384 parameter positions",
     ));
   }
   ParameterTrack::new(seconds(duration, method, "duration")?, frames)
     .map_err(|error| args::message(method, error.to_string()))
 }
 
-pub(super) fn track_table(lua: &Lua, track: &ParameterTrack<Value>) -> mlua::Result<Table> {
+pub(super) fn keyframes_table(lua: &Lua, keyframes: &ParameterTrack<Value>) -> mlua::Result<Table> {
   let output = lua.create_table()?;
-  for (index, frame) in track.frames().iter().enumerate() {
+  for (index, frame) in keyframes.frames().iter().enumerate() {
     let row = lua.create_table()?;
     row.raw_set("timestamp", frame.timestamp.as_secs_f64())?;
     let keys = lua.create_table()?;
     for (key, value) in &frame.values {
       keys.raw_set(key.as_str(), value.clone())?;
     }
-    row.raw_set("key", keys)?;
+    row.raw_set("values", keys)?;
     output.raw_set(index + 1, row)?;
   }
   Ok(output)

@@ -1,14 +1,14 @@
-track 轨道
+keyframes 轨道
 {
 [1] = {
 timestamp -> float 时间点
-key = { -> 当前时间点记录的参数
+values = { -> 当前时间点记录的参数
 "参数" = "值" -> 参数名和参数内容
 }
 }
 [2] = {
 timestamp -> float 时间点
-key = { -> 当前时间点记录的参数
+values = { -> 当前时间点记录的参数
 "参数" = "值" -> 参数名和参数内容
 }
 }
@@ -23,7 +23,7 @@ easing 插值函数（也可以直接写function / const-animation）
 }
 }
 
-default_easing 默认插值函数（也可以直接写function / const-animation）
+callback_easing 默认插值函数（也可以直接写function / const-animation）
 {
 "参数1" = function / const-animation
 "参数2" = function / const-animation
@@ -50,7 +50,7 @@ end_value -> 当前插值区段结束值
 
 特殊处理：
 
-1. 对于参数 `track` 中的数组，应当按照时间点的递增顺序排列
+1. 对于参数 `keyframes` 中的数组，应当按照时间点的递增顺序排列
 
 - 遇到顺序错误（例如大时间点在上，小时间点在下），程序会自动重排序
 - 遇到时间点相等的，保留首个被扫的轨道内容，其他的全部丢弃
@@ -60,7 +60,7 @@ end_value -> 当前插值区段结束值
   {
   [1] = {
   timestamp = 0
-  key = {
+  values = {
 
           b = 3
 
@@ -68,7 +68,7 @@ end_value -> 当前插值区段结束值
       },
       [2] = {
         timestamp = 1
-        key = {
+        values = {
           a = 1
 
           c = 4
@@ -76,7 +76,7 @@ end_value -> 当前插值区段结束值
       },
       [3] = {
         timestamp = 2
-        key = {
+        values = {
           a = 2
           b = 1
 
@@ -84,7 +84,7 @@ end_value -> 当前插值区段结束值
       },
       [4] = {
         timestamp = 3
-        key = {
+        values = {
 
 
 
@@ -104,7 +104,7 @@ end_value -> 当前插值区段结束值
   {
   [1] = {
   timestamp = 0
-  key = {
+  values = {
   a = 1
   b = 3
   c = 4
@@ -112,7 +112,7 @@ end_value -> 当前插值区段结束值
   },
   [2] = {
   timestamp = 1
-  key = {
+  values = {
   a = 1
   （此处b不补全，由1和3闭合为一个插值区段）
   c = 4
@@ -120,7 +120,7 @@ end_value -> 当前插值区段结束值
   },
   [3] = {
   timestamp = 2
-  key = {
+  values = {
   a = 2
   b = 1
   c = 4（注意，c不会因为4时间点补全后和2时间点闭合就不补全3时间点，缺少尾包裹会被全补全，而且实际顺序是3时间点先被补全，因此4时间点实际补全的是3时间点补全后的值）
@@ -128,7 +128,7 @@ end_value -> 当前插值区段结束值
   },
   [4] = {
   timestamp = 3
-  key = {
+  values = {
   a = 2
   b = 1
   c = 4
@@ -145,7 +145,7 @@ end_value -> 当前插值区段结束值
 - 如果不传递任何值，则默认使用`animation.STEP`作为插值函数
 - 如果直接传递一个函数或者常量，则表示所有字段共用一个插值函数
 - 如果传递表，则表示要求字段使用指定的插值函数
-- 对于传递的表方式，如果有注册的字段没有注册插值函数，或插值区段缺少对应的插值函数，则均默认使用`animation.STEP`，可在参数`default_easing`来指定缺少插值函数时使用的默认函数
+- 对于传递的表方式，如果有注册的字段没有注册插值函数，或插值区段缺少对应的插值函数，则均默认使用`animation.STEP`，可在参数`callback_easing`来指定缺少插值函数时使用的默认函数
 - 对于插值函数出现错误依旧会抛出错误
 - 对于不存在的区段所设置的插值函数会被忽略
 - 存在对相同区段设置的插值函数会保留第一个，其余的均被忽略

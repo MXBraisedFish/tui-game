@@ -208,9 +208,9 @@ fn enqueue_debug_print(
   state: &mut super::LuaApiState,
   message: String,
   title: Option<String>,
-  time: bool,
+  show_time: bool,
   level: Option<String>,
-  type_head: bool,
+  show_session_type: bool,
 ) {
   if state.debug_log_window_started.elapsed() >= Duration::from_secs(1) {
     if state.debug_log_dropped > 0 {
@@ -236,9 +236,9 @@ fn enqueue_debug_print(
       LuaHostCommand::Print {
         message: truncate(message, 4096),
         title: title.map(|title| truncate(title, 4096)),
-        time,
+        time: show_time,
         level,
-        type_head,
+        type_head: show_session_type,
       },
     );
   } else {

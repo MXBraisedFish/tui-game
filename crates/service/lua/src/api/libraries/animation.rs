@@ -9,29 +9,29 @@ use tg_service_time::{
 };
 
 mod parameters;
-use parameters::{parse_track, resolve_easing, selector_copy, track_table};
+use parameters::{keyframes_table, parse_keyframes, resolve_easing, selector_copy};
 
 const OPTIONS: &[&str] = &[
   "easing",
-  "default_easing",
+  "callback_easing",
   "delay",
   "loop",
   "interval",
   "repeat",
-  "play_direction",
-  "repeat_fill_mode",
+  "direction",
+  "fill_mode",
 ];
 const SET_OPTIONS: &[&str] = &[
   "duration",
-  "track",
+  "keyframes",
   "easing",
-  "default_easing",
+  "callback_easing",
   "delay",
   "loop",
   "interval",
   "repeat",
-  "play_direction",
-  "repeat_fill_mode",
+  "direction",
+  "fill_mode",
 ];
 const MAX_ANIMATIONS: usize = 1024;
 
@@ -64,7 +64,7 @@ pub(super) fn animation(lua: &Lua, state: SharedApiState) -> mlua::Result<Table>
     "create",
     lua.create_function(move |lua, values: MultiValue| {
       let method = "animation.create";
-      let args = args::positional(lua, method, values, &["duration", "track"], OPTIONS)?;
+      let args = args::positional(lua, method, values, &["duration", "keyframes"], OPTIONS)?;
       let duration = seconds_number(args.required(0, method, "duration")?, method, "duration")?;
       let binding = LuaAnimationBinding {
         timer: ScheduledTimerId(0),
@@ -73,15 +73,15 @@ pub(super) fn animation(lua: &Lua, state: SharedApiState) -> mlua::Result<Table>
         interval: 0.0,
         looping: false,
         repetitions: None,
-        track: Rc::new(parse_track(
-          args.required(1, method, "track")?,
+        keyframes: Rc::new(parse_keyframes(
+          args.required(1, method, "keyframes")?,
           duration,
           method,
         )?),
         easing: Value::String(lua.create_string("step")?),
-        default_easing: Value::String(lua.create_string("step")?),
+        callback_easing: Value::String(lua.create_string("step")?),
         direction: "normal".into(),
-        fill: "forwards".into(),
+        fill_mode: "forwards".into(),
       };
       let mut binding = binding_options(lua, binding, args.options(), method)?;
       let options = schedule_options(&binding, method)?;
@@ -111,11 +111,12 @@ pub(super) fn animation(lua: &Lua, state: SharedApiState) -> mlua::Result<Table>
       let args = args::positional(lua, method, values, &["id"], SET_OPTIONS)?;
       let id = parse_id(args.required(0, method, "id")?, method)?;
       let original = with_pool(&set_state, method, |pool| {
-        Ok(pool.animations.get(&id).cloned())
+        pool
+          .animations
+          .get(&id)
+          .cloned()
+          .ok_or_else(|| missing_animation(method, id))
       })?;
-      let Some(original) = original else {
-        return Ok(false);
-      };
       let binding = binding_options(lua, original, args.options(), method)?;
       let options = schedule_options(&binding, method)?;
       with_pool_mut(&set_state, method, |pool| {
@@ -139,11 +140,11 @@ pub(super) fn animation(lua: &Lua, state: SharedApiState) -> mlua::Result<Table>
         let id = parse_id(args::one(&method, "id", values)?, &method)?;
         with_pool_mut(&state, &method, |pool| {
           let Some(binding) = pool.animations.get(&id).cloned() else {
-            return Ok(if name == "get_info" {
-              Value::Nil
+            return if name == "exists" {
+              Ok(Value::Boolean(false))
             } else {
-              Value::Boolean(false)
-            });
+              Err(missing_animation(&method, id))
+            };
           };
           let time = TimeService::new();
           let success = match name {
@@ -211,20 +212,21 @@ pub(super) fn animation(lua: &Lua, state: SharedApiState) -> mlua::Result<Table>
       let key = args::optional_string(args.options(), method, "key", None)?;
       // Release pool access before running user callbacks, which may mutate or delete animations.
       let snapshot = with_pool(&state, method, |pool| {
-        Ok(pool.animations.get(&id).and_then(|binding| {
-          TimeService::new()
-            .scheduled_timer_info(&pool.runtime().time, binding.timer)
-            .map(|info| (binding.clone(), info))
-        }))
+        let binding = pool
+          .animations
+          .get(&id)
+          .ok_or_else(|| missing_animation(method, id))?;
+        let info = TimeService::new()
+          .scheduled_timer_info(&pool.runtime().time, binding.timer)
+          .ok_or_else(|| args::message(method, "animation schedule is unavailable"))?;
+        Ok((binding.clone(), info))
       })?;
-      let Some((binding, info)) = snapshot else {
-        return Ok(Value::Nil);
-      };
+      let (binding, info) = snapshot;
       let time = sample_time(&binding, info);
       if let Some(key) = key {
         return sample_parameter(&binding, &interpolate, &key, time);
       }
-      let mut keys = binding.track.keys().peekable();
+      let mut keys = binding.keyframes.keys().peekable();
       if keys.peek().is_none() {
         return Ok(Value::Nil);
       }
@@ -254,19 +256,19 @@ fn binding_options(
       *target = seconds_number(value, method, name)?;
     }
   }
-  let track = options.raw_get::<Value>("track")?;
-  binding.track = Rc::new(if track.is_nil() {
+  let keyframes = options.raw_get::<Value>("keyframes")?;
+  binding.keyframes = Rc::new(if keyframes.is_nil() {
     tg_service_animation::ParameterTrack::new(
       seconds(binding.duration, method, "duration")?,
-      binding.track.frames().to_vec(),
+      binding.keyframes.frames().to_vec(),
     )
     .map_err(|error| args::message(method, error.to_string()))?
   } else {
-    parse_track(track, binding.duration, method)?
+    parse_keyframes(keyframes, binding.duration, method)?
   });
   for (name, target, segments) in [
     ("easing", &mut binding.easing, true),
-    ("default_easing", &mut binding.default_easing, false),
+    ("callback_easing", &mut binding.callback_easing, false),
   ] {
     let value = options.raw_get::<Value>(name)?;
     if !value.is_nil() {
@@ -291,13 +293,13 @@ fn binding_options(
   }
   for (name, target, choices) in [
     (
-      "play_direction",
+      "direction",
       &mut binding.direction,
       &["normal", "reverse", "alternate", "alternate_reverse"][..],
     ),
     (
-      "repeat_fill_mode",
-      &mut binding.fill,
+      "fill_mode",
+      &mut binding.fill_mode,
       &["forwards", "backwards"][..],
     ),
   ] {
@@ -352,7 +354,7 @@ fn sample_time(binding: &LuaAnimationBinding, info: ScheduledTimerInfo) -> Durat
     } else {
       info.options.gap
     };
-    if info.elapsed < wait && info.executed_count > 0 && binding.fill == "forwards" {
+    if info.elapsed < wait && info.executed_count > 0 && binding.fill_mode == "forwards" {
       (info.executed_count - 1, duration)
     } else {
       (
@@ -380,11 +382,16 @@ fn sample_parameter(
   key: &str,
   time: Duration,
 ) -> mlua::Result<Value> {
-  let Some(segment) = binding.track.segment(key, time) else {
+  let Some(segment) = binding.keyframes.segment(key, time) else {
     return Ok(Value::Nil);
   };
   let current = time.clamp(segment.start_time, segment.end_time);
-  let easing = resolve_easing(&binding.easing, &binding.default_easing, key, segment.index)?;
+  let easing = resolve_easing(
+    &binding.easing,
+    &binding.callback_easing,
+    key,
+    segment.index,
+  )?;
   if let Value::Function(function) = easing {
     return function.call((
       current.as_secs_f64(),
@@ -446,25 +453,25 @@ fn info_table(
   output.raw_set("interval", binding.interval)?;
   output.raw_set("loop", binding.looping)?;
   output.raw_set("repeat", binding.repetitions)?;
-  output.raw_set("track", track_table(lua, &binding.track)?)?;
+  output.raw_set("keyframes", keyframes_table(lua, &binding.keyframes)?)?;
   output.raw_set(
     "easing",
     selector_copy(lua, binding.easing.clone(), "animation.get_info", true)?,
   )?;
   output.raw_set(
-    "default_easing",
+    "callback_easing",
     selector_copy(
       lua,
-      binding.default_easing.clone(),
+      binding.callback_easing.clone(),
       "animation.get_info",
       false,
     )?,
   )?;
-  output.raw_set("play_direction", binding.direction.as_str())?;
+  output.raw_set("direction", binding.direction.as_str())?;
   output.raw_set(
-    "repeat_fill_mode",
+    "fill_mode",
     if binding.looping {
-      &binding.fill
+      &binding.fill_mode
     } else {
       "forwards"
     },
@@ -497,4 +504,11 @@ fn parse_id(value: Value, method: &str) -> mlua::Result<u64> {
 
 fn format_id(id: u64) -> String {
   format!("animation_{id:03}")
+}
+
+fn missing_animation(method: &str, id: u64) -> mlua::Error {
+  args::message(
+    method,
+    format!("animation '{}' does not exist", format_id(id)),
+  )
 }

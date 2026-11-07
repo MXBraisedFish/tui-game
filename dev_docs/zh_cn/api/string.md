@@ -940,7 +940,7 @@ debug.print(tostring(captures2.n))
 
 ### 额外说明
 
-- 选填参数 `init` 取值范围为 $(-\infty, x + 1]$，$x$ 为 `text` 的字符数。
+- 选填参数 `init` 取值范围为 $(-\infty, x + 1]$；$x$ 为 `text` 的字符数，必须为有限数。
 - 返回值 `captures` 混合表结构如下：
 
 ```lua
@@ -1020,7 +1020,7 @@ Alice
 
 ### 额外说明
 
-- 选填参数 `init` 取值范围为 $(-\infty, x + 1]$，$x$ 为 `text` 的字符数。
+- 选填参数 `init` 取值范围为 $(-\infty, x + 1]$；$x$ 为 `text` 的字符数，必须为有限数。
 - 返回值混合表结构如下：
 
 ```lua

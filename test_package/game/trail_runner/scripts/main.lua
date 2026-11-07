@@ -193,7 +193,7 @@ end
 -- Draw the current package state in terminal-cell coordinates.
 function Render()
   draw.fill_rect(0, 0, width, height, { char = " ", bg = color.BLACK })
-  draw.stroke_rect(0, 2, width, height - 5, { fg = color.GREEN, border_char = char.ROUNDED_LINE })
+  draw.stroke_rect(0, 2, width, height - 5, { fg = color.GREEN, border_chars = char.ROUNDED_LINE })
 
   local title = label("title")
   draw.text(2, 0, "f%<fg:bright_green>" .. title .. "</fg>", { bold = true })
