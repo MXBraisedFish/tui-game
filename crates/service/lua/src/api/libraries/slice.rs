@@ -175,8 +175,10 @@ fn install_mutations(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::
         {
           return Ok(false);
         }
-        if let Some(enabled) = event_passthrough {
-          service.set_event_passthrough(objects.ui_mut(), id, enabled);
+        if let Some(enabled) = event_passthrough
+          && !service.set_event_passthrough(objects.ui_mut(), id, enabled)
+        {
+          return Ok(false);
         }
         Ok(true)
       })

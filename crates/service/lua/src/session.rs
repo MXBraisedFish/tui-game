@@ -2751,7 +2751,7 @@ mod tests {
         function Init(ctx)
           system_language = i18n.get_language_code()
           create_request_id = i18n.create()
-          duplicate_create_result = i18n.create({ language_code = "ignored" })
+          duplicate_create_result = debug.pcall(i18n.create, { language_code = "ignored" })
           local extra_language_argument = debug.pcall(function() i18n.get_language_code("extra") end)
           debug.assert(not extra_language_argument)
         end
@@ -2791,7 +2791,7 @@ mod tests {
     );
     assert_eq!(
       session.environment_value("duplicate_create_result"),
-      Value::Nil
+      Value::Boolean(false)
     );
     let commands = session.take_host_commands();
     assert_eq!(
@@ -2883,6 +2883,72 @@ mod tests {
   }
 
   #[test]
+  fn i18n_admission_errors_preserve_state_and_allow_retry() {
+    for kind in [LuaSessionKind::Game, LuaSessionKind::Screensaver] {
+      let mut session =
+        LuaSession::load(spec(&valid_script(""), kind), LuaPolicy::default()).unwrap();
+      let Value::Table(library) = session.environment_value("i18n") else {
+        panic!("i18n library is unavailable");
+      };
+      let create: Function = library.get("create").unwrap();
+      let reload: Function = library.get("reload").unwrap();
+      let assert_rejected = |function: &Function, expected: &str| {
+        let error = function.call::<Value>(()).unwrap_err().to_string();
+        assert!(error.contains(expected), "{error}");
+      };
+      assert_rejected(&reload, "does not exist");
+      session
+        .api_state
+        .borrow_mut()
+        .commands
+        .resize(4096, LuaHostCommand::ExitGame);
+      assert_rejected(&create, "queue is full");
+      {
+        let state = session.api_state.borrow();
+        assert!(!state.i18n.created && !state.i18n.loading);
+        assert_eq!(state.next_i18n_request_id, 1);
+      }
+      session.take_host_commands();
+      assert_eq!(create.call::<String>(()).unwrap(), "1");
+      assert_rejected(&create, "already exists");
+      assert_rejected(&reload, "in progress");
+      assert_eq!(session.take_host_commands().len(), 1);
+      let mut event = crate::LuaI18nEvent {
+        request_id: 1,
+        kind: crate::LuaI18nEventKind::Created,
+        ok: false,
+        message: "failed to create i18n instance".into(),
+        warning: None,
+        language_code: "en_us".into(),
+        callback_language_code: "en_us".into(),
+        namespaces: None,
+      };
+      api::apply_i18n_event(&session.api_state, &event);
+      assert_eq!(create.call::<String>(()).unwrap(), "2");
+      assert_eq!(session.take_host_commands().len(), 1);
+      event.request_id = 2;
+      event.ok = true;
+      api::apply_i18n_event(&session.api_state, &event);
+      assert_rejected(&create, "already exists");
+      session
+        .api_state
+        .borrow_mut()
+        .commands
+        .resize(4096, LuaHostCommand::ExitGame);
+      assert_rejected(&reload, "queue is full");
+      {
+        let state = session.api_state.borrow();
+        assert!(state.i18n.created && !state.i18n.loading);
+        assert_eq!(state.next_i18n_request_id, 3);
+      }
+      session.take_host_commands();
+      assert_eq!(reload.call::<String>(()).unwrap(), "3");
+      assert_rejected(&reload, "in progress");
+      assert_eq!(session.take_host_commands().len(), 1);
+    }
+  }
+
+  #[test]
   fn i18n_custom_callback_is_literal_strict_and_only_used_for_missing_keys() {
     let source = valid_script(
       r#"
@@ -2968,6 +3034,15 @@ mod tests {
           local negative_crop = debug.pcall(function() image.load("sample.png", { crop_x = -1 }) end)
           local named_color = debug.pcall(function() image.load("sample.png", { background = "red" }) end)
           local invalid_mode = debug.pcall(function() image.load("sample.png", { mode = "native" }) end)
+          for _, path in ipairs({"missing.png", "missing", ".", "missing_dir/sample.png", "sample.png/child.png", "folder.png"}) do
+            local ok, message = debug.pcall(image.load, path)
+            debug.assert(not ok and string.find(message, "image.load", {plain=true}) ~= nil)
+          end
+          for _, options in ipairs({{block_width=2049}, {block_height=2049},
+            {block_width=129,block_height=128}, {block_width=2048,block_height=9}}) do
+            local ok, message = debug.pcall(image.load, "sample", options)
+            debug.assert(not ok and string.find(message, "image.load", {plain=true}) ~= nil)
+          end
           debug.assert(image.HALF_BLOCK == "half_block" and image.MIX_BLOCK == "mix_block")
           local change_mode = debug.pcall(function() image.HALF_BLOCK = "mix_block" end)
           debug.assert(not change_mode)
@@ -2978,9 +3053,9 @@ mod tests {
           local nan = debug.pcall(function() image.load("sample", { anti_alias = 0 / 0 }) end)
           debug.assert(not nan)
           image.load("sample", { mode = image.HALF_BLOCK, anti_alias = 0 })
-          image.load("sample")
+          image.load("sample", {block_width=2048,block_height=8})
           image.load("sample", { anti_alias = 0.5 })
-          local over_limit = image.load("sample")
+          local over_limit, over_limit_error = debug.pcall(image.load, "sample")
           debug.assert(image_request_id == "1")
           debug.assert(not named_color_args)
           debug.assert(not extra_color_arg)
@@ -2990,7 +3065,7 @@ mod tests {
           debug.assert(not negative_crop)
           debug.assert(not named_color)
           debug.assert(not invalid_mode)
-          debug.assert(over_limit == nil)
+          debug.assert(not over_limit and string.find(over_limit_error, "image request limit", {plain=true}) ~= nil)
         end
         function HandleEvent(event)
           if event.type == "image" and event.data.request_id == image_request_id and event.data.ok then
@@ -3008,6 +3083,7 @@ mod tests {
     fs::write(&spec.entry_path, &source).unwrap();
     let assets_dir = package_dir.join("assets");
     fs::create_dir_all(&assets_dir).unwrap();
+    fs::create_dir(assets_dir.join("folder.png")).unwrap();
     image::RgbImage::from_pixel(8, 8, image::Rgb([220, 100, 30]))
       .save(assets_dir.join("sample.png"))
       .unwrap();
@@ -3130,6 +3206,23 @@ mod tests {
         .any(|command| matches!(command, LuaHostCommand::ImageRequest { request_id: 5, .. }))
     );
 
+    let next_request_id = session.api_state.borrow().next_image_request_id;
+    {
+      let mut state = session.api_state.borrow_mut();
+      state.pending_image_request_ids.clear();
+      state.commands.resize(4096, LuaHostCommand::ExitGame);
+    }
+    let Value::Table(library) = session.environment_value("image") else {
+      panic!("image library is unavailable");
+    };
+    let load: Function = library.get("load").unwrap();
+    let error = load.call::<Value>("sample").unwrap_err().to_string();
+    assert!(error.contains("queue is full"), "{error}");
+    {
+      let state = session.api_state.borrow();
+      assert!(state.pending_image_request_ids.is_empty());
+      assert_eq!(state.next_image_request_id, next_request_id);
+    }
     session.stop();
     fs::remove_dir_all(package_dir).unwrap();
   }
@@ -3569,9 +3662,9 @@ mod tests {
       r#"
         function Init(ctx)
           local text = "f%<fg:green>Test"
-          local plain = measurement.get_text_width(text, { text_mode = string.PLAIN_TEXT })
-          local rich = measurement.get_text_width(text, { text_mode = string.RICH_TEXT })
-          local auto = measurement.get_text_width(text, { text_mode = string.AUTO })
+          local plain = measurement.get_text_width(text, { parse_mode = string.PLAIN_TEXT })
+          local rich = measurement.get_text_width(text, { parse_mode = string.RICH_TEXT })
+          local auto = measurement.get_text_width(text, { parse_mode = string.AUTO })
           debug.assert(plain == 16, { message = "plain mode must preserve all syntax" })
           debug.assert(rich == 6, { message = "rich mode must preserve the f% prefix" })
           debug.assert(auto == 4, { message = "auto mode must consume the f% prefix" })
@@ -3591,7 +3684,7 @@ mod tests {
           debug.assert(select('#', measurement.get_text_size("Hello\n世界")) == 2)
           debug.assert(measurement.get_text_width("abcdef", { max_width = 3, auto_wrap = true, word_wrap = false }) == 3)
           debug.assert(measurement.get_text_height("abcdef", { max_width = 3, max_height = 1, overflow_marker = "..", auto_wrap = true, word_wrap = false }) == 1)
-          local rich_width, rich_height = measurement.get_text_size("f%{value:name}", { rich_params = { name = "终端" }, text_mode = string.AUTO, horizontal_align = align.RIGHT })
+          local rich_width, rich_height = measurement.get_text_size("f%{value:name}", { rich_params = { name = "终端" }, parse_mode = string.AUTO, horizontal_align = align.RIGHT })
           debug.assert(rich_width == 4 and rich_height == 1)
           local empty_width, empty_height = measurement.get_text_size("")
           debug.assert(empty_width == 0 and empty_height == 0)
@@ -3685,7 +3778,7 @@ mod tests {
             measurement.get_text_width("text", { horizontal_align = "bottom" })
           end))
           debug.assert(fails(function()
-            measurement.get_text_width("text", { text_mode = "unknown" })
+            measurement.get_text_width("text", { parse_mode = "unknown" })
           end))
           debug.assert(fails(function()
             measurement.get_text_width(nil)
@@ -4885,7 +4978,7 @@ mod tests {
             debug.assert(not debug.pcall(debug.print, "legacy options", options))
           end
           debug.info("positional")
-          local extra_skip_argument = debug.pcall(function() events.skip_action("extra") end)
+          local extra_skip_argument = debug.pcall(function() events.skip_actions("extra") end)
           debug.assert(not extra_skip_argument)
           debug.info("info")
           debug.warn("warn")
@@ -5515,6 +5608,7 @@ mod tests {
           debug.assert(type(math.ln) == "function")
           debug.assert(type(math.type) == "function")
           debug.assert(math.log10 == nil and math.number_type == nil)
+          debug.assert(math.percent == nil and type(math.ratio) == "function")
           debug.assert(type(1) == "number" and type(1.5) == "number")
 
           debug.assert(math.abs(-5) == 5 and math.type(math.abs(-5)) == "float")
@@ -5559,6 +5653,10 @@ mod tests {
           debug.assert(near(math.rad(180), math.PI, 0.000000000001))
           debug.assert(math.normalize_angle(450) == 90)
           debug.assert(math.normalize_angle(-90) == 270)
+          debug.assert(math.normalize_angle(450.5) == 90.5)
+          debug.assert(math.normalize_angle(-90.25) == 269.75)
+          debug.assert(math.normalize_angle(math.MAX_INTEGER) == 7)
+          debug.assert(math.normalize_angle(-1e-300) == 0)
           debug.assert(math.type(math.normalize_angle(0)) == "float")
 
           debug.assert(math.max({ 1, 5, 3 }) == 5)
@@ -5573,20 +5671,44 @@ mod tests {
           debug.assert(math.tointeger(3.14) == nil)
           debug.assert(math.tointeger(9223372036854775808.0) == nil)
           debug.assert(math.type("3") == nil)
+          for _, value in ipairs({math.INFINITE, math.NEGATIVE_INFINITE, 0/0}) do
+            debug.assert(math.type(value) == "float" and math.tointeger(value) == nil)
+          end
           debug.assert(math.ult(-1, 0) == false)
           debug.assert(math.approx_equal(0.1 + 0.2, 0.3))
           debug.assert(math.approx_equal(1.0, 1.005, { epsilon = 0.01 }))
           debug.assert(not math.approx_equal(1.0, 1.01, { epsilon = 0.001 }))
           debug.assert(math.approx_equal(-0.0, 0.0, { epsilon = 0.0 }))
-          debug.assert(near(math.percent(5, 16), 0.3125, 0.000000000001))
-          debug.assert(math.percent(5, 16, {}) == 0.3125)
-          debug.assert(near(math.percent(5, 16, { as_percent = true }), 31.25, 0.000000000001))
+          debug.assert(near(math.ratio(5, 16), 0.3125, 0.000000000001))
+          debug.assert(math.ratio(5, 16, {}) == 0.3125)
+          debug.assert(near(math.ratio(5, 16, { as_percent = true }), 31.25, 0.000000000001))
 
           debug.assert(math.factorial(0) == 1)
           debug.assert(math.type(math.factorial(5)) == "float")
           debug.assert(math.factorial(170) > 7e306)
           debug.assert(math.combination(5, 2) == 10)
           debug.assert(math.type(math.combination(5, 2)) == "integer")
+          for _, fn in ipairs({math.abs, math.exp, math.lg, math.ln, math.sqrt,
+            math.frexp, math.sin, math.cos, math.tan, math.asin, math.acos,
+            math.atan, math.deg, math.rad, math.normalize_angle}) do
+            debug.assert(math.type((fn(1))) == "float" and math.type((fn(1.0))) == "float")
+          end
+          for _, fn in ipairs({math.ceil, math.floor, math.round, math.modf}) do
+            debug.assert(math.type((fn(1))) == "integer" and math.type((fn(1.0))) == "integer")
+            debug.assert(fn(math.MIN_INTEGER) == math.MIN_INTEGER)
+            debug.assert(fn(math.MAX_INTEGER) == math.MAX_INTEGER)
+            debug.assert(fn(-9223372036854775808.0) == math.MIN_INTEGER)
+            debug.assert(not debug.pcall(fn, 9223372036854775808.0))
+          end
+          for _, fn in ipairs({math.pow, math.log, math.atan2, math.ratio}) do
+            for _, left in ipairs({2, 2.0}) do
+              for _, right in ipairs({2, 2.0}) do debug.assert(math.type(fn(left, right)) == "float") end
+            end
+          end
+          debug.assert(math.exp(math.ln(1.7976931348623157e308)) > 1e308)
+          debug.assert(fails(function() math.exp(710) end))
+          debug.assert(math.max({1, 2.5}) == 2.5 and math.min({1.5, 2}) == 1.5)
+          debug.assert(math.approx_equal(1, 1.0, {epsilon=0}))
 
           debug.assert(fails(function() math.abs(math.INFINITE) end))
           debug.assert(fails(function() math.ceil(1e20) end))
@@ -5610,6 +5732,34 @@ mod tests {
           debug.assert(fails(function() math.approx_equal(1, 1, true) end))
           debug.assert(fails(function() math.factorial(171) end))
           debug.assert(fails(function() math.combination(67, 33) end))
+          for _, call in ipairs({
+            function() math.round_to(1, 2.0) end,
+            function() math.fmod(7.0, 3) end,
+            function() math.fmod(7, 3.0) end,
+            function() math.ldexp(1, 2.0) end,
+            function() math.ult(1.0, 2) end,
+            function() math.ult(1, 2.0) end,
+            function() math.factorial(5.0) end,
+            function() math.combination(5.0, 2) end,
+            function() math.combination(5, 2.0) end,
+            function() math.max({1, n=1.0}) end,
+          }) do debug.assert(fails(call)) end
+          for _, value in ipairs({math.INFINITE, math.NEGATIVE_INFINITE, 0/0}) do
+            for _, fn in ipairs({math.abs, math.ceil, math.floor, math.round, math.exp,
+              math.lg, math.ln, math.sqrt, math.frexp, math.sin, math.cos, math.tan,
+              math.asin, math.acos, math.atan, math.deg, math.rad, math.normalize_angle, math.modf}) do
+              debug.assert(not debug.pcall(fn, value))
+            end
+            for _, fn in ipairs({math.pow, math.log, math.atan2, math.approx_equal, math.ratio}) do
+              debug.assert(not debug.pcall(fn, value, 2))
+              debug.assert(not debug.pcall(fn, 2, value))
+            end
+            debug.assert(not debug.pcall(math.round_to, value, 0))
+            debug.assert(not debug.pcall(math.ldexp, value, 0))
+            debug.assert(not debug.pcall(math.max, {value}))
+            debug.assert(not debug.pcall(math.min, {value}))
+            debug.assert(not debug.pcall(math.approx_equal, 1, 1, {epsilon=value}))
+          end
         end
       "#,
     );
@@ -5698,19 +5848,19 @@ mod tests {
       "game.exit_game",
       "game.save_game",
       "game.save_best",
-      "events.skip_action",
-      "events.clear_action",
-      "events.enable_focus_release",
-      "events.disable_focus_release",
+      "events.skip_actions",
+      "events.clear_actions",
+      "events.enable_focus_release_events",
+      "events.disable_focus_release_events",
       "ime.lock",
       "ime.unlock",
       "ime.write_clipboard",
-      "ime.receive_input_event",
-      "ime.reject_input_event",
-      "keyboard.receive_action_event",
-      "keyboard.reject_action_event",
-      "keyboard.receive_key_event",
-      "keyboard.reject_key_event",
+      "ime.enable_input_event",
+      "ime.disable_input_event",
+      "keyboard.enable_action_event",
+      "keyboard.disable_action_event",
+      "keyboard.enable_key_event",
+      "keyboard.disable_key_event",
       "file.write",
       "file.list_dir",
       "file.create_dir",
@@ -5798,7 +5948,7 @@ mod tests {
           debug.info("entry")
         function Init(ctx)
           debug.info("init")
-          events.clear_action()
+          events.clear_actions()
         end
       "#,
     );
@@ -5833,13 +5983,20 @@ mod tests {
     let source = valid_script(
       r#"
       function Init(ctx)
-        events.skip_action()
-        events.clear_action()
+        events.skip_actions()
+        events.clear_actions()
       end
     "#,
     );
-    let mut session =
-      LuaSession::load(spec(&source, LuaSessionKind::Game), LuaPolicy::default()).unwrap();
+    let mut session = LuaSession::load_with_api(
+      spec(&source, LuaSessionKind::Game),
+      LuaPolicy::default(),
+      LuaApiConfig {
+        debug_enabled: true,
+        ..LuaApiConfig::default()
+      },
+    )
+    .unwrap();
     let commands = session.take_host_commands();
     assert!(
       commands
@@ -5859,44 +6016,73 @@ mod tests {
       .err()
       .unwrap()
       .message
-      .contains("events.skip_action")
+      .contains("events.skip_actions")
     );
   }
 
   #[test]
-  fn asynchronous_admission_returns_nil_and_releases_capacity_before_callbacks() {
+  fn disabled_event_action_controls_do_not_change_the_input_queue() {
+    let source = valid_script(
+      r#"
+      function Init(ctx)
+        debug.assert(events.skip_action == nil and events.clear_action == nil)
+        debug.assert(events.enable_focus_release == nil and events.disable_focus_release == nil)
+        for _, fn in ipairs({events.skip_actions, events.clear_actions}) do
+          fn()
+          fn()
+          fn("ignored while debug is disabled")
+        end
+      end
+    "#,
+    );
+    let mut session =
+      LuaSession::load(spec(&source, LuaSessionKind::Game), LuaPolicy::default()).unwrap();
+    session.update().unwrap();
+    let commands = session.take_host_commands();
+    assert_eq!(commands.len(), 2);
+    for method in ["events.skip_actions", "events.clear_actions"] {
+      assert!(commands.iter().any(|command| matches!(command,
+        LuaHostCommand::Ignored {method: found, reason: "debug mode is disabled"} if *found == method
+      )));
+    }
+    assert_eq!(session.state(), LuaSessionState::Running);
+  }
+
+  #[test]
+  fn asynchronous_admission_preserves_library_failure_rules_and_releases_capacity_before_callbacks()
+  {
     use crate::{LuaEventData as Data, LuaFileEvent, LuaFileOutcome, LuaRuntimeEvent};
     let source = valid_script(
       r#"
       local ids = {}
       function Init(ctx)
-        debug.assert(file.read("missing.txt") == nil)
-        debug.assert(file.list_dir("missing-dir") == nil)
-        debug.assert(image.load("missing.png") == nil)
-        debug.assert(i18n.reload() == nil)
+        debug.assert(not debug.pcall(function() return file.read("missing.txt") end))
+        debug.assert(not debug.pcall(function() return file.list_dir("missing-dir") end))
+        debug.assert(not debug.pcall(function() return image.load("missing.png") end))
+        debug.assert(not debug.pcall(i18n.reload))
         debug.assert(not select(1, debug.pcall(function() file.read("missing.txt", {unknown=true}) end)))
         debug.assert(not select(1, debug.pcall(function() image.load("missing.png", {scale=-1}) end)))
         for i = 1, 8 do
-          ids[i] = i % 2 == 0 and file.read("input.txt", {byte=true}) or file.read("input.txt")
+          ids[i] = i % 2 == 0 and file.read("input.txt", {binary_mode=true}) or file.read("input.txt")
           debug.assert(type(ids[i]) == "string")
         end
-        debug.assert(file.read("input.txt") == nil)
-        debug.assert(file.write("output.txt", "text") == nil)
-        debug.assert(file.list_dir(".") == nil)
-        debug.assert(file.create_dir("new") == nil)
-        debug.assert(file.remove("input.txt") == nil)
+        debug.assert(not debug.pcall(function() return file.read("input.txt") end))
+        debug.assert(not debug.pcall(function() return file.write("output.txt", "text") end))
+        debug.assert(not debug.pcall(function() return file.list_dir(".") end))
+        debug.assert(not debug.pcall(function() return file.create_dir("new") end))
+        debug.assert(not debug.pcall(function() return file.remove("input.txt") end))
         for i = 1, 4 do debug.assert(type(image.load("sample.png")) == "string") end
-        debug.assert(image.load("sample.png") == nil)
+        debug.assert(not debug.pcall(function() return image.load("sample.png") end))
         debug.assert(type(i18n.create()) == "string")
-        debug.assert(i18n.create() == nil)
-        debug.assert(i18n.reload() == nil)
+        debug.assert(not debug.pcall(i18n.create))
+        debug.assert(not debug.pcall(i18n.reload))
       end
       function HandleEvent(e)
         if e.type == "file" then
           debug.assert(e.data.request_id == ids[1] and e.data.ok == false)
           replacement = file.read("input.txt")
           debug.assert(type(replacement) == "string" and replacement ~= ids[1])
-          debug.assert(file.read("input.txt") == nil)
+          debug.assert(not debug.pcall(function() return file.read("input.txt") end))
         end
       end
     "#,
@@ -5984,21 +6170,55 @@ mod tests {
           function Init(ctx)
             debug.assert(file.read_byte == nil)
             debug.assert(file.write_byte == nil)
+            debug.assert(file.ALL == nil and file.ANY == "any")
+            for _, request in ipairs({
+              function() file.read("input.txt", {event_tip="removed"}) end,
+              function() file.write("output.txt", "text", {event_tip="removed"}) end,
+              function() file.list_dir(".", {event_tip="removed"}) end,
+              function() file.create_dir("created", {event_tip="removed"}) end,
+              function() file.remove("input.txt", {event_tip="removed"}) end,
+              function() file.read("input.bin", {byte=true}) end,
+              function() file.write("output.bin", "bytes", {byte=true}) end,
+              function() file.list_dir(".", {file_type="txt"}) end,
+            }) do
+              debug.assert(not debug.pcall(request))
+            end
+            for _, extension in ipairs({"", ".txt", "path/txt", false}) do
+              debug.assert(not debug.pcall(file.list_dir, ".", {extension=extension}))
+            end
+            debug.assert(not debug.pcall(file.read, "input.bin", {binary_mode="true"}))
+            debug.assert(not debug.pcall(file.write, "output.bin", "bytes", {binary_mode=1}))
+            debug.assert(not debug.pcall(file.write, "input.txt/child", "text"))
+            for _, request in ipairs({
+              function() file.read("missing/input.txt") end,
+              function() file.read("missing/input.bin", {binary_mode=true}) end,
+              function() file.write("missing/output.txt", "text") end,
+              function() file.write("missing/output.bin", "bytes", {binary_mode=true}) end,
+              function() file.remove("missing") end,
+              function() file.list_dir("missing") end,
+              function() file.read(".") end,
+              function() file.write(".", "text") end,
+              function() file.list_dir("input.txt") end,
+              function() file.create_dir("input.txt") end,
+            }) do
+              local ok, message = debug.pcall(request)
+              debug.assert(not ok and string.find(message, "cannot resolve asset path", {plain=true}) ~= nil)
+            end
             debug.assert(file.exists("."))
             debug.assert(file.exists("./input.txt"))
             debug.assert(not file.exists("./missing.txt"))
             list_request_id = file.list_dir(".", { recursive = true })
             read_text_request_id = file.read("./input.txt")
             read_bytes_request_id = file.read("./input.bin", {
-              byte = true, event_tip = "read-binary",
+              binary_mode = true,
             })
             write_text_request_id = file.write("./output.txt", "output")
             write_bytes_request_id = file.write("./output.bin", "a\0\255b", {
-              byte = true,
-              event_tip = "write-binary",
+              binary_mode = true,
             })
-            create_dir_request_id = file.create_dir("./created/nested/leaf", { event_tip = "created" })
-            remove_request_id = file.remove("./input.txt", { event_tip = "removed" })
+            create_dir_request_id = file.create_dir("./created/nested/leaf")
+            remove_request_id = file.remove("./input.txt")
+            filtered_request_id = file.list_dir(".", {extension="TXT"})
             debug.assert(type(list_request_id) == "string"
                 and type(read_text_request_id) == "string"
                 and type(read_bytes_request_id) == "string"
@@ -6013,6 +6233,7 @@ mod tests {
 
           function HandleEvent(event)
             if event.type == "file" and event.data.ok then
+              debug.assert(event.data.tip == "")
               completed_request_id = event.data.request_id
             end
           end
@@ -6042,6 +6263,10 @@ mod tests {
 
     let expected_root = assets_root.canonicalize().unwrap();
     let requests = session.take_host_commands();
+    assert_eq!(requests.len(), 8);
+    assert!(requests.iter().all(|command| matches!(command,
+      LuaHostCommand::FileRequest {event_tip: Some(tip), ..} if tip.is_empty()
+    )));
     let lua_request_id = |name| {
       let Value::String(value) = session.environment_value(name) else {
         panic!("{name} should return a Lua string request id");
@@ -6049,6 +6274,14 @@ mod tests {
       value.to_str().unwrap().parse::<u64>().unwrap()
     };
     let read_text_request_id = lua_request_id("read_text_request_id");
+    let filtered_request_id = lua_request_id("filtered_request_id");
+    assert!(requests.iter().any(|command| matches!(command,
+      LuaHostCommand::FileRequest {
+        request_id,
+        task: tg_service_file::FileTask::LuaListDir {file_type: Some(extension), ..},
+        ..
+      } if *request_id == filtered_request_id && extension == "txt"
+    )));
     assert!(requests.iter().any(|command| matches!(
       command,
       LuaHostCommand::FileRequest {
@@ -6079,7 +6312,7 @@ mod tests {
         ..
       } if path == &expected_root.join("input.bin")
         && virtual_path == "input.bin"
-        && event_tip == "read-binary"
+        && event_tip.is_empty()
     )));
     assert!(requests.iter().any(|command| matches!(
       command,
@@ -6100,7 +6333,7 @@ mod tests {
       } if path == &expected_root.join("output.bin")
         && bytes == b"a\0\xffb"
         && virtual_path == "output.bin"
-        && event_tip == "write-binary"
+        && event_tip.is_empty()
     )));
     assert!(requests.iter().any(|command| matches!(
       command,
@@ -6112,7 +6345,7 @@ mod tests {
         ..
       } if path == &expected_root.join("created/nested/leaf")
         && virtual_path == "created/nested/leaf"
-        && event_tip == "created"
+        && event_tip.is_empty()
     )));
     assert!(requests.iter().any(|command| matches!(
       command,
@@ -6124,7 +6357,7 @@ mod tests {
         ..
       } if path == &expected_root.join("input.txt")
         && virtual_path == "input.txt"
-        && event_tip == "removed"
+        && event_tip.is_empty()
     )));
 
     session
@@ -6136,7 +6369,7 @@ mod tests {
             request_id: read_text_request_id,
             kind: LuaFileOperation::ReadText,
             path: "input.txt".to_string(),
-            tip: None,
+            tip: Some(String::new()),
             outcome: super::super::LuaFileOutcome::Text("input".to_string()),
           }),
         },
@@ -6446,23 +6679,87 @@ mod tests {
   }
 
   #[test]
+  fn failed_native_updates_do_not_report_success_or_replace_lua_configuration() {
+    use tg_service_widget::{
+      HitAreaId, HitAreaService, HyperlinkId, HyperlinkService, MarkdownService, ProgressBarId,
+      ProgressBarService, TextInputId,
+    };
+    let source = valid_script(
+      r#"
+      function Init(ctx)
+        animation_id = animation.create(1, {{timestamp=0, values={x=0}}})
+        hitbox_id = widget.hitbox.create(2, 1)
+        link_id = widget.link.create("old", "https://example.com")
+        input_id = widget.input.create(2, 1)
+        progress_id = widget.progressbar.create(2)
+        markdown_id = widget.markdown.create(2, 1, "old")
+      end
+      function Update(dt)
+        debug.assert(animation.set(animation_id, {duration=2}) == false)
+        debug.assert(widget.hitbox.set(hitbox_id, {width=3}) == false)
+        debug.assert(widget.link.set(link_id, {text="new"}) == false)
+        debug.assert(widget.input.set(input_id, {width=3}) == false)
+        debug.assert(widget.progressbar.set(progress_id, {width=3}) == false)
+        debug.assert(widget.markdown.set(markdown_id, {markdown="new"}) == false)
+        debug.assert(widget.markdown.set(markdown_id, {width=3}) == false)
+        debug.assert(widget.hitbox.get_info(hitbox_id).width == 2)
+        debug.assert(widget.link.get_info(link_id).text == "old")
+        debug.assert(widget.input.get_info(input_id).width == 2)
+        debug.assert(widget.progressbar.get_info(progress_id).width == 2)
+        debug.assert(widget.markdown.get_info(markdown_id).markdown == "old")
+      end
+    "#,
+    );
+    let mut session =
+      LuaSession::load(spec(&source, LuaSessionKind::Game), LuaPolicy::default()).unwrap();
+    // Remove backing objects to exercise failures independently of the Lua ID registry.
+    session
+      .with_objects_mut(|pool| {
+        let timer = pool.animations.values().next().unwrap().timer;
+        assert!(
+          tg_service_time::TimeService::new()
+            .remove_scheduled_timer(&mut pool.runtime_mut().time, timer)
+        );
+        let id = *pool.hitboxes.keys().next().unwrap();
+        assert!(HitAreaService::new().remove(&mut pool.ui, HitAreaId(id)));
+        let id = *pool.links.keys().next().unwrap();
+        assert!(HyperlinkService::new().remove(&mut pool.ui, HyperlinkId(id)));
+        let id = *pool.inputs.keys().next().unwrap();
+        assert!(pool.text_input.remove(&mut pool.ui, TextInputId(id)));
+        let id = *pool.progressbars.keys().next().unwrap();
+        assert!(ProgressBarService::new().remove(&mut pool.ui, ProgressBarId(id)));
+        let id = pool.markdowns.values().next().unwrap().native;
+        assert!(MarkdownService::new().remove(&mut pool.ui, id));
+      })
+      .unwrap();
+    session.update().unwrap();
+    assert_eq!(
+      session.with_objects(|pool| pool.animations.values().next().unwrap().duration),
+      Some(1.0)
+    );
+  }
+
+  #[test]
   fn ime_controls_validate_options_and_preserve_keyboard_independence() {
     let source = valid_script(
       r#"
       function Init(ctx)
         debug.assert(ime.receive_action_event == nil)
+        debug.assert(ime.receive_input_event == nil and ime.reject_input_event == nil)
+        debug.assert(ime.enable_input_events == nil and ime.disable_input_events == nil)
         debug.assert(ime.lock() == false)
         debug.assert(ime.unlock() == false)
-        debug.assert(ime.unlock({restore=false}) == false)
-        for _, fn in ipairs({ime.receive_input_event, ime.reject_input_event}) do
+        debug.assert(ime.unlock({restore_ime=false}) == false)
+        for _, fn in ipairs({ime.enable_input_event, ime.disable_input_event}) do
           debug.assert(fn() == true and fn() == true)
           debug.assert(not select(1, debug.pcall(function() fn({}) end)))
         end
-        debug.assert(ime.receive_input_event())
+        debug.assert(ime.enable_input_event())
         for _, call in ipairs({
           function() ime.lock(nil) end,
           function() ime.unlock(false) end,
-          function() ime.unlock({restore=1}) end,
+          function() ime.unlock({restore_ime=1}) end,
+          function() ime.unlock({restore=true}) end,
           function() ime.unlock({unknown=true}) end,
           function() ime.lock = false end,
         }) do debug.assert(not select(1, debug.pcall(call))) end
@@ -6483,9 +6780,9 @@ mod tests {
     let source = valid_script(
       r#"
       function Init(ctx)
-        debug.assert(ime.unlock({restore=false}))
+        debug.assert(ime.unlock({restore_ime=false}))
         debug.assert(ime.unlock())
-        debug.assert(ime.unlock({restore=true}))
+        debug.assert(ime.unlock({restore_ime=true}))
       end
     "#,
     );
@@ -6515,14 +6812,14 @@ mod tests {
       r#"
       local seen = {}
       function Init(ctx)
-        debug.assert(ime.receive_input_event())
+        debug.assert(ime.enable_input_event())
       end
       function HandleEvent(e)
         if e.type == "input" then
           seen[#seen+1] = e.data.text
           if e.data.text == "toggle" then
-            ime.reject_input_event()
-            ime.receive_input_event()
+            ime.disable_input_event()
+            ime.enable_input_event()
           end
         end
       end
@@ -6602,19 +6899,57 @@ mod tests {
   }
 
   #[test]
+  fn keyboard_rejection_reports_queue_failure_without_discarding_active_input() {
+    let source = valid_script("function Init(ctx) keyboard.enable_key_event() end");
+    let mut session =
+      LuaSession::load(spec(&source, LuaSessionKind::Game), LuaPolicy::default()).unwrap();
+    let Value::Table(library) = session.environment_value("keyboard") else {
+      panic!("keyboard library is unavailable");
+    };
+    let reject_action: Function = library.get("disable_action_event").unwrap();
+    let reject_key: Function = library.get("disable_key_event").unwrap();
+    {
+      let mut state = session.api_state.borrow_mut();
+      assert!(state.input.accept(&crate::LuaEventData::Action {
+        action: "move_left".into(),
+        state: crate::LuaActionState::Pressed,
+      }));
+      assert!(state.input.accept(&crate::LuaEventData::Key {
+        key: "left".into(),
+        state: crate::LuaActionState::Pressed,
+      }));
+      state.commands.resize(4096, LuaHostCommand::ExitGame);
+    }
+    assert!(!reject_action.call::<bool>(()).unwrap());
+    assert!(!reject_key.call::<bool>(()).unwrap());
+    {
+      let state = session.api_state.borrow();
+      assert!(state.input.actions && state.input.keys && !state.fatal_api_error);
+    }
+    assert!(session.take_input_releases().is_empty());
+    session.take_host_commands();
+    assert!(reject_action.call::<bool>(()).unwrap());
+    assert!(reject_key.call::<bool>(()).unwrap());
+    assert_eq!(session.take_input_releases().len(), 2);
+    assert_eq!(session.take_host_commands().len(), 2);
+  }
+
+  #[test]
   fn keyboard_settings_succeed_idempotently_and_validate_arguments() {
     let source = valid_script(
       r#"
       function Init(ctx)
+        debug.assert(keyboard.receive_action_event == nil and keyboard.reject_action_event == nil)
+        debug.assert(keyboard.receive_key_event == nil and keyboard.reject_key_event == nil)
         for _, fn in ipairs({
-          keyboard.receive_action_event, keyboard.reject_action_event,
-          keyboard.receive_key_event, keyboard.reject_key_event,
+          keyboard.enable_action_event, keyboard.disable_action_event,
+          keyboard.enable_key_event, keyboard.disable_key_event,
         }) do
           debug.assert(fn() == true)
           debug.assert(fn() == true)
           debug.assert(not select(1, debug.pcall(function() fn({}) end)))
         end
-        debug.assert(not select(1, debug.pcall(function() keyboard.receive_key_event = true end)))
+        debug.assert(not select(1, debug.pcall(function() keyboard.enable_key_event = true end)))
       end
     "#,
     );
@@ -6649,18 +6984,18 @@ mod tests {
       r#"
       local seen = {}
       function Init(ctx)
-        keyboard.receive_key_event()
-        for _, fn in ipairs({events.enable_focus_release, events.disable_focus_release}) do
+        keyboard.enable_key_event()
+        for _, fn in ipairs({events.enable_focus_release_events, events.disable_focus_release_events}) do
           debug.assert(fn())
           debug.assert(fn())
           debug.assert(not select(1, debug.pcall(function() fn(nil) end)))
         end
-        debug.assert(events.enable_focus_release())
-        debug.assert(not select(1, debug.pcall(function() events.disable_focus_release = true end)))
+        debug.assert(events.enable_focus_release_events())
+        debug.assert(not select(1, debug.pcall(function() events.disable_focus_release_events = true end)))
       end
       function HandleEvent(e)
         if e.type == "resize" then
-          local fn = e.data.width == 1 and events.disable_focus_release or events.enable_focus_release
+          local fn = e.data.width == 1 and events.disable_focus_release_events or events.enable_focus_release_events
           debug.assert(fn())
           debug.assert(fn())
         elseif e.type == "key" or e.type == "action" then
@@ -6789,15 +7124,15 @@ mod tests {
     use crate::{LuaActionState as State, LuaEventBroker, LuaEventData as Data, LuaSessionToken};
     for enabled in [true, false] {
       let setting = if enabled {
-        "enable_focus_release"
+        "enable_focus_release_events"
       } else {
-        "disable_focus_release"
+        "disable_focus_release_events"
       };
       let source = valid_script(&format!(
         r#"
         local seen = {{}}
         function Init(ctx)
-          keyboard.receive_key_event()
+          keyboard.enable_key_event()
           events.{setting}()
         end
         function HandleEvent(e)
@@ -6930,7 +7265,7 @@ mod tests {
       r#"
       local keys=0
       function HandleEvent(e)
-        if e.type == "resize" then keyboard.receive_key_event() end
+        if e.type == "resize" then keyboard.enable_key_event() end
         if e.type == "key" then keys=keys+1 end
       end
       function SaveGame() return {keys=keys} end
@@ -6989,12 +7324,12 @@ mod tests {
     let source = valid_script(
       r#"
       local seen = ""
-      function Init(ctx) keyboard.receive_key_event() end
+      function Init(ctx) keyboard.enable_key_event() end
       function HandleEvent(e)
         seen = seen .. e.type .. "/" .. (e.data.action or e.data.key) .. "/" .. e.data.state .. ";"
         if e.type == "action" and e.data.state == "pressed" then
-          keyboard.reject_action_event()
-          keyboard.receive_action_event()
+          keyboard.disable_action_event()
+          keyboard.enable_action_event()
         end
       end
       function SaveGame() return {seen=seen} end

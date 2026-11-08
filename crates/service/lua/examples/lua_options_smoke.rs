@@ -14,6 +14,7 @@ use tg_service_lua::{
   LuaApiConfig, LuaDrawCommand, LuaHostCommand, LuaService, LuaSessionKind, LuaSessionSpec,
 };
 use tg_service_render::BorderStyle;
+use tg_service_rich_text::TextMode;
 
 /// The temporary deployment tree owned by this smoke run.
 struct SmokeDeployment(PathBuf);
@@ -43,6 +44,47 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     &entry,
     r##"
     function Init(ctx)
+      for _, measure in ipairs({measurement.get_text_size, measurement.get_text_width, measurement.get_text_height}) do
+        local text = "f%<fg:green>Hello</fg>\nTUI"
+        local defaults = table.pack(measure(text))
+        local explicit = table.pack(measure(text, {rich_params={}, max_width=math.POSITIVE_INFINITE,
+          max_height=math.INFINITE, parse_mode=string.AUTO}))
+        debug.assert(defaults.n == explicit.n)
+        for index=1,defaults.n do debug.assert(defaults[index] == explicit[index]) end
+        for _, value in ipairs({0,-1,1.5,65536,math.NEGATIVE_INFINITE,0/0,false,"infinite"}) do
+          debug.assert(not debug.pcall(measure,text,{max_width=value}))
+          debug.assert(not debug.pcall(measure,text,{max_height=value}))
+        end
+        debug.assert(not debug.pcall(measure,text,{rich_params=false}))
+        debug.assert(not debug.pcall(measure,text,{text_mode=string.AUTO}))
+        debug.assert(not debug.pcall(measure,text,{parse_mode="unknown"}))
+      end
+      debug.assert(measurement.get_text_width("f%{value:word}",
+        {rich_params={word="value"}, parse_mode=string.AUTO}) == 5)
+      debug.assert(measurement.get_text_width("f%<fg:green>Test", {parse_mode=string.PLAIN_TEXT}) == 16)
+      debug.assert(math.percent == nil and math.ratio(1, 4) == 0.25)
+      debug.assert(math.round_to(1.25, 1) == 1.3)
+      debug.assert(not debug.pcall(math.round_to, 1.25, 1.0))
+      debug.assert(math.normalize_angle(-90.25) == 269.75)
+      debug.assert(math.normalize_angle(math.MAX_INTEGER) == 7)
+      debug.assert(not debug.pcall(math.normalize_angle, math.INFINITE))
+      debug.assert(math.type(math.INFINITE) == "float" and math.tointeger(math.INFINITE) == nil)
+      for _, name in ipairs({"enable_action_event", "disable_action_event", "enable_key_event", "disable_key_event"}) do
+        debug.assert(type(keyboard[name]) == "function")
+      end
+      debug.assert(keyboard.receive_action_event == nil and keyboard.reject_action_event == nil)
+      debug.assert(keyboard.receive_key_event == nil and keyboard.reject_key_event == nil)
+      for _, format in ipairs({"base64", "url", "hex"}) do
+        local encode, decode = encoding[format .. "_encode"], encoding[format .. "_decode"]
+        local original = "Tui Game\0\255"
+        debug.assert(decode(encode(original)) == original)
+        for _, case in ipairs({{encode,"text"}, {decode,"data"}}) do
+          for _, invalid in ipairs({{}, {false}}) do
+            local ok, message = debug.pcall(case[1], table.unpack(invalid))
+            debug.assert(not ok and string.find(message, case[2], {plain=true}) ~= nil)
+          end
+        end
+      end
       for _, case in ipairs({
         {char.LINE,"┌","┐","└","┘"}, {char.BOLD_LINE,"┏","┓","┗","┛"},
         {char.DOUBLE_LINE,"╔","╗","╚","╝"}, {char.ROUNDED_LINE,"╭","╮","╰","╯"},
@@ -104,8 +146,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     function UpdateFrame(dt, alpha) end
     function Render()
       draw.text(0,0,"unlimited",{max_width=math.POSITIVE_INFINITE,max_height=math.INFINITE})
-      draw.text(0,1,"default")
-      draw.text(0,2,"f%{value:word}",{rich_params={word="value"},max_width=3,max_height=1})
+      draw.text(0,1,"default",{parse_mode=string.PLAIN_TEXT})
+      draw.text(0,2,"f%{value:word}",{parse_mode=string.RICH_TEXT,rich_params={word="value"},max_width=3,max_height=1})
       draw.fill_rect(0,3,2,1)
       draw.stroke_rect(0,4,4,3,{border_chars=char.ROUNDED_LINE})
       draw.stroke_rect(5,4,4,3,{border_chars={top="T",bottom="B",left="L",right="R",
@@ -115,6 +157,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         debug.assert(not debug.pcall(draw.text,0,0,"invalid",{max_height=value}))
       end
       debug.assert(not debug.pcall(draw.text,0,0,"invalid",{rich_params=false}))
+      debug.assert(not debug.pcall(draw.text,0,0,"invalid",{text_mode=string.PLAIN_TEXT}))
+      debug.assert(not debug.pcall(draw.text,0,0,"invalid",{parse_mode="unknown"}))
       debug.assert(not debug.pcall(draw.stroke_rect,0,0,2,2,{border_char=char.LINE}))
       for _, value in ipairs({"","ab","我"}) do
         debug.assert(not debug.pcall(draw.fill_rect,0,0,1,1,{char=value}))
@@ -156,6 +200,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     session.render()?;
     let drawings = session.take_draw_commands();
     assert_eq!(drawings.len(), 6);
+    for (command, expected_mode) in
+      drawings[..3]
+        .iter()
+        .zip([TextMode::Auto, TextMode::Plain, TextMode::Rich])
+    {
+      assert!(
+        matches!(command, LuaDrawCommand::Text {params,..} if params.text_mode == expected_mode)
+      );
+    }
     for command in &drawings[..2] {
       let LuaDrawCommand::Text { params, .. } = command else {
         panic!("expected text drawing");

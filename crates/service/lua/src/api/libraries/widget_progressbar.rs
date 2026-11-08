@@ -64,13 +64,16 @@ pub(super) fn progressbar(lua: &Lua, state: SharedApiState) -> mlua::Result<Tabl
         };
         let binding = options(&table, method, binding)?;
         let service = ProgressBarService::new();
-        service.set_options(&mut pool.ui, ProgressBarId(id), binding.options.clone());
-        service.set_progress(
-          &mut pool.ui,
-          ProgressBarId(id),
-          binding.completed_ratio as f32,
-          binding.preview_ratio as f32,
-        );
+        if !service.set_options(&mut pool.ui, ProgressBarId(id), binding.options.clone())
+          || !service.set_progress(
+            &mut pool.ui,
+            ProgressBarId(id),
+            binding.completed_ratio as f32,
+            binding.preview_ratio as f32,
+          )
+        {
+          return Ok(false);
+        }
         pool.progressbars.insert(id, binding);
         Ok(true)
       })

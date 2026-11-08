@@ -11,19 +11,23 @@ use super::*;
 pub(super) fn events(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
   let source = lua.create_table()?;
   for (name, command) in [
-    ("skip_action", LuaHostCommand::SkipActions),
-    ("clear_action", LuaHostCommand::ClearActions),
+    ("skip_actions", LuaHostCommand::SkipActions),
+    ("clear_actions", LuaHostCommand::ClearActions),
   ] {
     let state = state.clone();
     source.raw_set(
       name,
       lua.create_function(move |_, values: MultiValue| {
         let method = if matches!(command, LuaHostCommand::SkipActions) {
-          "events.skip_action"
+          "events.skip_actions"
         } else {
-          "events.clear_action"
+          "events.clear_actions"
         };
         require_game(&state.borrow(), method)?;
+        if !state.borrow().context.debug_enabled {
+          ignore_once(&mut state.borrow_mut(), method, "debug mode is disabled");
+          return Ok(());
+        }
         args::no_args(method, values)?;
         push_host_command(&mut state.borrow_mut(), command.clone());
         Ok(())
@@ -31,17 +35,17 @@ pub(super) fn events(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
     )?;
   }
   for (name, enabled) in [
-    ("enable_focus_release", true),
-    ("disable_focus_release", false),
+    ("enable_focus_release_events", true),
+    ("disable_focus_release_events", false),
   ] {
     let state = state.clone();
     source.raw_set(
       name,
       lua.create_function(move |_, values: MultiValue| {
         let method = if enabled {
-          "events.enable_focus_release"
+          "events.enable_focus_release_events"
         } else {
-          "events.disable_focus_release"
+          "events.disable_focus_release_events"
         };
         require_game(&state.borrow(), method)?;
         args::no_args(method, values)?;

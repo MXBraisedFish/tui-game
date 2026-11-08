@@ -45,11 +45,14 @@ pub(super) fn i18n(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
       validate_language_code(method, "callback_language_code", &callback_language_code)?;
 
       let mut api = create_state.borrow_mut();
-      if api.i18n.created
-        || api.i18n.loading
-        || api.commands.len() >= MAX_HOST_COMMANDS_PER_CALLBACK
-      {
-        return Ok(Value::Nil);
+      if api.i18n.created {
+        return Err(args::message(method, "i18n instance already exists"));
+      }
+      if api.i18n.loading {
+        return Err(args::message(method, "i18n loading is already in progress"));
+      }
+      if api.commands.len() >= MAX_HOST_COMMANDS_PER_CALLBACK {
+        return Err(args::message(method, "host command queue is full"));
       }
       api.i18n.created = true;
       api.i18n.loading = true;
@@ -152,11 +155,14 @@ pub(super) fn i18n(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
       validate_language_code(method, "callback_language_code", &callback_language_code)?;
 
       let mut api = reload_state.borrow_mut();
-      if !api.i18n.created
-        || api.i18n.loading
-        || api.commands.len() >= MAX_HOST_COMMANDS_PER_CALLBACK
-      {
-        return Ok(Value::Nil);
+      if !api.i18n.created {
+        return Err(args::message(method, "i18n instance does not exist"));
+      }
+      if api.i18n.loading {
+        return Err(args::message(method, "i18n loading is already in progress"));
+      }
+      if api.commands.len() >= MAX_HOST_COMMANDS_PER_CALLBACK {
+        return Err(args::message(method, "host command queue is full"));
       }
       api.i18n.loading = true;
       let request_id = api.next_i18n_request_id;

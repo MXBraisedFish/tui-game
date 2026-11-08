@@ -6,7 +6,7 @@ use std::{
 };
 
 use tg_service_async::{AsyncRuntime, TaskStatusEvent};
-use tg_service_image::{ImageConvertParams, ImageEvent, ImageService};
+use tg_service_image::{ImageConvertParams, ImageEvent, ImageService, validate_request};
 
 #[derive(Debug)]
 enum Event {
@@ -43,6 +43,15 @@ fn main() {
     cache: false,
     ..Default::default()
   };
+  validate_request(&params).expect("valid conversion request");
+  assert!(
+    validate_request(&ImageConvertParams {
+      output_width: Some(129),
+      output_height: Some(128),
+      ..params.clone()
+    })
+    .is_err()
+  );
   let mut service = ImageService::new(None);
   let rendered = service
     .convert(params.clone())

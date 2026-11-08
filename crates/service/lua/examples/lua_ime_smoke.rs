@@ -49,19 +49,19 @@ fn main() {
     local native = {native}
     local locked, unlocked = false, false
     function Init(ctx)
-      debug.assert(ime.receive_input_event())
-      debug.assert(ime.receive_input_event())
+      debug.assert(ime.enable_input_event())
+      debug.assert(ime.enable_input_event())
       if native then
         locked = ime.lock()
-        unlocked = ime.unlock({{restore=true}})
+        unlocked = ime.unlock({{restore_ime=true}})
       end
     end
     function HandleEvent(event)
       if event.type == "input" then
         texts[#texts+1] = event.data.text
         if event.data.text == "reject" then
-          ime.reject_input_event()
-          ime.receive_input_event()
+          ime.disable_input_event()
+          ime.enable_input_event()
         end
       end
     end

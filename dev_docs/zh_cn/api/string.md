@@ -54,7 +54,7 @@ string.AUTO
 
 ### 可用于
 
-- 参数 `text_mode`
+- 参数 `parse_mode`
 
 ### 示例
 
@@ -62,8 +62,8 @@ string.AUTO
 local p_str = "Hello Tui Game"
 local r_str = "f%<fg:red>Hello<fg:yellow> Tui Game</fg>"
 
-local len1 = measurement.get_text_width(p_str, { text_mode = string.AUTO })
-local len2 = measurement.get_text_width(r_str, { text_mode = string.AUTO })
+local len1 = measurement.get_text_width(p_str, { parse_mode = string.AUTO })
+local len2 = measurement.get_text_width(r_str, { parse_mode = string.AUTO })
 
 debug.print(tostring(len1))
 debug.print(tostring(len2))
@@ -96,7 +96,7 @@ string.PLAIN_TEXT
 
 ### 可用于
 
-- 参数 `text_mode`
+- 参数 `parse_mode`
 
 ### 示例
 
@@ -104,8 +104,8 @@ string.PLAIN_TEXT
 local p_str = "Hello Tui Game"
 local r_str = "f%<fg:red>Hello<fg:yellow> Tui Game</fg>"
 
-local len1 = measurement.get_text_width(p_str, { text_mode = string.PLAIN_TEXT })
-local len2 = measurement.get_text_width(r_str, { text_mode = string.PLAIN_TEXT })
+local len1 = measurement.get_text_width(p_str, { parse_mode = string.PLAIN_TEXT })
+local len2 = measurement.get_text_width(r_str, { parse_mode = string.PLAIN_TEXT })
 
 debug.print(tostring(len1))
 debug.print(tostring(len2))
@@ -142,7 +142,7 @@ string.RICH_TEXT
 
 ### 可用于
 
-- 参数 `text_mode`
+- 参数 `parse_mode`
 
 ### 示例
 
@@ -150,8 +150,8 @@ string.RICH_TEXT
 local nh_r_str = "<fg:red>Hello<fg:yellow> Tui Game</fg>"
 local r_str = "f%<fg:red>Hello<fg:yellow> Tui Game</fg>"
 
-local len1 = measurement.get_text_width(nh_r_str, { text_mode = string.RICH_TEXT })
-local len2 = measurement.get_text_width(r_str, { text_mode = string.RICH_TEXT })
+local len1 = measurement.get_text_width(nh_r_str, { parse_mode = string.RICH_TEXT })
+local len2 = measurement.get_text_width(r_str, { parse_mode = string.RICH_TEXT })
 
 debug.print(tostring(len1))
 debug.print(tostring(len2))

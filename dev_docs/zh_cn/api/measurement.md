@@ -38,16 +38,16 @@ measurement.get_text_size
 
 #### 选填参数
 
-| 参数名             | 类型          | 默认值        | 说明                               |
-| ------------------ | ------------- | ------------- | ---------------------------------- |
-| `horizontal_align` | const-align   | `align.LEFT`  | 各行相对于最长显示行的水平对齐方式 |
-| `auto_wrap`        | boolean       | `true`        | 是否自动换行                       |
-| `word_wrap`        | boolean       | `true`        | 是否按完整单词换行                 |
-| `max_height`       | integer / nil | `nil`         | 最大绘制高度                       |
-| `max_width`        | integer / nil | `nil`         | 最大绘制宽度                       |
-| `overflow_marker`  | string        | `"..."`       | 文本溢出时使用的省略标记           |
-| `rich_params`      | table / nil   | `nil`         | 富文本参数对象表                   |
-| `text_mode`        | const-string  | `string.AUTO` | 文本解析模式                       |
+| 参数名             | 类型                 | 默认值                   | 说明                               |
+| ------------------ | -------------------- | ------------------------ | ---------------------------------- |
+| `horizontal_align` | const-align          | `align.LEFT`             | 各行相对于最长显示行的水平对齐方式 |
+| `auto_wrap`        | boolean              | `true`                   | 是否自动换行                       |
+| `word_wrap`        | boolean              | `true`                   | 是否按完整单词换行                 |
+| `max_height`       | integer / const-math | `math.POSITIVE_INFINITE` | 最大绘制高度                       |
+| `max_width`        | integer / const-math | `math.POSITIVE_INFINITE` | 最大绘制宽度                       |
+| `overflow_marker`  | string               | `"..."`                  | 文本溢出时使用的省略标记           |
+| `rich_params`      | table                | `{}`                     | 富文本参数对象表                   |
+| `parse_mode`       | const-string         | `string.AUTO`            | 文本解析模式                       |
 
 ### 返回值
 
@@ -98,16 +98,16 @@ measurement.get_text_width
 
 #### 选填参数
 
-| 参数名             | 类型          | 默认值        | 说明                               |
-| ------------------ | ------------- | ------------- | ---------------------------------- |
-| `horizontal_align` | const-align   | `align.LEFT`  | 各行相对于最长显示行的水平对齐方式 |
-| `auto_wrap`        | boolean       | `true`        | 是否自动换行                       |
-| `word_wrap`        | boolean       | `true`        | 是否按完整单词换行                 |
-| `max_height`       | integer / nil | `nil`         | 最大绘制高度                       |
-| `max_width`        | integer / nil | `nil`         | 最大绘制宽度                       |
-| `overflow_marker`  | string        | `"..."`       | 文本溢出时使用的省略标记           |
-| `rich_params`      | table / nil   | `nil`         | 富文本参数对象表                   |
-| `text_mode`        | const-string  | `string.AUTO` | 文本解析模式                       |
+| 参数名             | 类型                 | 默认值                   | 说明                               |
+| ------------------ | -------------------- | ------------------------ | ---------------------------------- |
+| `horizontal_align` | const-align          | `align.LEFT`             | 各行相对于最长显示行的水平对齐方式 |
+| `auto_wrap`        | boolean              | `true`                   | 是否自动换行                       |
+| `word_wrap`        | boolean              | `true`                   | 是否按完整单词换行                 |
+| `max_height`       | integer / const-math | `math.POSITIVE_INFINITE` | 最大绘制高度                       |
+| `max_width`        | integer / const-math | `math.POSITIVE_INFINITE` | 最大绘制宽度                       |
+| `overflow_marker`  | string               | `"..."`                  | 文本溢出时使用的省略标记           |
+| `rich_params`      | table                | `{}`                     | 富文本参数对象表                   |
+| `parse_mode`       | const-string         | `string.AUTO`            | 文本解析模式                       |
 
 ### 返回值
 
@@ -157,16 +157,16 @@ measurement.get_text_height
 
 #### 选填参数
 
-| 参数名             | 类型          | 默认值        | 说明                               |
-| ------------------ | ------------- | ------------- | ---------------------------------- |
-| `horizontal_align` | const-align   | `align.LEFT`  | 各行相对于最长显示行的水平对齐方式 |
-| `auto_wrap`        | boolean       | `true`        | 是否自动换行                       |
-| `word_wrap`        | boolean       | `true`        | 是否按完整单词换行                 |
-| `max_height`       | integer / nil | `nil`         | 最大绘制高度                       |
-| `max_width`        | integer / nil | `nil`         | 最大绘制宽度                       |
-| `overflow_marker`  | string        | `"..."`       | 文本溢出时使用的省略标记           |
-| `rich_params`      | table / nil   | `nil`         | 富文本参数对象表                   |
-| `text_mode`        | const-string  | `string.AUTO` | 文本解析模式                       |
+| 参数名             | 类型                 | 默认值                   | 说明                               |
+| ------------------ | -------------------- | ------------------------ | ---------------------------------- |
+| `horizontal_align` | const-align          | `align.LEFT`             | 各行相对于最长显示行的水平对齐方式 |
+| `auto_wrap`        | boolean              | `true`                   | 是否自动换行                       |
+| `word_wrap`        | boolean              | `true`                   | 是否按完整单词换行                 |
+| `max_height`       | integer / const-math | `math.POSITIVE_INFINITE` | 最大绘制高度                       |
+| `max_width`        | integer / const-math | `math.POSITIVE_INFINITE` | 最大绘制宽度                       |
+| `overflow_marker`  | string               | `"..."`                  | 文本溢出时使用的省略标记           |
+| `rich_params`      | table                | `{}`                     | 富文本参数对象表                   |
+| `parse_mode`       | const-string         | `string.AUTO`            | 文本解析模式                       |
 
 ### 返回值
 

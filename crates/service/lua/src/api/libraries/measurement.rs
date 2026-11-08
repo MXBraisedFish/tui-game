@@ -81,7 +81,7 @@ pub(super) fn draw_text_parameters(
       "reverse",
       "hidden",
       "dim",
-      "text_mode",
+      "parse_mode",
       "slice_layer",
     ],
   )
@@ -133,7 +133,7 @@ fn measurement_text_parameters(lua: &Lua, method: &str, values: MultiValue) -> m
       "max_width",
       "overflow_marker",
       "rich_params",
-      "text_mode",
+      "parse_mode",
     ],
   )
 }
@@ -158,12 +158,18 @@ pub(super) fn parse_draw_text_params(
   include_position: bool,
 ) -> mlua::Result<DrawTextParams> {
   let text = args::dynamic_text(args::required(table, method, "text")?, method, "text")?;
-  let mode = args::optional_string(table, method, "text_mode", Some("auto"))?.unwrap();
+  let mode_name = "parse_mode";
+  let mode = args::optional_string(table, method, mode_name, Some("auto"))?.unwrap();
   let text_mode = match mode.as_str() {
     "auto" => TextMode::Auto,
     "plain_text" => TextMode::Plain,
     "rich_text" => TextMode::Rich,
-    _ => return Err(args::message(method, "invalid text_mode constant")),
+    _ => {
+      return Err(args::message(
+        method,
+        format!("invalid {mode_name} constant"),
+      ));
+    }
   };
   let horizontal = args::optional_string(table, method, "horizontal_align", Some("left"))?.unwrap();
   let line_align = match horizontal.as_str() {
@@ -178,9 +184,21 @@ pub(super) fn parse_draw_text_params(
     Value::Boolean(false) => TextWrapMode::Normal,
     value => return Err(args::invalid(method, "auto_wrap", "boolean or nil", &value)),
   };
+  // The renderer represents unlimited dimensions as absent bounds.
+  for name in ["max_width", "max_height"] {
+    if let Value::Number(value) = table.raw_get::<Value>(name)?
+      && value == f64::INFINITY
+    {
+      table.raw_set(name, Value::Nil)?;
+    }
+  }
   let max_width = optional_positive_u16(table, method, "max_width")?;
   let max_height = optional_positive_u16(table, method, "max_height")?;
-  let mut rich_params = rich_text_params(table.get::<Value>("rich_params")?, method)?;
+  let mut rich_params = match table.get::<Value>("rich_params")? {
+    Value::Nil => Some(Default::default()),
+    value @ Value::Table(_) => rich_text_params(value, method)?,
+    value => return Err(args::invalid(method, "rich_params", "table", &value)),
+  };
   let parses_rich_text = match text_mode {
     TextMode::Rich => true,
     TextMode::Auto => text.starts_with("f%"),

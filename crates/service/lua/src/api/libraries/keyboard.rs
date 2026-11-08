@@ -10,20 +10,20 @@ use super::*;
 pub(super) fn keyboard(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
   let source = lua.create_table()?;
   for (name, actions, enabled) in [
-    ("receive_action_event", true, true),
-    ("reject_action_event", true, false),
-    ("receive_key_event", false, true),
-    ("reject_key_event", false, false),
+    ("enable_action_event", true, true),
+    ("disable_action_event", true, false),
+    ("enable_key_event", false, true),
+    ("disable_key_event", false, false),
   ] {
     let state = state.clone();
     source.raw_set(
       name,
       lua.create_function(move |_, values: MultiValue| {
         let method = match name {
-          "receive_action_event" => "keyboard.receive_action_event",
-          "reject_action_event" => "keyboard.reject_action_event",
-          "receive_key_event" => "keyboard.receive_key_event",
-          _ => "keyboard.reject_key_event",
+          "enable_action_event" => "keyboard.enable_action_event",
+          "disable_action_event" => "keyboard.disable_action_event",
+          "enable_key_event" => "keyboard.enable_key_event",
+          _ => "keyboard.disable_key_event",
         };
         require_game(&state.borrow(), method)?;
         args::no_args(method, values)?;
@@ -35,6 +35,9 @@ pub(super) fn keyboard(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> 
         };
         if current == enabled {
           return Ok(true);
+        }
+        if !enabled && api.commands.len() >= MAX_HOST_COMMANDS_PER_CALLBACK {
+          return Ok(false);
         }
         if actions {
           api.input.actions = enabled;

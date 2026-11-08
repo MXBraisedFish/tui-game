@@ -15,8 +15,8 @@ use tg_service_input::{InputNotification, InputService};
 use tg_service_layout::Size;
 use tg_service_log::LogService;
 use tg_service_lua::{
-  LuaEventBroker, LuaEventData, LuaEventRoute, LuaService, LuaSession, LuaSessionKind,
-  LuaSessionSpec, LuaSessionToken,
+  LuaEventBroker, LuaEventData, LuaEventRoute, LuaHostCommand, LuaService, LuaSession,
+  LuaSessionKind, LuaSessionSpec, LuaSessionToken,
 };
 
 struct Deployment(PathBuf);
@@ -43,8 +43,12 @@ fn main() {
     r#"
     local seen = {}
     function Init(ctx)
-      debug.assert(keyboard.receive_action_event())
-      debug.assert(keyboard.receive_key_event())
+      for _, fn in ipairs({events.skip_actions, events.clear_actions}) do
+        fn()
+        fn()
+      end
+      debug.assert(keyboard.enable_action_event())
+      debug.assert(keyboard.enable_key_event())
     end
     function HandleEvent(e)
       if e.type == "action" or e.type == "key" then
@@ -54,7 +58,7 @@ fn main() {
       elseif e.type == "overlay_started" or e.type == "overlay_stopped" then
         seen[#seen+1] = e.type
       elseif e.type == "resize" then
-        local fn = e.data.width == 1 and events.disable_focus_release or events.enable_focus_release
+        local fn = e.data.width == 1 and events.disable_focus_release_events or events.enable_focus_release_events
         debug.assert(fn())
         debug.assert(fn())
       end
@@ -82,6 +86,13 @@ fn main() {
       save_best_enabled: false,
     })
     .unwrap();
+  let commands = session.take_host_commands();
+  assert_eq!(commands.len(), 2);
+  for method in ["events.skip_actions", "events.clear_actions"] {
+    assert!(commands.iter().any(|command| matches!(command,
+      LuaHostCommand::Ignored {method: found, reason: "debug mode is disabled"} if *found == method
+    )));
+  }
   let token = LuaSessionToken {
     kind: LuaSessionKind::Game,
     generation: 1,

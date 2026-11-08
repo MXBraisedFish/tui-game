@@ -48,20 +48,20 @@ pub(super) fn ime(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
     lua.create_function(move |lua, values: MultiValue| {
       let method = "ime.unlock";
       require_game(&unlock_state.borrow(), method)?;
-      let parsed = args::positional(lua, method, values, &[], &["restore"])?;
-      let restore = args::optional_bool(parsed.options(), method, "restore", true)?;
+      let parsed = args::positional(lua, method, values, &[], &["restore_ime"])?;
+      let restore_ime = args::optional_bool(parsed.options(), method, "restore_ime", true)?;
       let mut api = unlock_state.borrow_mut();
       let Some(service) = api.context.input_method.clone() else {
         return Ok(false);
       };
-      let success = service.borrow_mut().unlock_input_method(restore);
+      let success = service.borrow_mut().unlock_input_method(restore_ime);
       if success {
         api.input.ime_locked = false;
       }
       Ok(success)
     })?,
   )?;
-  for (name, enabled) in [("receive_input_event", true), ("reject_input_event", false)] {
+  for (name, enabled) in [("enable_input_event", true), ("disable_input_event", false)] {
     let state = state.clone();
     source.raw_set(
       name,

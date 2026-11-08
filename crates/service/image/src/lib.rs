@@ -306,7 +306,7 @@ impl ImageService {
     if is_cancelled(cancellation) {
       return Ok(None);
     }
-    validate(&params)?;
+    validate_request(&params)?;
 
     let resolved = resolve_path(&params.image_path)?;
     if is_cancelled(cancellation) {
@@ -428,46 +428,76 @@ impl ImageService {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct Rgb(u8, u8, u8);
 
-fn validate(p: &ImageConvertParams) -> Result<(), String> {
-  if p.image_path.is_empty() {
+/// Validate conversion parameters without reading or decoding the source image.
+///
+/// Source-dependent crop bounds, default output sizes, and scaled dimensions are checked during
+/// conversion instead.
+///
+/// # Errors
+///
+/// Return an error for an empty path, invalid output or crop dimensions, negative crop offsets,
+/// a non-positive or non-finite scale, or an anti-alias radius outside the supported range.
+///
+/// # Examples
+///
+/// ```rust
+/// use tg_service_image::{ImageConvertParams, validate_request};
+///
+/// let params = ImageConvertParams {
+///   image_path: "assets/example.png".into(),
+///   output_width: Some(128),
+///   output_height: Some(128),
+///   ..Default::default()
+/// };
+/// assert!(validate_request(&params).is_ok());
+/// assert!(validate_request(&ImageConvertParams {
+///   output_height: Some(129),
+///   ..params
+/// }).is_err());
+/// ```
+pub fn validate_request(params: &ImageConvertParams) -> Result<(), String> {
+  if params.image_path.is_empty() {
     return Err("image_path 不能为空".into());
   }
-  if p.output_width == Some(0) {
+  if params.output_width == Some(0) {
     return Err("output_width 必须 > 0".into());
   }
-  if p.output_height == Some(0) {
+  if params.output_height == Some(0) {
     return Err("output_height 必须 > 0".into());
   }
-  if p
+  if params
     .output_width
     .is_some_and(|width| width > MAX_OUTPUT_DIMENSION)
   {
     return Err(format!("output_width 不得超过 {MAX_OUTPUT_DIMENSION}"));
   }
-  if p
+  if params
     .output_height
     .is_some_and(|height| height > MAX_OUTPUT_DIMENSION)
   {
     return Err(format!("output_height 不得超过 {MAX_OUTPUT_DIMENSION}"));
   }
-  if !p.scale.is_finite() || p.scale <= 0.0 {
+  if let (Some(width), Some(height)) = (params.output_width, params.output_height) {
+    output_dimensions(width, height, params)?;
+  }
+  if !params.scale.is_finite() || params.scale <= 0.0 {
     return Err("scale 必须是有限正数".into());
   }
-  if !p.anti_alias.is_finite() || !(0.0..=MAX_ANTI_ALIAS_RADIUS).contains(&p.anti_alias) {
+  if !params.anti_alias.is_finite() || !(0.0..=MAX_ANTI_ALIAS_RADIUS).contains(&params.anti_alias) {
     return Err(format!(
       "anti_alias 必须是 0 到 {MAX_ANTI_ALIAS_RADIUS} 之间的有限数值"
     ));
   }
-  if p.crop_x < 0 {
+  if params.crop_x < 0 {
     return Err("crop_x 不得小于 0".into());
   }
-  if p.crop_y < 0 {
+  if params.crop_y < 0 {
     return Err("crop_y 不得小于 0".into());
   }
-  if let Some(0) = p.crop_width {
+  if let Some(0) = params.crop_width {
     return Err("crop_width 必须 > 0".into());
   }
-  if let Some(0) = p.crop_height {
+  if let Some(0) = params.crop_height {
     return Err("crop_height 必须 > 0".into());
   }
   Ok(())
@@ -1277,7 +1307,7 @@ mod tests {
         anti_alias,
         ..Default::default()
       };
-      assert!(validate(&params).is_ok());
+      assert!(validate_request(&params).is_ok());
     }
     for anti_alias in [
       -0.01,
@@ -1292,7 +1322,11 @@ mod tests {
         anti_alias,
         ..Default::default()
       };
-      assert!(validate(&params).unwrap_err().contains("anti_alias"));
+      assert!(
+        validate_request(&params)
+          .unwrap_err()
+          .contains("anti_alias")
+      );
     }
   }
 
@@ -1409,7 +1443,7 @@ mod tests {
       image_path: String::new(),
       ..Default::default()
     };
-    assert!(validate(&p).is_err());
+    assert!(validate_request(&p).is_err());
   }
 
   #[test]
@@ -1419,7 +1453,7 @@ mod tests {
       output_width: Some(0),
       ..Default::default()
     };
-    assert!(validate(&p).is_err());
+    assert!(validate_request(&p).is_err());
   }
 
   #[test]
@@ -1429,7 +1463,7 @@ mod tests {
       output_height: Some(0),
       ..Default::default()
     };
-    assert!(validate(&p).is_err());
+    assert!(validate_request(&p).is_err());
   }
 
   #[test]
@@ -1439,7 +1473,7 @@ mod tests {
       crop_width: Some(0),
       ..Default::default()
     };
-    assert!(validate(&p).is_err());
+    assert!(validate_request(&p).is_err());
   }
 
   #[test]
@@ -1449,7 +1483,7 @@ mod tests {
       scale: -1.0,
       ..Default::default()
     };
-    assert!(validate(&p).is_err());
+    assert!(validate_request(&p).is_err());
   }
 
   #[test]
@@ -1460,7 +1494,10 @@ mod tests {
         scale,
         ..Default::default()
       };
-      assert!(validate(&params).is_err(), "scale {scale} must be rejected");
+      assert!(
+        validate_request(&params).is_err(),
+        "scale {scale} must be rejected"
+      );
     }
   }
 
@@ -1473,7 +1510,7 @@ mod tests {
         crop_y,
         ..Default::default()
       };
-      assert!(validate(&params).is_err());
+      assert!(validate_request(&params).is_err());
     }
   }
 
@@ -1485,7 +1522,7 @@ mod tests {
       output_height: Some(20),
       ..Default::default()
     };
-    assert!(validate(&p).is_ok());
+    assert!(validate_request(&p).is_ok());
   }
 
   #[test]

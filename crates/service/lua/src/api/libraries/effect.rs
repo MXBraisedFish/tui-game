@@ -6,13 +6,13 @@ use crate::{LuaCellEffect, LuaEffectRequest, LuaEffectScope};
 mod process;
 pub(crate) use process::process_buffer;
 
-const OPTIONS: &[&str] = &["process", "scope", "include_continuation"];
+const OPTIONS: &[&str] = &["process", "scope", "include_continuation_cells"];
 const FIELDS: &[&str] = &[
   "width",
   "height",
   "process",
   "scope",
-  "include_continuation",
+  "include_continuation_cells",
 ];
 
 /// Register the read-only character shader library.
@@ -24,34 +24,39 @@ pub(super) fn effect(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
   let source = lua.create_table()?;
   source.raw_set("CANVAS", "canvas")?;
   source.raw_set("SLICE", "slice")?;
-  let chars_state = state.clone();
+  let cells_state = state.clone();
   source.raw_set(
-    "chars",
+    "cells",
     lua.create_function(move |lua, values: MultiValue| {
-      let method = "effect.chars";
+      let method = "effect.cells";
       let table = positional_table(
         lua,
         method,
         values,
         &["x", "y", "width", "height"],
-        &["include_continuation", "scope", "slice_layer"],
+        &["include_continuation_cells", "scope", "slice_layer"],
       )?;
       let region = tg_service_canvas::CellEffectRegion {
         x: coordinate(&table, method, "x")?,
         y: coordinate(&table, method, "y")?,
         width: positive_u16(&table, method, "width")?,
         height: positive_u16(&table, method, "height")?,
-        include_continuation: args::optional_bool(&table, method, "include_continuation", false)?,
+        include_continuation: args::optional_bool(
+          &table,
+          method,
+          "include_continuation_cells",
+          false,
+        )?,
       };
       let surface = if scope(&table, method, LuaEffectScope::Canvas)? == LuaEffectScope::Slice {
-        Some(match parse_draw_target(&table, method, &chars_state)? {
+        Some(match parse_draw_target(&table, method, &cells_state)? {
           LuaDrawTarget::Base => tg_service_canvas::CellSurface::Base,
           LuaDrawTarget::Slice(id) => tg_service_canvas::CellSurface::Slice(id),
         })
       } else {
         None
       };
-      let snapshot = chars_state.borrow().completed_frame.clone();
+      let snapshot = cells_state.borrow().completed_frame.clone();
       let result = lua.create_table()?;
       let cells = snapshot.map_or_else(Vec::new, |snapshot| snapshot.cells(surface, region));
       result.raw_set("n", cells.len())?;
@@ -92,7 +97,12 @@ pub(super) fn effect(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
         method,
         values,
         &["x", "y", "width", "height"],
-        &["process", "scope", "include_continuation", "slice_layer"],
+        &[
+          "process",
+          "scope",
+          "include_continuation_cells",
+          "slice_layer",
+        ],
       )?;
       let binding = configuration(lua, &table, method, None)?;
       enqueue(&immediate_state, &table, method, binding)
@@ -110,7 +120,7 @@ pub(super) fn effect(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
           .effects
           .get(&id)
           .cloned()
-          .ok_or_else(|| args::message(method, "unknown effect id"))
+          .ok_or_else(|| missing_effect(method, id))
       })?;
       enqueue(&apply_state, &table, method, binding)
     })?,
@@ -123,9 +133,11 @@ pub(super) fn effect(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
       let table = positional_table(lua, method, values, &["id"], FIELDS)?;
       let id = table_id(&table, method)?;
       with_pool_mut(&set_state, method, |pool| {
-        let Some(binding) = pool.effects.get(&id).cloned() else {
-          return Ok(false);
-        };
+        let binding = pool
+          .effects
+          .get(&id)
+          .cloned()
+          .ok_or_else(|| missing_effect(method, id))?;
         let binding = configuration(lua, &table, method, Some(binding))?;
         pool.effects.insert(id, binding);
         Ok(true)
@@ -148,13 +160,17 @@ pub(super) fn effect(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
           None
         };
         with_pool_mut(&state, &method, |pool| match name {
-          "delete" => Ok(Value::Boolean(pool.effects.remove(&id.unwrap()).is_some())),
+          "delete" => pool
+            .effects
+            .remove(&id.unwrap())
+            .map(|_| Value::Boolean(true))
+            .ok_or_else(|| missing_effect(&method, id.unwrap())),
           "exists" => Ok(Value::Boolean(pool.effects.contains_key(&id.unwrap()))),
           "get_info" => pool
             .effects
             .get(&id.unwrap())
             .map(|binding| info(lua, id.unwrap(), binding).map(Value::Table))
-            .unwrap_or(Ok(Value::Nil)),
+            .unwrap_or_else(|| Err(missing_effect(&method, id.unwrap()))),
           "clear" => {
             pool.effects.clear();
             Ok(Value::Boolean(true))
@@ -202,13 +218,13 @@ fn configuration(
   match table.raw_get::<Value>("process")? {
     Value::Nil => {}
     Value::Function(function) => binding.process = function,
-    value => return Err(args::invalid(method, "process", "function or nil", &value)),
+    value => return Err(args::invalid(method, "process", "function", &value)),
   }
   binding.scope = scope(table, method, binding.scope)?;
   binding.include_continuation = args::optional_bool(
     table,
     method,
-    "include_continuation",
+    "include_continuation_cells",
     binding.include_continuation,
   )?;
   Ok(binding)
@@ -269,6 +285,10 @@ fn format_id(id: u64) -> String {
   format!("effect_{id:03}")
 }
 
+fn missing_effect(method: &str, id: u64) -> mlua::Error {
+  args::message(method, format!("effect '{}' does not exist", format_id(id)))
+}
+
 fn info(lua: &Lua, id: u64, binding: &LuaCellEffect) -> mlua::Result<Table> {
   let result = lua.create_table()?;
   result.raw_set("id", format_id(id))?;
@@ -276,6 +296,6 @@ fn info(lua: &Lua, id: u64, binding: &LuaCellEffect) -> mlua::Result<Table> {
   result.raw_set("height", binding.height)?;
   result.raw_set("process", binding.process.clone())?;
   result.raw_set("scope", binding.scope.as_str())?;
-  result.raw_set("include_continuation", binding.include_continuation)?;
+  result.raw_set("include_continuation_cells", binding.include_continuation)?;
   Ok(result)
 }

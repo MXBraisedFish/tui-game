@@ -10,27 +10,28 @@
 
 | 方法                    | 说明                                       | 定位                                            |
 | ----------------------- | ------------------------------------------ | ----------------------------------------------- |
-| `skip_action`           | 将本帧剩余等待处理的输入动作留到后续帧处理 | [skip_action](#skip_action)                     |
-| `clear_action`          | 清除当前等待处理的输入动作                 | [clear_action](#clear_action)                   |
-| `enable_focus_release`  | 启用游戏失焦时的释放事件补发               | [enable_focus_release](#enable_focus_release)   |
-| `disable_focus_release` | 关闭游戏失焦时的释放事件补发               | [disable_focus_release](#disable_focus_release) |
+| `skip_actions`           | 将本帧剩余等待处理的输入动作留到后续帧处理 | [skip_actions](#skip_actions)                     |
+| `clear_actions`          | 清除当前等待处理的输入动作                 | [clear_actions](#clear_actions)                   |
+| `enable_focus_release_events`  | 启用游戏失焦时的释放事件补发               | [enable_focus_release_events](#enable_focus_release_events)   |
+| `disable_focus_release_events` | 关闭游戏失焦时的释放事件补发               | [disable_focus_release_events](#disable_focus_release_events) |
 
 ---
 
 # 方法
 
-## `skip_action`
+## `skip_actions`
 
 将本帧剩余等待处理的输入动作留到后续帧处理。
 
 ### 限制
 
 - 仅游戏脚本可用。
+- 需开启调试模式。
 
 ### 调用
 
 ```lua
-events.skip_action
+events.skip_actions
 ```
 
 ### 返回值
@@ -40,27 +41,28 @@ events.skip_action
 ### 示例
 
 ```lua
-events.skip_action()
+events.skip_actions()
 ```
 
 ### 额外说明
 
-- 仅跳过用户输入的 `action` 事件。
+- 仅跳过玩家输入的 `action` 事件。
 
 ---
 
-## `clear_action`
+## `clear_actions`
 
 清除当前等待处理的输入动作。
 
 ### 限制
 
 - 仅游戏脚本可用。
+- 需开启调试模式。
 
 ### 调用
 
 ```lua
-events.clear_action
+events.clear_actions
 ```
 
 ### 返回值
@@ -70,16 +72,16 @@ events.clear_action
 ### 示例
 
 ```lua
-events.clear_action()
+events.clear_actions()
 ```
 
 ### 额外说明
 
-- 仅清除用户输入的 `action` 事件。
+- 仅清除玩家输入的 `action` 事件。
 
 ---
 
-## `enable_focus_release`
+## `enable_focus_release_events`
 
 启用游戏失焦时的释放事件补发。
 
@@ -90,7 +92,7 @@ events.clear_action()
 ### 调用
 
 ```lua
-events.enable_focus_release
+events.enable_focus_release_events
 ```
 
 ### 返回值
@@ -104,7 +106,7 @@ events.enable_focus_release
 ### 示例
 
 ```lua
-local success = events.enable_focus_release()
+local success = events.enable_focus_release_events()
 debug.print(success)
 ```
 
@@ -116,7 +118,7 @@ true
 
 ---
 
-## `disable_focus_release`
+## `disable_focus_release_events`
 
 关闭游戏失焦时的释放事件补发。
 
@@ -127,7 +129,7 @@ true
 ### 调用
 
 ```lua
-events.disable_focus_release
+events.disable_focus_release_events
 ```
 
 ### 返回值
@@ -141,7 +143,7 @@ events.disable_focus_release
 ### 示例
 
 ```lua
-local success = events.disable_focus_release()
+local success = events.disable_focus_release_events()
 debug.print(success)
 ```
 

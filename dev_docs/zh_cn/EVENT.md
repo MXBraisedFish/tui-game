@@ -77,7 +77,7 @@ local event = {
 
 action 和 key 都只发送状态变化：pressed 一次，下一宿主帧仍有效时 held 一次，结束时 released 一次。持续 held 不重复；快速点按可只有 pressed/released，同帧点按保留接收顺序，自动重复按下被过滤。每次键变化先排入 key，再排入该变化产生的有序动作。
 
-失焦、首个覆盖屏接管或对应 reject 会作废未交付普通输入，为实际已收到且尚未释放的输入补发一次 released；未交付 pressed 不产生孤立 released。收尾释放先于 focus(false) 或 overlay_started，不被 events.skip_action、events.clear_action 或刚关闭的接收开关丢弃。恢复接收后等待旧键松开，再次按下才重新激活。映射更新会先收尾旧动作，再启用新映射。
+失焦、首个覆盖屏接管或对应 reject 会作废未交付普通输入，为实际已收到且尚未释放的输入补发一次 released；未交付 pressed 不产生孤立 released。收尾释放先于 focus(false) 或 overlay_started，不被 events.skip_actions、events.clear_actions 或刚关闭的接收开关丢弃。恢复接收后等待旧键松开，再次按下才重新激活。映射更新会先收尾旧动作，再启用新映射。
 
 持续移动时请保存按住状态，在 Update 中执行：
 
@@ -96,7 +96,7 @@ end
 
 ### 2.1.1 `key`
 
-游戏通过 keyboard.receive_key_event() 开启后接收，默认关闭；屏保不接收。
+游戏通过 keyboard.enable_key_event() 开启后接收，默认关闭；屏保不接收。
 
 ```lua
 {type = "key", data = {key = "esc", state = "pressed"}}
@@ -111,7 +111,7 @@ end
 
 ### 2.1.2 `input`
 
-游戏调用 ime.receive_input_event() 后接收终端提交的文字，默认不接收。
+游戏调用 ime.enable_input_event() 后接收终端提交的文字，默认不接收。
 
 ```lua
 {type = "input", data = {text = "你好"}}
@@ -121,7 +121,7 @@ end
 | --- | --- | --- | --- |
 | text | string | 始终 | 终端提交的文字，包括普通字符和粘贴内容 |
 
-仅在终端有焦点且没有覆盖屏或程序输入框接管时发送。不包含输入法候选词和未提交文字；与 action、key 的接收开关独立。ime.reject_input_event() 会作废未交付的文字，重新开启后只接收新文字。events.skip_action() 和 events.clear_action() 不处理 input 事件。
+仅在终端有焦点且没有覆盖屏或程序输入框接管时发送。不包含输入法候选词和未提交文字；与 action、key 的接收开关独立。ime.disable_input_event() 会作废未交付的文字，重新开启后只接收新文字。events.skip_actions() 和 events.clear_actions() 不处理 input 事件。
 
 ### 2.2 `mouse`
 

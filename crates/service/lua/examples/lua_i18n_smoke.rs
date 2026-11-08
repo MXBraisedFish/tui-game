@@ -54,12 +54,16 @@ fn main() {
     fs::write(&entry, r#"
       function Init(ctx)
         completed = 0
+        debug.assert(not debug.pcall(i18n.reload))
         request_id = i18n.create({language_code = "zh_cn", callback_language_code = "en_us"})
+        debug.assert(request_id == "1")
+        debug.assert(not debug.pcall(i18n.create) and not debug.pcall(i18n.reload))
       end
       function HandleEvent(event)
         debug.assert(event.type == "i18n" and event.data.request_id == request_id)
         completed = completed + 1
         local data = event.data
+        debug.assert(not debug.pcall(i18n.create))
         debug.assert(data.language_code == "zh_cn" and data.callback_language_code == "en_us")
         if completed == 1 or completed == 5 then
           debug.assert(data.ok and string.find(data.warning, "primary") and string.find(data.warning, "fallback"))
@@ -83,6 +87,7 @@ fn main() {
         end
         if completed < 6 then
           request_id = i18n.reload({language_code = "zh_cn", callback_language_code = "en_us"})
+          debug.assert(not debug.pcall(i18n.reload))
         end
       end
       function Update(dt) end

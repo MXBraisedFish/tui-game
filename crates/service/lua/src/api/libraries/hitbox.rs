@@ -64,7 +64,9 @@ pub(super) fn hitbox(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
           return Ok(false);
         };
         let binding = options(&table, method, binding)?;
-        HitAreaService::new().set_options(pool.ui_mut(), HitAreaId(id), binding.options);
+        if !HitAreaService::new().set_options(pool.ui_mut(), HitAreaId(id), binding.options) {
+          return Ok(false);
+        }
         pool.hitboxes.insert(id, binding);
         Ok(true)
       })

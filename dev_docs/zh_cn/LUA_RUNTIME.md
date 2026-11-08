@@ -58,7 +58,7 @@ ctx = {
 
 支持的类型：
 
-- `key`：`data.key` 和 `data.state`，用 keyboard.receive_key_event() 开启；默认关闭。
+- `key`：`data.key` 和 `data.state`，用 keyboard.enable_key_event() 开启；默认关闭。
 - `action`：`data.action` 和 `data.state`（`pressed`、`held`、`released`）。
 - `mouse`：`data.kind`、`button`、`scroll`、`x`、`y`。
 - `resize`：`data.width`、`height`。

@@ -148,7 +148,9 @@ pub(super) fn scrollbox(lua: &Lua, state: SharedApiState) -> mlua::Result<Table>
           false,
           0,
         )?;
-        binding.widget.set_options(options);
+        if !binding.widget.set_options(options) {
+          return Ok(false);
+        }
         binding.background = background;
         if has_vertical || has_horizontal {
           binding.widget.scroll_to_axes(

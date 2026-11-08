@@ -12,8 +12,8 @@
 | --------------------- | -------------------- | ------------------------------------------- |
 | `lock`                | 锁定输入法           | [lock](#lock)                               |
 | `unlock`              | 解锁输入法           | [unlock](#unlock)                           |
-| `receive_input_event` | 启用接收文字输入事件 | [receive_input_event](#receive_input_event) |
-| `reject_input_event`  | 关闭接收文字输入事件 | [reject_input_event](#reject_input_event)   |
+| `enable_input_event` | 启用接收文字输入事件 | [enable_input_event](#enable_input_event) |
+| `disable_input_event`  | 关闭接收文字输入事件 | [disable_input_event](#disable_input_event)   |
 | `write_clipboard`     | 将文字写入剪贴板     | [write_clipboard](#write_clipboard)         |
 
 ---
@@ -77,7 +77,7 @@ ime.unlock
 
 | 参数名    | 类型    | 默认值 | 说明                   |
 | --------- | ------- | ------ | ---------------------- |
-| `restore` | boolean | `true` | 是否恢复锁定前的输入法 |
+| `restore_ime` | boolean | `true` | 是否恢复锁定前的输入法 |
 
 ### 返回值
 
@@ -90,7 +90,7 @@ ime.unlock
 ### 示例
 
 ```lua
-local success = ime.unlock({ restore = true })
+local success = ime.unlock({ restore_ime = true })
 debug.print(success)
 ```
 
@@ -102,7 +102,7 @@ true
 
 ---
 
-## `receive_input_event`
+## `enable_input_event`
 
 启用接收终端提交的文字。
 
@@ -113,7 +113,7 @@ true
 ### 调用
 
 ```lua
-ime.receive_input_event
+ime.enable_input_event
 ```
 
 ### 返回值
@@ -127,18 +127,19 @@ ime.receive_input_event
 ### 示例
 
 ```lua
-local success = ime.receive_input_event()
+local success = ime.enable_input_event()
 debug.print(success)
 ```
 
 **输出：**
 
 ```lua
+true
 ```
 
 ---
 
-## `reject_input_event`
+## `disable_input_event`
 
 关闭接收终端提交的文字。
 
@@ -149,7 +150,7 @@ debug.print(success)
 ### 调用
 
 ```lua
-ime.reject_input_event
+ime.disable_input_event
 ```
 
 ### 返回值
@@ -163,7 +164,7 @@ ime.reject_input_event
 ### 示例
 
 ```lua
-local success = ime.reject_input_event()
+local success = ime.disable_input_event()
 debug.print(success)
 ```
 

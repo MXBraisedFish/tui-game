@@ -17,7 +17,7 @@
 
 | 方法       | 说明                             | 定位                  |
 | ---------- | -------------------------------- | --------------------- |
-| `chars`    | 获取指定区域的所有字符格信息     | [chars](#chars)       |
+| `cells`    | 获取指定区域的所有字符格信息     | [cells](#cells)       |
 | `effect`   | 使用临时字符着色器作用于区域字符 | [effect](#effect)     |
 | `create`   | 创建一个字符着色器对象           | [create](#create)     |
 | `delete`   | 删除指定字符着色器               | [delete](#delete)     |
@@ -138,14 +138,14 @@ end
 
 # 方法
 
-## `chars`
+## `cells`
 
 获取指定区域的所有字符格信息。
 
 ### 调用
 
 ```lua
-effect.chars
+effect.cells
 ```
 
 ### 参数
@@ -163,7 +163,7 @@ effect.chars
 
 | 参数                   | 类型         | 默认值          | 含义                 |
 | ---------------------- | ------------ | --------------- | -------------------- |
-| `include_continuation` | boolean      | `false`         | 占位符是否命中宽字符 |
+| `include_continuation_cells` | boolean      | `false`         | 占位符是否命中宽字符 |
 | `scope`                | const-effect | `effect.CANVAS` | 作用层级             |
 | `slice_layer`          | string       | `"base"`        | 作用目标图层切片     |
 
@@ -183,7 +183,7 @@ local is_print = false
 
 function Update()
   if is_draw and not is_print then
-    local chars = effect.chars(5, 2, 2, 1)
+    local chars = effect.cells(5, 2, 2, 1)
     debug.print(table.pretty(chars))
     is_print = true
   end
@@ -289,12 +289,12 @@ effect.effect
 
 #### 选填参数
 
-| 参数                   | 类型           | 默认值          | 含义                 |
-| ---------------------- | -------------- | --------------- | -------------------- |
-| `process`              | function / nil | `nil`           | 处理函数             |
-| `scope`                | const-effect   | `effect.CANVAS` | 作用层级             |
-| `include_continuation` | boolean        | `false`         | 占位符是否命中宽字符 |
-| `slice_layer`          | string         | `"base"`        | 作用目标图层切片     |
+| 参数                   | 类型         | 默认值          | 含义                 |
+| ---------------------- | ------------ | --------------- | -------------------- |
+| `process`              | function     | `function(char) return char end` | 处理函数             |
+| `scope`                | const-effect | `effect.CANVAS` | 作用层级             |
+| `include_continuation_cells` | boolean      | `false`         | 占位符是否命中宽字符 |
+| `slice_layer`          | string       | `"base"`        | 作用目标图层切片     |
 
 ### 返回值
 
@@ -349,11 +349,11 @@ effect.create
 
 #### 选填参数
 
-| 参数                   | 类型           | 默认值          | 含义                 |
-| ---------------------- | -------------- | --------------- | -------------------- |
-| `process`              | function / nil | `nil`           | 处理函数             |
-| `scope`                | const-effect   | `effect.CANVAS` | 作用层级             |
-| `include_continuation` | boolean        | `false`         | 占位符是否命中宽字符 |
+| 参数                   | 类型         | 默认值          | 含义                 |
+| ---------------------- | ------------ | --------------- | -------------------- |
+| `process`              | function     | `function(char) return char end` | 处理函数             |
+| `scope`                | const-effect | `effect.CANVAS` | 作用层级             |
+| `include_continuation_cells` | boolean      | `false`         | 占位符是否命中宽字符 |
 
 ### 返回值
 
@@ -520,7 +520,7 @@ debug.print(table.pretty(effect.list()))
     height = 10,
     process = <function>,
     scope = "canvas",
-    include_continuation = false
+    include_continuation_cells = false
   },
   n = 1
 }
@@ -533,14 +533,14 @@ debug.print(table.pretty(effect.list()))
 ```lua
 {
   {
-    id = "effect_001",           -- string（字符着色器 ID）
-    width = 20,                  -- integer（作用区域宽度）
-    height = 10,                 -- integer（作用区域高度）
-    process = <function>,        -- function（处理函数）
-    scope = "canvas",            -- string（作用层级）
-    include_continuation = false -- boolean（占位符是否命中宽字符）
+    id = "effect_001",                 -- string（字符着色器 ID）
+    width = 20,                        -- integer（作用区域宽度）
+    height = 10,                       -- integer（作用区域高度）
+    process = <function>,              -- function（处理函数）
+    scope = "canvas",                  -- string（作用层级）
+    include_continuation_cells = false -- boolean（占位符是否命中宽字符）
   },
-  n = 1,                         -- integer（字符着色器数量）
+  n = 1,                               -- integer（字符着色器数量）
 }
 ```
 
@@ -662,13 +662,13 @@ effect.set
 
 #### 选填参数
 
-| 参数                   | 类型           | 默认值   | 含义                 |
-| ---------------------- | -------------- | -------- | -------------------- |
-| `width`                | integer        | 保持原值 | 作用区域宽度         |
-| `height`               | integer        | 保持原值 | 作用区域高度         |
-| `process`              | function / nil | 保持原值 | 处理函数             |
-| `scope`                | const-effect   | 保持原值 | 作用层级             |
-| `include_continuation` | boolean        | 保持原值 | 占位符是否命中宽字符 |
+| 参数                   | 类型         | 默认值   | 含义                 |
+| ---------------------- | ------------ | -------- | -------------------- |
+| `width`                | integer      | 保持原值 | 作用区域宽度         |
+| `height`               | integer      | 保持原值 | 作用区域高度         |
+| `process`              | function     | 保持原值 | 处理函数             |
+| `scope`                | const-effect | 保持原值 | 作用层级             |
+| `include_continuation_cells` | boolean      | 保持原值 | 占位符是否命中宽字符 |
 
 ### 返回值
 
@@ -698,7 +698,7 @@ true
   height = 5,
   process = <function>,
   scope = "canvas",
-  include_continuation = false
+  include_continuation_cells = false
 }
 ```
 
@@ -729,17 +729,11 @@ effect.get_info
 
 ### 返回值
 
-**该字符着色器存在时**，返回一个值。
+返回一个值。
 
 | 类型  | 说明                   |
 | ----- | ---------------------- |
 | table | 该字符着色器信息对象表 |
-
-**该字符着色器不存在时**，返回一个值。
-
-| 类型 | 说明               |
-| ---- | ------------------ |
-| nil  | 不存在该字符着色器 |
 
 ### 示例
 
@@ -758,7 +752,7 @@ debug.print(table.pretty(effect.get_info(ef)))
   height = 10,
   process = <function>,
   scope = "canvas",
-  include_continuation = false
+  include_continuation_cells = false
 }
 ```
 
@@ -768,12 +762,12 @@ debug.print(table.pretty(effect.get_info(ef)))
 
 ```lua
 {
-  id = "effect_001",           -- string（字符着色器 ID）
-  width = 20,                  -- integer（作用区域宽度）
-  height = 10,                 -- integer（作用区域高度）
-  process = <function>,        -- function（处理函数）
-  scope = "canvas",            -- string（作用层级）
-  include_continuation = false -- boolean（占位符是否命中宽字符）
+  id = "effect_001",                 -- string（字符着色器 ID）
+  width = 20,                        -- integer（作用区域宽度）
+  height = 10,                       -- integer（作用区域高度）
+  process = <function>,              -- function（处理函数）
+  scope = "canvas",                  -- string（作用层级）
+  include_continuation_cells = false -- boolean（占位符是否命中宽字符）
 }
 ```
 

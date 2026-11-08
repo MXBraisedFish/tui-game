@@ -51,7 +51,7 @@ draw.text
 | `max_width`        | integer / const-math | `math.POSITIVE_INFINITE` | 最大绘制宽度                       |
 | `max_height`       | integer / const-math | `math.POSITIVE_INFINITE` | 最大绘制高度                       |
 | `overflow_marker`  | string               | `"..."`                  | 文本溢出时使用的省略标记           |
-| `text_mode`        | const-string         | `string.AUTO`            | 文本解析模式                       |
+| `parse_mode`       | const-string         | `string.AUTO`            | 文本解析模式                       |
 | `rich_params`      | table                | `{}`                     | 富文本参数对象表                   |
 | `bold`             | boolean              | `false`                  | 粗体                               |
 | `italic`           | boolean              | `false`                  | 斜体                               |

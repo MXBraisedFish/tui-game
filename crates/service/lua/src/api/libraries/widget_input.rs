@@ -99,12 +99,14 @@ pub(super) fn input(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
           .unwrap_or_default()
           .into();
         let binding = options(&table, method, binding)?;
-        pool.text_input.configure(
+        if !pool.text_input.configure(
           &mut pool.ui,
           TextInputId(id),
           binding.options.clone(),
           binding.enter_submit,
-        );
+        ) {
+          return Ok(false);
+        }
         pool.inputs.insert(id, binding);
         Ok(true)
       })

@@ -88,40 +88,50 @@ pub(super) fn image(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
       };
       let background = parse_background_color(table, method)?;
       let Some(resolved) = resolve_image_path(&assets_root, &relative)? else {
-        return Ok(None);
+        return Err(args::message(
+          method,
+          "image file was not found or is unavailable",
+        ));
       };
+      let params = ImageConvertParams {
+        image_path: resolved.to_string_lossy().into_owned(),
+        mode,
+        background,
+        output_width,
+        output_height,
+        crop_x,
+        crop_y,
+        crop_width,
+        crop_height,
+        square_crop: false,
+        scale,
+        anti_alias,
+        cache,
+      };
+      tg_service_image::validate_request(&params).map_err(|error| {
+        args::message(
+          method,
+          error
+            .replace("output_width", "block_width")
+            .replace("output_height", "block_height"),
+        )
+      })?;
 
       let mut api = load_state.borrow_mut();
-      if api.pending_image_request_ids.len() >= MAX_LUA_IMAGE_TASKS_PER_SESSION
-        || api.commands.len() >= MAX_HOST_COMMANDS_PER_CALLBACK
-      {
-        return Ok(None);
+      if api.pending_image_request_ids.len() >= MAX_LUA_IMAGE_TASKS_PER_SESSION {
+        return Err(args::message(method, "image request limit was reached"));
+      }
+      if api.commands.len() >= MAX_HOST_COMMANDS_PER_CALLBACK {
+        return Err(args::message(method, "host command queue is full"));
       }
       let request_id = api.next_image_request_id;
       api.next_image_request_id = api.next_image_request_id.wrapping_add(1).max(1);
       api.pending_image_request_ids.insert(request_id);
       push_host_command(
         &mut api,
-        LuaHostCommand::ImageRequest {
-          request_id,
-          params: ImageConvertParams {
-            image_path: resolved.to_string_lossy().into_owned(),
-            mode,
-            background,
-            output_width,
-            output_height,
-            crop_x,
-            crop_y,
-            crop_width,
-            crop_height,
-            square_crop: false,
-            scale,
-            anti_alias,
-            cache,
-          },
-        },
+        LuaHostCommand::ImageRequest { request_id, params },
       );
-      Ok(Some(request_id.to_string()))
+      Ok(request_id.to_string())
     })?,
   )?;
   readonly::proxy(lua, source)

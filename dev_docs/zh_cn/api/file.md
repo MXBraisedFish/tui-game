@@ -11,7 +11,7 @@
 | 常量             | 说明                                  | 定位                              |
 | ---------------- | ------------------------------------- | --------------------------------- |
 | `AUTO`           | 自动检测模式                          | [AUTO](#auto)                     |
-| `ALL`            | 全部统一模式                          | [ALL](#all)                       |
+| `ANY`            | 全部统一模式                          | [ANY](#any)                       |
 | `CR`             | 回车符                                | [CR](#cr)                         |
 | `LF`             | 换行符                                | [LF](#lf)                         |
 | `CRLF`           | 回车换行符组合                        | [CRLF](#crlf)                     |
@@ -112,26 +112,26 @@ Hello Tui Game
 
 ---
 
-## `ALL`
+## `ANY`
 
 全部统一模式。
 
 ### 调用
 
 ```lua
-file.ALL
+file.ANY
 ```
 
 ### 可用于
 
-- 参数 `file_type`
+- 参数 `extension`
 
 ### 示例
 
 > assets/dir/...
 
 ```lua
-local request_id = file.list_dir("dir/", { file_type = file.ALL })
+local request_id = file.list_dir("dir/", { extension = file.ANY })
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -166,7 +166,7 @@ end
 ### 等值
 
 ```text
-"all"
+"any"
 ```
 
 ---
@@ -1921,26 +1921,19 @@ file.read
 
 #### 选填参数
 
-| 参数名        | 类型                | 默认值      | 说明           |
-| ------------- | ------------------- | ----------- | -------------- |
-| `encoding`    | string / const-file | `file.AUTO` | 文本编码       |
-| `end_of_line` | string / const-file | `file.AUTO` | 换行符规范     |
-| `byte`        | boolean             | `false`     | 二进制模式     |
-| `event_tip`   | string / nil        | `nil`       | 自定义事件标记 |
+| 参数名        | 类型                | 默认值      | 说明       |
+| ------------- | ------------------- | ----------- | ---------- |
+| `encoding`    | string / const-file | `file.AUTO` | 文本编码   |
+| `end_of_line` | string / const-file | `file.AUTO` | 换行符规范 |
+| `binary_mode` | boolean             | `false`     | 二进制模式 |
 
 ### 返回值
 
-**请求提交成功时**，返回一个值。
+返回一个值。
 
 | 类型   | 说明    |
 | ------ | ------- |
 | string | 事件 ID |
-
-**请求提交失败时**，返回一个值。
-
-| 类型 | 说明         |
-| ---- | ------------ |
-| nil  | 请求提交失败 |
 
 ### 示例
 
@@ -1977,8 +1970,8 @@ end
 
 - 事件返回值见⌊[事件协议](../EVENT.md)⌉。
 - 路径相对当前包的 `assets/`。
-- 选填参数 `byte` 为 `false` 时按文本读取。
-- 选填参数 `byte` 为 `true` 时按二进制读取，选填参数 `encoding` 与选填参数 `end_of_line` 会被忽略。
+- 选填参数 `binary_mode` 为 `false` 时按文本读取。
+- 选填参数 `binary_mode` 为 `true` 时按二进制读取，选填参数 `encoding` 与选填参数 `end_of_line` 会被忽略。
 
 ---
 
@@ -2007,31 +2000,24 @@ file.write
 
 #### 选填参数
 
-| 参数名        | 类型                | 默认值      | 说明           |
-| ------------- | ------------------- | ----------- | -------------- |
-| `encoding`    | string / const-file | `file.AUTO` | 文本编码       |
-| `end_of_line` | string / const-file | `file.AUTO` | 换行符规范     |
-| `byte`        | boolean             | `false`     | 二进制模式     |
-| `event_tip`   | string / nil        | `nil`       | 自定义事件标记 |
+| 参数名        | 类型                | 默认值      | 说明       |
+| ------------- | ------------------- | ----------- | ---------- |
+| `encoding`    | string / const-file | `file.AUTO` | 文本编码   |
+| `end_of_line` | string / const-file | `file.AUTO` | 换行符规范 |
+| `binary_mode` | boolean             | `false`     | 二进制模式 |
 
 ### 返回值
 
-**请求提交成功时**，返回一个值。
+返回一个值。
 
 | 类型   | 说明    |
 | ------ | ------- |
 | string | 事件 ID |
 
-**请求提交失败时**，返回一个值。
-
-| 类型 | 说明         |
-| ---- | ------------ |
-| nil  | 请求提交失败 |
-
 ### 示例
 
 ```lua
-local request_id = file.write("file.txt", "Hello Tui Game", { event_tip = "Get!" })
+local request_id = file.write("file.txt", "Hello Tui Game")
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -2060,8 +2046,8 @@ end
 
 - 事件返回值见⌊[事件协议](../EVENT.md)⌉。
 - 路径相对当前包的 `assets/`。
-- 选填参数 `byte` 为 `false` 时按文本读取。
-- 选填参数 `byte` 为 `true` 时按二进制读取，选填参数 `encoding` 与选填参数 `end_of_line` 会被忽略。
+- 选填参数 `binary_mode` 为 `false` 时按文本读取。
+- 选填参数 `binary_mode` 为 `true` 时按二进制读取，选填参数 `encoding` 与选填参数 `end_of_line` 会被忽略。
 - 方法会自动创建不存在的文件，但不会自动补全不存在的目录。
 
 ---
@@ -2093,29 +2079,22 @@ file.list_dir
 | 参数名      | 类型                | 默认值     | 说明               |
 | ----------- | ------------------- | ---------- | ------------------ |
 | `recursive` | boolean             | `false`    | 是否递归子目录枚举 |
-| `file_type` | string / const-file | `file.ALL` | 仅匹配指定扩展名   |
-| `event_tip` | string / nil        | `nil`      | 自定义事件标记     |
+| `extension` | string / const-file | `file.ANY` | 仅匹配指定扩展名   |
 
 ### 返回值
 
-**请求提交成功时**，返回一个值。
+返回一个值。
 
 | 类型   | 说明    |
 | ------ | ------- |
 | string | 事件 ID |
-
-**请求提交失败时**，返回一个值。
-
-| 类型 | 说明         |
-| ---- | ------------ |
-| nil  | 请求提交失败 |
 
 ### 示例
 
 > assets/dir/...
 
 ```lua
-local request_id = file.list_dir("dir/", { file_type = file.ALL })
+local request_id = file.list_dir("dir/", { extension = file.ANY })
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -2151,7 +2130,7 @@ end
 
 - 事件返回值见⌊[事件协议](../EVENT.md)⌉。
 - 路径相对当前包的 `assets/`。
-- 选填参数 `file_type` 只接受不含点号的扩展名，且不区分大小写。
+- 选填参数 `extension` 只接受不含点号的扩展名，且不区分大小写。
 
 ---
 
@@ -2177,25 +2156,13 @@ file.create_dir
 | ------ | ------ | ----------------------- |
 | `path` | string | 相对 `assets/` 目录路径 |
 
-#### 选填参数
-
-| 参数名      | 类型         | 默认值 | 说明           |
-| ----------- | ------------ | ------ | -------------- |
-| `event_tip` | string / nil | `nil`  | 自定义事件标记 |
-
 ### 返回值
 
-**请求提交成功时**，返回一个值。
+返回一个值。
 
 | 类型   | 说明    |
 | ------ | ------- |
 | string | 事件 ID |
-
-**请求提交失败时**，返回一个值。
-
-| 类型 | 说明         |
-| ---- | ------------ |
-| nil  | 请求提交失败 |
 
 ### 示例
 
@@ -2318,24 +2285,17 @@ file.remove
 
 #### 选填参数
 
-| 参数名      | 类型         | 默认值  | 说明                         |
-| ----------- | ------------ | ------- | ---------------------------- |
-| `recursive` | boolean      | `false` | 是否删除非空目录（递归删除） |
-| `event_tip` | string / nil | `nil`   | 自定义事件标记               |
+| 参数名      | 类型    | 默认值  | 说明                         |
+| ----------- | ------- | ------- | ---------------------------- |
+| `recursive` | boolean | `false` | 是否删除非空目录（递归删除） |
 
 ### 返回值
 
-**请求提交成功时**，返回一个值。
+返回一个值。
 
 | 类型   | 说明    |
 | ------ | ------- |
 | string | 事件 ID |
-
-**请求提交失败时**，返回一个值。
-
-| 类型 | 说明         |
-| ---- | ------------ |
-| nil  | 请求提交失败 |
 
 ### 示例
 
@@ -2363,7 +2323,7 @@ end
     kind = "remove_completed",
     ok = false,
     error = {
-      code = "io", 
+      code = "io",
       message = "I/O operation failed"
     },
     path = "test1",

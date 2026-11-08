@@ -16,19 +16,6 @@ pub(super) fn draw(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
     lua.create_function(move |lua, values: MultiValue| {
       let method = "draw.text";
       let table = draw_text_parameters(lua, method, values)?;
-      // The renderer represents unlimited dimensions as absent bounds.
-      for name in ["max_width", "max_height"] {
-        if let Value::Number(value) = table.raw_get::<Value>(name)?
-          && value == f64::INFINITY
-        {
-          table.raw_set(name, Value::Nil)?;
-        }
-      }
-      match table.raw_get::<Value>("rich_params")? {
-        Value::Nil => table.raw_set("rich_params", lua.create_table()?)?,
-        Value::Table(_) => {}
-        value => return Err(args::invalid(method, "rich_params", "table", &value)),
-      }
       let target = parse_draw_target(&table, method, &text_state)?;
       let params = {
         let state = text_state.borrow();

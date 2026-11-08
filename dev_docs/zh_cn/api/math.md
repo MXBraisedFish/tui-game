@@ -56,7 +56,7 @@
 | `type`            | 返回数值的类型名                | [type](#type)                       |
 | `ult`             | 以无符号整数比较两个整数        | [ult](#ult)                         |
 | `approx_equal`    | 以指定误差比较两个数字是否相等  | [approx_equal](#approx_equal)       |
-| `percent`         | 计算 $value / total$            | [percent](#percent)                 |
+| `ratio`         | 计算 $value / total$            | [ratio](#ratio)                 |
 | `factorial`       | 计算阶乘 $n!$                   | [factorial](#factorial)             |
 | `combination`     | 计算组合数 $C^n_k$              | [combination](#combination)         |
 
@@ -398,7 +398,7 @@ math.abs
 
 | 参数名  | 类型  | 说明             |
 | ------- | ----- | ---------------- |
-| `value` | float | 要取绝对值的数值 |
+| `value` | integer / float | 要取绝对值的数值 |
 
 ### 返回值
 
@@ -449,7 +449,7 @@ math.ceil
 
 | 参数名  | 类型  | 说明         |
 | ------- | ----- | ------------ |
-| `value` | float | 要取整的数值 |
+| `value` | integer / float | 要取整的数值 |
 
 ### 返回值
 
@@ -480,7 +480,7 @@ math.ceil
 
 ### 额外说明
 
-- 必填参数 `value` 取值范围为 $[-9223372036854775808, 9223372036854775807]$。
+- 必填参数 `value` 为取值范围为 $[-9223372036854775808, 9223372036854775807]$。
 
 ---
 
@@ -500,7 +500,7 @@ math.floor
 
 | 参数名  | 类型  | 说明         |
 | ------- | ----- | ------------ |
-| `value` | float | 要取整的数值 |
+| `value` | integer / float | 要取整的数值 |
 
 ### 返回值
 
@@ -551,7 +551,7 @@ math.round
 
 | 参数名  | 类型  | 说明         |
 | ------- | ----- | ------------ |
-| `value` | float | 要取整的数值 |
+| `value` | integer / float | 要取整的数值 |
 
 ### 返回值
 
@@ -595,10 +595,10 @@ math.round_to
 
 #### 必填参数
 
-| 参数名   | 类型    | 说明         |
-| -------- | ------- | ------------ |
-| `value`  | float   | 要取整的数值 |
-| `digits` | integer | 小数位数     |
+| 参数名   | 类型            | 说明         |
+| -------- | --------------- | ------------ |
+| `value`  | integer / float | 要取整的数值 |
+| `precision` | integer         | 小数位数     |
 
 ### 返回值
 
@@ -624,8 +624,8 @@ debug.print(tostring(r1) .. ", " .. tostring(r2))
 
 ### 额外说明
 
-- 必填参数 `digits` 取值范围为 $[-308, 308]$。
 - 必填参数 `value` 取值范围为 $(-\infty, +\infty)$；必须为有限数。
+- 必填参数 `precision` 取值范围为 $[-308, 308]$。
 
 ---
 
@@ -699,8 +699,8 @@ math.pow
 
 | 参数名 | 类型  | 说明 |
 | ------ | ----- | ---- |
-| `x`    | float | 底数 |
-| `y`    | float | 指数 |
+| `x`    | integer / float | 底数 |
+| `y`    | integer / float | 指数 |
 
 ### 返回值
 
@@ -752,7 +752,7 @@ math.exp
 
 | 参数名  | 类型  | 说明   |
 | ------- | ----- | ------ |
-| `value` | float | 指数值 |
+| `value` | integer / float | 指数值 |
 
 ### 返回值
 
@@ -783,7 +783,7 @@ math.exp
 
 ### 额外说明
 
-- 必填参数 `value` 取值范围为 $(-\infty, 709]$；必须为有限数。
+- 必填参数 `value` 取值范围为 $(-\infty, \ln(1.7976931348623157 \times 10^{308})]$；必须为有限数。
 
 ---
 
@@ -803,8 +803,8 @@ math.log
 
 | 参数名  | 类型  | 说明 |
 | ------- | ----- | ---- |
-| `value` | float | 真数 |
-| `base`  | float | 底数 |
+| `value` | integer / float | 真数 |
+| `base`  | integer / float | 底数 |
 
 ### 返回值
 
@@ -856,7 +856,7 @@ math.lg
 
 | 参数名  | 类型  | 说明 |
 | ------- | ----- | ---- |
-| `value` | float | 真数 |
+| `value` | integer / float | 真数 |
 
 ### 返回值
 
@@ -901,7 +901,7 @@ math.ln
 
 | 参数名  | 类型  | 说明 |
 | ------- | ----- | ---- |
-| `value` | float | 真数 |
+| `value` | integer / float | 真数 |
 
 ### 返回值
 
@@ -946,7 +946,7 @@ math.sqrt
 
 | 参数名  | 类型  | 说明     |
 | ------- | ----- | -------- |
-| `value` | float | 被开方数 |
+| `value` | integer / float | 被开方数 |
 
 ### 返回值
 
@@ -997,7 +997,7 @@ math.ldexp
 
 | 参数名 | 类型    | 说明 |
 | ------ | ------- | ---- |
-| `x`    | float   | 尾数 |
+| `x`    | integer / float   | 尾数 |
 | `exp`  | integer | 指数 |
 
 ### 返回值
@@ -1029,8 +1029,8 @@ math.ldexp
 
 ### 额外说明
 
-- 必填参数 `x` 取值范围为 $(-\infty, +\infty)$；必须为有限数。
-- 必填参数 `exp` 取值范围为 $(-\infty, 2097]$；必须为有限数，小于 $-2097$ 时直接返回符号与 `x` 相同的 $0$。
+- 必填参数 `x` 取值范围为 $(-\infty, +\infty)$；必须为有限数，，且不得等于 $0$。
+- 必填参数 `exp` 取值范围为 $[-2097, 2097]$。
 
 ---
 
@@ -1050,7 +1050,7 @@ math.frexp
 
 | 参数名  | 类型  | 说明         |
 | ------- | ----- | ------------ |
-| `value` | float | 要分解的数值 |
+| `value` | integer / float | 要分解的数值 |
 
 ### 返回值
 
@@ -1103,7 +1103,7 @@ math.sin
 
 | 参数名  | 类型  | 说明   |
 | ------- | ----- | ------ |
-| `value` | float | 弧度值 |
+| `value` | integer / float | 弧度值 |
 
 ### 返回值
 
@@ -1154,7 +1154,7 @@ math.cos
 
 | 参数名  | 类型  | 说明   |
 | ------- | ----- | ------ |
-| `value` | float | 弧度值 |
+| `value` | integer / float | 弧度值 |
 
 ### 返回值
 
@@ -1205,7 +1205,7 @@ math.tan
 
 | 参数名  | 类型  | 说明   |
 | ------- | ----- | ------ |
-| `value` | float | 弧度值 |
+| `value` | integer / float | 弧度值 |
 
 ### 返回值
 
@@ -1256,7 +1256,7 @@ math.asin
 
 | 参数名  | 类型  | 说明   |
 | ------- | ----- | ------ |
-| `value` | float | 正弦值 |
+| `value` | integer / float | 正弦值 |
 
 ### 返回值
 
@@ -1276,7 +1276,7 @@ debug.print(tostring(r))
 **输出：**
 
 ```lua
-
+0.5235987755982989
 ```
 
 ### 重定向
@@ -1307,7 +1307,7 @@ math.acos
 
 | 参数名  | 类型  | 说明   |
 | ------- | ----- | ------ |
-| `value` | float | 余弦值 |
+| `value` | integer / float | 余弦值 |
 
 ### 返回值
 
@@ -1358,7 +1358,7 @@ math.atan
 
 | 参数名  | 类型  | 说明   |
 | ------- | ----- | ------ |
-| `value` | float | 正切值 |
+| `value` | integer / float | 正切值 |
 
 ### 返回值
 
@@ -1409,8 +1409,8 @@ math.atan2
 
 | 参数名 | 类型  | 说明   |
 | ------ | ----- | ------ |
-| `y`    | float | 纵坐标 |
-| `x`    | float | 横坐标 |
+| `y`    | integer / float | 纵坐标 |
+| `x`    | integer / float | 横坐标 |
 
 ### 返回值
 
@@ -1462,7 +1462,7 @@ math.deg
 
 | 参数名  | 类型  | 说明   |
 | ------- | ----- | ------ |
-| `value` | float | 弧度值 |
+| `value` | integer / float | 弧度值 |
 
 ### 返回值
 
@@ -1513,7 +1513,7 @@ math.rad
 
 | 参数名  | 类型  | 说明   |
 | ------- | ----- | ------ |
-| `value` | float | 角度值 |
+| `value` | integer / float | 角度值 |
 
 ### 返回值
 
@@ -1562,9 +1562,9 @@ math.normalize_angle
 
 #### 必填参数
 
-| 参数名  | 类型    | 说明   |
-| ------- | ------- | ------ |
-| `value` | integer | 角度值 |
+| 参数名  | 类型            | 说明   |
+| ------- | --------------- | ------ |
+| `value` | integer / float | 角度值 |
 
 ### 返回值
 
@@ -1590,7 +1590,7 @@ debug.print(tostring(a1) .. ", " .. tostring(a2))
 
 ### 额外说明
 
-- 必填参数 `value` 取值范围为 $[-9223372036854775808, 9223372036854775807]$。
+- 必填参数 `value` 取值范围为 $(-\infty, +\infty)$；必须为有限数。
 
 ---
 
@@ -1642,6 +1642,8 @@ math.max
 ### 额外说明
 
 - 必填参数 `values` 必须为稠密数组。
+- 必填参数 `values` 的元素类型为 integer / float，取值范围为 $(-\infty, +\infty)$；必须为有限数。
+- 必填参数 `values` 的数组长度取值范围为 $[1, 16384]$；若提供 `n`，其类型必须为 integer，取值范围相同。
 
 ---
 
@@ -1693,6 +1695,8 @@ math.min
 ### 额外说明
 
 - 必填参数 `values` 必须为稠密数组。
+- 必填参数 `values` 的元素类型为 integer / float，取值范围为 $(-\infty, +\infty)$；必须为有限数。
+- 必填参数 `values` 的数组长度取值范围为 $[1, 16384]$；若提供 `n`，其类型必须为 integer，取值范围相同。
 
 ---
 
@@ -1712,7 +1716,7 @@ math.modf
 
 | 参数名  | 类型  | 说明         |
 | ------- | ----- | ------------ |
-| `value` | float | 要分解的数值 |
+| `value` | integer / float | 要分解的数值 |
 
 ### 返回值
 
@@ -1799,6 +1803,10 @@ debug.print(tostring(i1) .. ", " .. tostring(i2))
 ```lua
 math.tointeger
 ```
+
+### 额外说明
+
+- 必填参数 `value` 取值范围为 $[-9223372036854775808, 9223372036854775807]$。
 
 ---
 
@@ -1928,14 +1936,14 @@ math.approx_equal
 
 | 参数名  | 类型  | 说明       |
 | ------- | ----- | ---------- |
-| `left`  | float | 左侧操作数 |
-| `right` | float | 右侧操作数 |
+| `left`  | integer / float | 左侧操作数 |
+| `right` | integer / float | 右侧操作数 |
 
 #### 选填参数
 
 | 参数名    | 类型  | 默认值  | 说明     |
 | --------- | ----- | ------- | -------- |
-| `epsilon` | float | `1e-10` | 误差范围 |
+| `epsilon` | integer / float | `1e-10` | 误差范围 |
 
 ### 返回值
 
@@ -1970,14 +1978,14 @@ false
 
 ---
 
-## `percent`
+## `ratio`
 
 计算 $value / total$。
 
 ### 调用
 
 ```lua
-math.percent
+math.ratio
 ```
 
 ### 参数
@@ -1986,8 +1994,8 @@ math.percent
 
 | 参数名  | 类型  | 说明 |
 | ------- | ----- | ---- |
-| `value` | float | 分子 |
-| `total` | float | 分母 |
+| `value` | integer / float | 分子 |
+| `total` | integer / float | 分母 |
 
 #### 选填参数
 
@@ -2006,10 +2014,10 @@ math.percent
 ### 示例
 
 ```lua
-local p1 = math.percent(25, 80)
+local p1 = math.ratio(25, 80)
 debug.print(tostring(p1))
 
-local p2 = math.percent(25, 80, { as_percent = true })
+local p2 = math.ratio(25, 80, { as_percent = true })
 debug.print(tostring(p2))
 ```
 

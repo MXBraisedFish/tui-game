@@ -156,6 +156,9 @@ pub(super) fn markdown(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> 
         let Some(binding) = pool.markdowns.get_mut(&id) else {
           return Ok(false);
         };
+        if !MarkdownService::new().exists(&pool.ui, binding.native) {
+          return Ok(false);
+        }
         let text =
           args::optional_string(&table, method, "markdown", Some(&binding.options.markdown))?
             .unwrap();
@@ -192,20 +195,24 @@ pub(super) fn markdown(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> 
         } else {
           None
         };
-        if binding.options.markdown != text {
-          MarkdownService::new().set_markdown(&mut pool.ui, binding.native, text.clone());
-        }
-        if binding.options.markdown != text
+        let invalidate_layout = binding.options.markdown != text
           || binding.allow_overflow != allow
           || scrolling.widget.options().width != options.width
           || scrolling.widget.options().include_scrollbar != options.include_scrollbar
-          || scrolling.widget.options().always_show_scrollbar != options.always_show_scrollbar
+          || scrolling.widget.options().always_show_scrollbar != options.always_show_scrollbar;
+        if binding.options.markdown != text
+          && !MarkdownService::new().set_markdown(&mut pool.ui, binding.native, text.clone())
         {
+          return Ok(false);
+        }
+        if !scrolling.widget.set_options(options) {
+          return Ok(false);
+        }
+        if invalidate_layout {
           binding.layouts.clear();
         }
         binding.options.markdown = text;
         binding.allow_overflow = allow;
-        scrolling.widget.set_options(options);
         scrolling.background = background;
         if x.is_some() || y.is_some() {
           scrolling.widget.scroll_to_axes(x, y);

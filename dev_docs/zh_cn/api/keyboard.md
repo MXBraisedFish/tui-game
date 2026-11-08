@@ -10,16 +10,16 @@
 
 | 方法                   | 说明                 | 定位                                          |
 | ---------------------- | -------------------- | --------------------------------------------- |
-| `receive_action_event` | 启用接收动作事件     | [receive_action_event](#receive_action_event) |
-| `reject_action_event`  | 关闭接收动作事件     | [reject_action_event](#reject_action_event)   |
-| `receive_key_event`    | 启用接收原始按键事件 | [receive_key_event](#receive_key_event)       |
-| `reject_key_event`     | 关闭接收原始按键事件 | [reject_key_event](#reject_key_event)         |
+| `enable_action_event` | 启用接收动作事件     | [enable_action_event](#enable_action_event) |
+| `disable_action_event`  | 关闭接收动作事件     | [disable_action_event](#disable_action_event)   |
+| `enable_key_event`    | 启用接收原始按键事件 | [enable_key_event](#enable_key_event)       |
+| `disable_key_event`     | 关闭接收原始按键事件 | [disable_key_event](#disable_key_event)         |
 
 ---
 
 # 方法
 
-## `receive_action_event`
+## `enable_action_event`
 
 启用接收动作事件。
 
@@ -30,7 +30,7 @@
 ### 调用
 
 ```lua
-keyboard.receive_action_event
+keyboard.enable_action_event
 ```
 
 ### 返回值
@@ -44,7 +44,7 @@ keyboard.receive_action_event
 ### 示例
 
 ```lua
-local success = keyboard.receive_action_event()
+local success = keyboard.enable_action_event()
 debug.print(success)
 ```
 
@@ -56,7 +56,7 @@ true
 
 ---
 
-## `reject_action_event`
+## `disable_action_event`
 
 关闭接收动作事件。
 
@@ -67,7 +67,7 @@ true
 ### 调用
 
 ```lua
-keyboard.reject_action_event
+keyboard.disable_action_event
 ```
 
 ### 返回值
@@ -81,7 +81,7 @@ keyboard.reject_action_event
 ### 示例
 
 ```lua
-local success = keyboard.reject_action_event()
+local success = keyboard.disable_action_event()
 debug.print(success)
 ```
 
@@ -93,7 +93,7 @@ true
 
 ---
 
-## `receive_key_event`
+## `enable_key_event`
 
 开始接收原始按键事件。
 
@@ -104,7 +104,7 @@ true
 ### 调用
 
 ```lua
-keyboard.receive_key_event
+keyboard.enable_key_event
 ```
 
 ### 返回值
@@ -118,7 +118,7 @@ keyboard.receive_key_event
 ### 示例
 
 ```lua
-local success = keyboard.receive_key_event()
+local success = keyboard.enable_key_event()
 debug.print(success)
 ```
 
@@ -130,7 +130,7 @@ true
 
 ---
 
-## `reject_key_event`
+## `disable_key_event`
 
 关闭接收原始按键事件。
 
@@ -141,7 +141,7 @@ true
 ### 调用
 
 ```lua
-keyboard.reject_key_event
+keyboard.disable_key_event
 ```
 
 ### 返回值
@@ -155,8 +155,8 @@ keyboard.reject_key_event
 ### 示例
 
 ```lua
-keyboard.receive_key_event()
-debug.assert(keyboard.reject_key_event())
+keyboard.enable_key_event()
+debug.assert(keyboard.disable_key_event())
 ```
 
 **输出：**

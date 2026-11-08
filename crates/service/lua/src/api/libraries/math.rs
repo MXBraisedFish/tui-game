@@ -45,7 +45,7 @@ pub(super) fn math(lua: &Lua) -> mlua::Result<Table> {
   source.raw_set("type", numeric_type(lua)?)?;
   source.raw_set("ult", ult(lua)?)?;
   source.raw_set("approx_equal", approx_equal(lua)?)?;
-  source.raw_set("percent", percent(lua)?)?;
+  source.raw_set("ratio", ratio(lua)?)?;
   source.raw_set("factorial", factorial(lua)?)?;
   source.raw_set("combination", combination(lua)?)?;
 
@@ -141,26 +141,26 @@ fn rounded_integer(
 
 fn round_to(lua: &Lua) -> mlua::Result<Function> {
   lua.create_function(|lua, values: MultiValue| {
-    let parsed = args::positional(lua, "math.round_to", values, &["value", "digits"], &[])?;
+    let parsed = args::positional(lua, "math.round_to", values, &["value", "precision"], &[])?;
     let value = finite_number(
       parsed.required(0, "math.round_to", "value")?,
       "math.round_to",
       "value",
     )?;
-    let digits = args::integer(
-      parsed.required(1, "math.round_to", "digits")?,
+    let precision = strict_integer(
+      parsed.required(1, "math.round_to", "precision")?,
       "math.round_to",
-      "digits",
+      "precision",
     )?;
-    if !(-308..=308).contains(&digits) {
+    if !(-308..=308).contains(&precision) {
       return Err(args::message(
         "math.round_to",
-        "digits must be in -308..=308",
+        "precision must be in -308..=308",
       ));
     }
 
-    let factor = 10_f64.powi(digits.unsigned_abs() as i32);
-    let result = if digits >= 0 {
+    let factor = 10_f64.powi(precision.unsigned_abs() as i32);
+    let result = if precision >= 0 {
       if value.abs() > f64::MAX / factor {
         value
       } else {
@@ -176,8 +176,8 @@ fn round_to(lua: &Lua) -> mlua::Result<Function> {
 fn fmod(lua: &Lua) -> mlua::Result<Function> {
   lua.create_function(|lua, values: MultiValue| {
     let parsed = args::positional(lua, "math.fmod", values, &["x", "y"], &[])?;
-    let x = args::integer(parsed.required(0, "math.fmod", "x")?, "math.fmod", "x")?;
-    let y = args::integer(parsed.required(1, "math.fmod", "y")?, "math.fmod", "y")?;
+    let x = strict_integer(parsed.required(0, "math.fmod", "x")?, "math.fmod", "x")?;
+    let y = strict_integer(parsed.required(1, "math.fmod", "y")?, "math.fmod", "y")?;
     if y == 0 {
       return Err(args::message("math.fmod", "y must not be zero"));
     }
@@ -220,7 +220,7 @@ fn ldexp(lua: &Lua) -> mlua::Result<Function> {
   lua.create_function(|lua, values: MultiValue| {
     let parsed = args::positional(lua, "math.ldexp", values, &["x", "exp"], &[])?;
     let mut value = finite_number(parsed.required(0, "math.ldexp", "x")?, "math.ldexp", "x")?;
-    let mut exponent = args::integer(
+    let mut exponent = strict_integer(
       parsed.required(1, "math.ldexp", "exp")?,
       "math.ldexp",
       "exp",
@@ -295,12 +295,18 @@ fn atan2(lua: &Lua) -> mlua::Result<Function> {
 
 fn normalize_angle(lua: &Lua) -> mlua::Result<Function> {
   lua.create_function(|_, values: MultiValue| {
-    let value = args::integer(
-      args::one("math.normalize_angle", "value", values)?,
-      "math.normalize_angle",
-      "value",
-    )?;
-    Ok(value.rem_euclid(360) as f64)
+    let value = args::one("math.normalize_angle", "value", values)?;
+    if let Value::Integer(value) = value {
+      return Ok(value.rem_euclid(360) as f64);
+    }
+    let value = finite_number(value, "math.normalize_angle", "value")?;
+    let angle = value.rem_euclid(360.0);
+    // Rounding a tiny negative remainder can produce the excluded upper boundary.
+    Ok(if angle >= 360.0 || angle == 0.0 {
+      0.0
+    } else {
+      angle
+    })
   })
 }
 
@@ -316,7 +322,7 @@ fn extremum(lua: &Lua, maximum: bool) -> mlua::Result<Function> {
     let len = if matches!(declared_length, Value::Nil) {
       table.raw_len()
     } else {
-      let length = args::integer(declared_length, method, "values.n")?;
+      let length = strict_integer(declared_length, method, "values.n")?;
       usize::try_from(length)
         .map_err(|_| args::message(method, "values.n must be a non-negative integer"))?
     };
@@ -394,8 +400,8 @@ fn numeric_type(lua: &Lua) -> mlua::Result<Function> {
 fn ult(lua: &Lua) -> mlua::Result<Function> {
   lua.create_function(|lua, values: MultiValue| {
     let parsed = args::positional(lua, "math.ult", values, &["left", "right"], &[])?;
-    let left = args::integer(parsed.required(0, "math.ult", "left")?, "math.ult", "left")? as u64;
-    let right = args::integer(
+    let left = strict_integer(parsed.required(0, "math.ult", "left")?, "math.ult", "left")? as u64;
+    let right = strict_integer(
       parsed.required(1, "math.ult", "right")?,
       "math.ult",
       "right",
@@ -439,32 +445,32 @@ fn approx_equal(lua: &Lua) -> mlua::Result<Function> {
   })
 }
 
-fn percent(lua: &Lua) -> mlua::Result<Function> {
+fn ratio(lua: &Lua) -> mlua::Result<Function> {
   lua.create_function(|lua, values: MultiValue| {
     let parsed = args::positional(
       lua,
-      "math.percent",
+      "math.ratio",
       values,
       &["value", "total"],
       &["as_percent"],
     )?;
     let value = finite_number(
-      parsed.required(0, "math.percent", "value")?,
-      "math.percent",
+      parsed.required(0, "math.ratio", "value")?,
+      "math.ratio",
       "value",
     )?;
     let total = finite_number(
-      parsed.required(1, "math.percent", "total")?,
-      "math.percent",
+      parsed.required(1, "math.ratio", "total")?,
+      "math.ratio",
       "total",
     )?;
     if total == 0.0 {
-      return Err(args::message("math.percent", "total must not be zero"));
+      return Err(args::message("math.ratio", "total must not be zero"));
     }
-    let as_percent = args::optional_bool(parsed.options(), "math.percent", "as_percent", false)?;
+    let as_percent = args::optional_bool(parsed.options(), "math.ratio", "as_percent", false)?;
     let result = value / total;
     finite_result(
-      "math.percent",
+      "math.ratio",
       if as_percent { result * 100.0 } else { result },
     )
   })
@@ -472,7 +478,7 @@ fn percent(lua: &Lua) -> mlua::Result<Function> {
 
 fn factorial(lua: &Lua) -> mlua::Result<Function> {
   lua.create_function(|_, values: MultiValue| {
-    let n = args::integer(
+    let n = strict_integer(
       args::one("math.factorial", "n", values)?,
       "math.factorial",
       "n",
@@ -490,12 +496,12 @@ fn factorial(lua: &Lua) -> mlua::Result<Function> {
 fn combination(lua: &Lua) -> mlua::Result<Function> {
   lua.create_function(|lua, values: MultiValue| {
     let parsed = args::positional(lua, "math.combination", values, &["n", "k"], &[])?;
-    let n = args::integer(
+    let n = strict_integer(
       parsed.required(0, "math.combination", "n")?,
       "math.combination",
       "n",
     )?;
-    let mut k = args::integer(
+    let mut k = strict_integer(
       parsed.required(1, "math.combination", "k")?,
       "math.combination",
       "k",
@@ -518,6 +524,13 @@ fn combination(lua: &Lua) -> mlua::Result<Function> {
     }
     Ok(result as i64)
   })
+}
+
+fn strict_integer(value: Value, method: &str, parameter: &str) -> mlua::Result<i64> {
+  match value {
+    Value::Integer(value) => Ok(value),
+    value => Err(args::invalid(method, parameter, "integer", &value)),
+  }
 }
 
 fn finite_number(value: Value, method: &str, parameter: &str) -> mlua::Result<f64> {

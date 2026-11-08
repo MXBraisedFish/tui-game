@@ -127,19 +127,19 @@ fn completed_frame_queries() {
         layer_a, layer_b = slice.create(3,1,{bg=color.BLUE}), slice.create(3,1)
         layer_blank = slice.create(2,1,{bg=color.RED})
         rendered = 0
-        debug.assert(effect.chars(0,0,1,1).n == 0)
-        debug.assert(effect.chars(0,0,1,1,{scope=effect.SLICE,slice_layer=layer_a}).n == 0)
-        for _, options in ipairs({{scope="bad"},{include_continuation=1},{scope=effect.SLICE,slice_layer="slice_999"},{unknown=true}}) do
-          debug.assert(not debug.pcall(effect.chars,0,0,1,1,options))
+        debug.assert(effect.cells(0,0,1,1).n == 0)
+        debug.assert(effect.cells(0,0,1,1,{scope=effect.SLICE,slice_layer=layer_a}).n == 0)
+        for _, options in ipairs({{scope="bad"},{include_continuation_cells=1},{include_continuation=true},{scope=effect.SLICE,slice_layer="slice_999"},{unknown=true}}) do
+          debug.assert(not debug.pcall(effect.cells,0,0,1,1,options))
         end
         for _, invalid in ipairs({0,-1,65536,1.5,false}) do
-          debug.assert(not debug.pcall(effect.chars,0,0,invalid,1))
+          debug.assert(not debug.pcall(effect.cells,0,0,invalid,1))
         end
-        debug.assert(not debug.pcall(effect.chars,2147483648,0,1,1))
+        debug.assert(not debug.pcall(effect.cells,2147483648,0,1,1))
       end
       function Render()
         rendered = rendered + 1
-        local previous = effect.chars(0,0,1,1)
+        local previous = effect.cells(0,0,1,1)
         debug.assert(rendered == 1 and previous.n == 0 or rendered == 2 and previous[1].char == "8")
         slice.draw(layer_blank,8,0)
         if rendered == 2 then draw.text(0,0,"9"); return end
@@ -149,22 +149,22 @@ fn completed_frame_queries() {
         slice.draw(layer_a,1,0)
         slice.draw(layer_b,3,0)
         effect.effect(0,0,6,1,{process=function(cell)
-          debug.assert(effect.chars(0,0,1,1).n == 0)
+          debug.assert(effect.cells(0,0,1,1).n == 0)
           return {fg=color.GREEN,bg=color.NONE}
         end})
       end
       function Update(dt)
-        local chars = effect.chars(0,0,6,1,{slice_layer="ignored"})
+        local chars = effect.cells(0,0,6,1,{slice_layer="ignored"})
         debug.assert(chars.n == 6)
-        local blank_canvas = effect.chars(8,0,2,1)
-        local blank_slice = effect.chars(0,0,2,1,{scope=effect.SLICE,slice_layer=layer_blank})
+        local blank_canvas = effect.cells(8,0,2,1)
+        local blank_slice = effect.cells(0,0,2,1,{scope=effect.SLICE,slice_layer=layer_blank})
         for index=1,2 do
           debug.assert(blank_canvas[index].char == "" and blank_canvas[index].bg == color.RED)
           debug.assert(blank_slice[index].char == "" and blank_slice[index].bg == color.RED)
         end
         if rendered == 2 then
           debug.assert(chars[1].char == "9" and chars[2].char == "")
-          debug.assert(effect.chars(0,0,3,1,{scope=effect.SLICE,slice_layer=layer_a}).n == 0)
+          debug.assert(effect.cells(0,0,3,1,{scope=effect.SLICE,slice_layer=layer_a}).n == 0)
           return
         end
         local text = {"8","a","a","b","b","b"}
@@ -175,11 +175,11 @@ fn completed_frame_queries() {
           debug.assert(cell.blink == false and cell.reverse == false and cell.hidden == false and cell.dim == false)
           debug.assert(cell.relative_x == nil and cell.relative_y == nil)
         end
-        local base = effect.chars(0,0,6,1,{scope=effect.SLICE})
+        local base = effect.cells(0,0,6,1,{scope=effect.SLICE})
         debug.assert(base.n == 6 and base[1].char == "8" and base[2].char == "8" and base[3].char == "8" and base[4].char == "")
         debug.assert(base[1].fg == color.GREEN and base[2].fg == color.WHITE and base[3].fg == color.WHITE)
-        local a = effect.chars(0,0,3,1,{scope=effect.SLICE,slice_layer=layer_a})
-        local b = effect.chars(0,0,3,1,{scope=effect.SLICE,slice_layer=layer_b})
+        local a = effect.cells(0,0,3,1,{scope=effect.SLICE,slice_layer=layer_a})
+        local b = effect.cells(0,0,3,1,{scope=effect.SLICE,slice_layer=layer_b})
         for index=1,3 do
           debug.assert(a[index].char == "a" and a[index].x == index-1)
           debug.assert(a[index].fg == (index <= 2 and color.GREEN or color.WHITE))
@@ -187,10 +187,10 @@ fn completed_frame_queries() {
         end
         debug.assert(a[1].bg == color.NONE and a[2].bg == color.NONE and a[3].bg == color.BLUE)
         chars[1].char = "changed by caller"
-        debug.assert(effect.chars(0,0,1,1)[1].char == "8")
-        local clipped = effect.chars(-1,0,3,1)
+        debug.assert(effect.cells(0,0,1,1)[1].char == "8")
+        local clipped = effect.cells(-1,0,3,1)
         debug.assert(clipped.n == 2 and clipped[1].x == 0 and clipped[2].x == 1)
-        debug.assert(effect.chars(2147483647,-2147483648,65535,65535).n == 0)
+        debug.assert(effect.cells(2147483647,-2147483648,65535,65535).n == 0)
       end
     "#,
       kind,
@@ -218,12 +218,12 @@ fn nested_source_queries() {
       effect.effect(3,1,1,1,{process=function(cell) return {fg=color.BLUE,bold=true} end})
     end
     function Update(dt)
-      local parent_chars=effect.chars(0,0,4,1,{scope=effect.SLICE,slice_layer=parent})
+      local parent_chars=effect.cells(0,0,4,1,{scope=effect.SLICE,slice_layer=parent})
       for index=1,4 do debug.assert(parent_chars[index].char == "P" and parent_chars[index].fg == color.WHITE) end
-      local child_chars=effect.chars(0,0,3,1,{scope=effect.SLICE,slice_layer=child})
+      local child_chars=effect.cells(0,0,3,1,{scope=effect.SLICE,slice_layer=child})
       debug.assert(child_chars.n == 2 and child_chars[1].x == 1 and child_chars[1].char == "")
       debug.assert(child_chars[2].x == 2 and child_chars[2].char == "Z" and child_chars[2].fg == color.BLUE and child_chars[2].bold)
-      local final=effect.chars(3,1,1,1)
+      local final=effect.cells(3,1,1,1)
       debug.assert(final[1].char == "Z" and final[1].x == 3 and final[1].fg == color.BLUE)
     end
   "#,
@@ -242,10 +242,10 @@ fn wide_character_queries() {
     end
     function Update(dt)
       for _, scope in ipairs({effect.CANVAS,effect.SLICE}) do
-        debug.assert(effect.chars(3,0,1,1,{scope=scope}).n == 0)
-        local wide=effect.chars(3,0,1,1,{scope=scope,include_continuation=true})
+        debug.assert(effect.cells(3,0,1,1,{scope=scope}).n == 0)
+        local wide=effect.cells(3,0,1,1,{scope=scope,include_continuation_cells=true})
         debug.assert(wide.n == 1 and wide[1].x == 2 and wide[1].char == "我́" and wide[1].fg == color.BLUE)
-        local all=effect.chars(2,0,3,1,{scope=scope,include_continuation=true})
+        local all=effect.cells(2,0,3,1,{scope=scope,include_continuation_cells=true})
         debug.assert(all.n == 2 and all[2].x == 4 and all[2].char == "a")
       end
     end
@@ -260,27 +260,55 @@ fn lifecycle_and_identity() {
   for kind in [LuaSessionKind::Game, LuaSessionKind::Screensaver] {
     let mut harness = Harness::new(
       r#"
+      local function assert_missing(id)
+        debug.assert(not effect.exists(id))
+        for _, method in ipairs({"apply", "set", "delete", "get_info"}) do
+          local ok, message
+          if method == "apply" then
+            ok, message = debug.pcall(effect[method], id, 0, 0)
+          elseif method == "set" then
+            ok, message = debug.pcall(effect[method], id, {width=2})
+          else
+            ok, message = debug.pcall(effect[method], id)
+          end
+          debug.assert(not ok)
+          debug.assert(string.find(message, "effect." .. method, {plain=true}) ~= nil)
+          debug.assert(string.find(message, id, {plain=true}) ~= nil)
+          debug.assert(string.find(message, "does not exist", {plain=true}) ~= nil)
+        end
+      end
       function Init(ctx)
         debug.assert(effect.CANVAS == "canvas" and effect.SLICE == "slice")
+        debug.assert(effect.chars == nil and type(effect.cells) == "function")
         debug.assert(not debug.pcall(function() effect.CANVAS = "slice" end))
         ef = effect.create(3, 1)
         debug.assert(ef == "effect_001" and effect.count() == 1)
         local info = effect.get_info(ef)
         debug.assert(info.width == 3 and info.height == 1 and info.scope == "canvas")
-        debug.assert(info.include_continuation == false and type(info.process) == "function")
+        debug.assert(info.include_continuation_cells == false and type(info.process) == "function")
+        debug.assert(info.include_continuation == nil)
         local original = {char="a"}
         debug.assert(info.process(original) == original)
-        for _, options in ipairs({{width=0}, {height=65536}, {scope="unknown"}, {process=false}, {include_continuation=1}, {unknown=true}}) do
+        for _, options in ipairs({{width=0}, {height=65536}, {scope="unknown"}, {process=false}, {include_continuation_cells=1}, {include_continuation=true}, {unknown=true}}) do
           debug.assert(not debug.pcall(effect.set, ef, options))
           debug.assert(effect.get_info(ef).width == 3)
         end
         for _, invalid in ipairs({0, -1, 65536, 1.5, "3", false}) do
           debug.assert(not debug.pcall(effect.create, invalid, 1))
         end
+        debug.assert(not debug.pcall(effect.create, 1, 1, {include_continuation=true}))
+        debug.assert(not debug.pcall(effect.effect, 0, 0, 1, 1, {include_continuation=true}))
+        local process = function(cell) return {char="changed"} end
+        debug.assert(effect.set(ef, {process=process, include_continuation_cells=true}))
+        debug.assert(effect.set(ef, {process=nil}))
+        debug.assert(effect.get_info(ef).process == process)
+        debug.assert(effect.list()[1].include_continuation_cells == true)
+        debug.assert(effect.list()[1].include_continuation == nil)
+        debug.assert(effect.set(ef, {process=info.process, include_continuation_cells=false}))
         debug.assert(effect.list().n == 1 and effect.list()[1].id == ef)
         debug.assert(effect.exists(ef) and not effect.exists("effect_999"))
-        debug.assert(not effect.set("effect_999", {width=2}))
-        debug.assert(not effect.delete("effect_999") and effect.get_info("effect_999") == nil)
+        assert_missing("effect_999")
+        debug.assert(effect.count() == 1 and effect.get_info(ef).width == 3)
         debug.assert(effect.set(ef, {process=nil, scope=effect.CANVAS}))
       end
       function Render()
@@ -290,9 +318,10 @@ fn lifecycle_and_identity() {
       end
       function Update(dt)
         debug.assert(effect.delete(ef) and effect.count() == 0)
-        debug.assert(not effect.exists(ef))
+        assert_missing(ef)
         debug.assert(effect.create(1,1) == "effect_002")
         debug.assert(effect.clear() and effect.list().n == 0)
+        assert_missing("effect_002")
       end
     "#,
       kind,
@@ -394,7 +423,7 @@ fn wide_graphemes_and_styles() {
     function Render()
       draw.text(2,0,"我́a",{fg=color.RED,bg=color.BLUE})
       effect.effect(3,0,1,1,{scope=effect.SLICE,process=function(cell) debug.assert(false) end})
-      effect.effect(3,0,1,1,{scope=effect.SLICE,include_continuation=true,process=function(cell)
+      effect.effect(3,0,1,1,{scope=effect.SLICE,include_continuation_cells=true,process=function(cell)
         calls=calls+1
         debug.assert(cell.char == "我́" and cell.x == 2 and cell.relative_x == -1)
         debug.assert(cell.fg == color.RED and cell.bg == color.BLUE)

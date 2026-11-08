@@ -67,6 +67,9 @@ fn main() {
   image::RgbImage::new(2, 2)
     .save(assets.join("sample.png"))
     .unwrap();
+  fs::copy(assets.join("sample.png"), assets.join("vanishing.png")).unwrap();
+  fs::copy(assets.join("sample.png"), assets.join("unsupported.gif")).unwrap();
+  fs::create_dir(assets.join("folder.png")).unwrap();
   for language in ["zh_cn", "en_us"] {
     let directory = assets.join("language").join(language);
     fs::create_dir_all(&directory).unwrap();
@@ -79,44 +82,68 @@ fn main() {
     local pending = {file={}, image={}, i18n={}}
     local files, images, languages = 0, 0, 0
     local failed_files, failed_images = 0, 0
+    local filtered_request
     local function remember(kind, id)
       debug.assert(type(id) == "string" and not pending[kind][id])
       pending[kind][id] = true
     end
     function Init(ctx)
-      debug.assert(file.read("missing.txt") == nil)
-      debug.assert(image.load("missing.png") == nil)
-      debug.assert(i18n.reload() == nil)
+      debug.assert(file.ANY == "any" and file.ALL == nil)
+      debug.assert(not debug.pcall(function() return file.read("missing.txt") end))
+      debug.assert(not debug.pcall(function() return image.load("missing.png") end))
+      for _, path in ipairs({"missing_dir/sample.png", "folder.png", "unsupported.gif"}) do
+        debug.assert(not debug.pcall(image.load, path))
+      end
+      for _, options in ipairs({{block_width=2049}, {block_height=2049},
+        {block_width=129,block_height=128}, {scale=0}, {crop_width=0}}) do
+        debug.assert(not debug.pcall(image.load, "sample.png", options))
+      end
+      debug.assert(not debug.pcall(i18n.reload))
       remember("file", file.read("input.txt"))
-      remember("file", file.read("input.txt", {byte=true}))
+      remember("file", file.read("input.txt", {binary_mode=true}))
       remember("file", file.write("text.txt", "written"))
-      remember("file", file.write("bytes.bin", "a\0b", {byte=true}))
+      remember("file", file.write("bytes.bin", "a\0b", {binary_mode=true}))
       remember("file", file.create_dir("created"))
-      remember("file", file.list_dir("."))
+      remember("file", file.list_dir(".", {extension=file.ANY}))
       remember("file", file.remove("remove.txt"))
       remember("file", file.read("broken.txt", {encoding="utf-8"}))
-      debug.assert(file.read("input.txt") == nil)
-      debug.assert(file.write("rejected.txt", "must not exist") == nil)
+      debug.assert(not debug.pcall(function() return file.read("input.txt") end))
+      debug.assert(not debug.pcall(function() return file.write("rejected.txt", "must not exist") end))
       for i = 1, 3 do remember("image", image.load("sample.png")) end
       remember("image", image.load("broken.png"))
-      debug.assert(image.load("sample.png") == nil)
+      debug.assert(not debug.pcall(function() return image.load("sample.png") end))
       remember("i18n", i18n.create({language_code="zh_cn", callback_language_code="en_us"}))
-      debug.assert(i18n.create() == nil and i18n.reload() == nil)
+      debug.assert(not debug.pcall(i18n.create) and not debug.pcall(i18n.reload))
     end
     function HandleEvent(e)
       debug.assert(type(e.data.request_id) == "string")
       debug.assert(pending[e.type][e.data.request_id])
       pending[e.type][e.data.request_id] = nil
       if e.type == "file" then
+        debug.assert(e.data.tip == "")
+        if e.data.request_id == filtered_request then
+          debug.assert(e.data.ok and #e.data.entries > 0)
+          for _, entry in ipairs(e.data.entries) do
+            debug.assert(entry.file_type == "txt" and entry.extension == nil)
+          end
+        end
         files = files + 1
         if not e.data.ok then failed_files = failed_files + 1 end
         if files == 1 then
-          remember("file", file.read("input.txt"))
-          debug.assert(file.read("input.txt") == nil)
+          filtered_request = file.list_dir(".", {extension="TXT"})
+          remember("file", filtered_request)
+          debug.assert(not debug.pcall(function() return file.read("input.txt") end))
         end
       elseif e.type == "image" then
         images = images + 1
         if not e.data.ok then failed_images = failed_images + 1 end
+        if images == 1 then
+          remember("image", image.load("sample.png", {crop_x=2}))
+        elseif images == 2 then
+          remember("image", image.load("sample.png", {scale=10000}))
+        elseif images == 3 then
+          remember("image", image.load("vanishing.png"))
+        end
       elseif e.type == "i18n" then
         debug.assert(e.data.ok and i18n.get_value("ui", "title") == "ready")
         languages = languages + 1
@@ -158,7 +185,7 @@ fn main() {
   broker.synchronize_sessions(Some(token), None);
   let deadline = Instant::now() + Duration::from_secs(10);
   let mut completed = 0;
-  while completed < 14 && Instant::now() < deadline {
+  while completed < 17 && Instant::now() < deadline {
     for command in session.take_host_commands() {
       let (task_id, operation) = match command {
         LuaHostCommand::FileRequest {
@@ -191,10 +218,15 @@ fn main() {
             callback_language_code,
           },
         ),
-        LuaHostCommand::ImageRequest { request_id, params } => (
-          images.convert_async(&runtime, params),
-          LuaTaskOperation::ImageConvert { request_id },
-        ),
+        LuaHostCommand::ImageRequest { request_id, params } => {
+          if std::path::Path::new(&params.image_path).ends_with("vanishing.png") {
+            fs::remove_file(&params.image_path).unwrap();
+          }
+          (
+            images.convert_async(&runtime, params),
+            LuaTaskOperation::ImageConvert { request_id },
+          )
+        }
         _ => panic!("unexpected host command"),
       };
       broker
@@ -213,20 +245,20 @@ fn main() {
       session.dispatch_event(&delivery).unwrap();
       completed += 1;
     }
-    if completed < 14 {
+    if completed < 17 {
       std::thread::sleep(Duration::from_millis(5));
     }
   }
   assert_eq!(
-    completed, 14,
+    completed, 17,
     "every admitted request must receive a terminal event"
   );
   let saved = session.save_game().unwrap().unwrap();
   assert_eq!(saved["files"], 9);
-  assert_eq!(saved["images"], 4);
+  assert_eq!(saved["images"], 7);
   assert_eq!(saved["languages"], 1);
   assert_eq!(saved["failed_files"], 1);
-  assert_eq!(saved["failed_images"], 1);
+  assert_eq!(saved["failed_images"], 4);
   assert_eq!(
     fs::read_to_string(assets.join("text.txt")).unwrap(),
     "written"
@@ -238,6 +270,6 @@ fn main() {
   session.stop();
   drop(runtime);
   println!(
-    "Lua async ok: string IDs, nil admission failures, shared quotas, terminal failures and capacity reuse"
+    "Lua async ok: string IDs, admission errors, shared quotas, terminal failures and capacity reuse"
   );
 }

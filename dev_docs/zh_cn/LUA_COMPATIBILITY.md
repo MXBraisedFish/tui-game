@@ -13,7 +13,7 @@
 | 位置 | 当前安装项 |
 |---|---|
 | 全局及 `base` | `ipairs`, `pairs`, `next`, `select`, `rawequal`, `rawget`, `rawset`, `rawlen`, `tonumber`, `tostring`, `type`, `setmetatable`, `getmetatable` |
-| `math` | 函数：`abs`, `ceil`, `floor`, `round`, `round_to`, `fmod`, `pow`, `exp`, `log`, `lg`, `ln`, `sqrt`, `ldexp`, `frexp`, `sin`, `cos`, `tan`, `asin`, `acos`, `atan`, `atan2`, `deg`, `rad`, `normalize_angle`, `max`, `min`, `modf`, `tointeger`, `type`, `ult`, `approx_equal`, `percent`, `factorial`, `combination`；常量：`PI`, `E`, `POSITIVE_INFINITE`, `INFINITE`, `NEGATIVE_INFINITE`, `DEG`, `RAD`, `MAX_INTEGER`, `MIN_INTEGER` |
+| `math` | 函数：`abs`, `ceil`, `floor`, `round`, `round_to`, `fmod`, `pow`, `exp`, `log`, `lg`, `ln`, `sqrt`, `ldexp`, `frexp`, `sin`, `cos`, `tan`, `asin`, `acos`, `atan`, `atan2`, `deg`, `rad`, `normalize_angle`, `max`, `min`, `modf`, `tointeger`, `type`, `ult`, `approx_equal`, `ratio`, `factorial`, `combination`；常量：`PI`, `E`, `POSITIVE_INFINITE`, `INFINITE`, `NEGATIVE_INFINITE`, `DEG`, `RAD`, `MAX_INTEGER`, `MIN_INTEGER` |
 | `table` | Lua 5.4 表操作：`concat`, `insert`, `move`, `pack`, `remove`, `sort`, `unpack`（选填参数使用末尾严格选项表，并保留操作上限）；项目扩展：`count`, `count_array`, `count_hash`, `compact`, `deepcopy`, `pretty` |
 | `string` | 常量 `AUTO`, `PLAIN_TEXT`, `RICH_TEXT`；函数 `lower`, `upper`, `reverse`, `regex_escape`, `split`, `sub`, `rep`, `find`, `match`, `gmatch`, `gsub`, `regex_find`, `regex_match`, `regex_gmatch`, `regex_gsub`, `regex_test`, `regex_split`, `format`, `rich_text_to_plain_text` |
 | `utf8` | `len`, `byte_len`, `is_ascii`, `codepoint_to_char`, `ascii_to_char`, `char_to_codepoint`, `char_to_ascii`, `char_position`, `codepoints`, `next` |
@@ -26,7 +26,7 @@
 
 | 命名空间 | 当前注册项 |
 |---|---|
-| `math` | `round`, `round_to`, `pow`, `lg`, `ln`, `ldexp`, `frexp`, `atan2`, `normalize_angle`, `approx_equal`, `percent`, `factorial`, `combination`, `PI`, `E`, `POSITIVE_INFINITE`, `INFINITE`, `NEGATIVE_INFINITE`, `DEG`, `RAD` |
+| `math` | `round`, `round_to`, `pow`, `lg`, `ln`, `ldexp`, `frexp`, `atan2`, `normalize_angle`, `approx_equal`, `ratio`, `factorial`, `combination`, `PI`, `E`, `POSITIVE_INFINITE`, `INFINITE`, `NEGATIVE_INFINITE`, `DEG`, `RAD` |
 | `table` | `count`, `count_array`, `count_hash`, `compact`, `deepcopy`, `pretty` |
 | `string` | 常量 `AUTO`, `PLAIN_TEXT`, `RICH_TEXT`；`split`, `regex_escape`, `regex_find`, `regex_match`, `regex_gmatch`, `regex_gsub`, `regex_test`, `regex_split`, `rich_text_to_plain_text` |
 | `utf8` | `byte_len`, `is_ascii`, `codepoint_to_char`, `ascii_to_char`, `char_to_codepoint`, `char_to_ascii`, `char_position`, `codepoints` |
@@ -35,8 +35,8 @@
 | `align` | 常量 `AUTO`, `LEFT`, `HORIZONTAL_CENTER`, `RIGHT`, `TOP`, `VERTICAL_CENTER`, `BOTTOM`, `CENTER`；函数 `resolve_x`, `resolve_y`, `resolve_rect` |
 | `measurement` | `get_text_size`, `get_text_width`, `get_text_height` |
 | `random` | 常量 `INT`, `FLOAT`；函数 `randint`, `randfloat`, `create`, `delete`, `clear`, `list`, `count`, `generate`, `set`, `exists`, `get_info` |
-| `keyboard` | `receive_action_event`、`reject_action_event`、`receive_key_event`、`reject_key_event`；游戏 action 默认开启、key 默认关闭，开关独立；仅游戏脚本可用；详见 [keyboard](api/keyboard.md) |
-| `ime` | `lock`、`unlock`、`receive_input_event`、`reject_input_event`、`write_clipboard`；文字事件默认不接收；unlock 的 restore 选项默认为 true；仅游戏脚本可用；详见 [ime](api/ime.md) |
+| `keyboard` | `enable_action_event`、`disable_action_event`、`enable_key_event`、`disable_key_event`；游戏 action 默认开启、key 默认关闭，开关独立；仅游戏脚本可用；详见 [keyboard](api/keyboard.md) |
+| `ime` | `lock`、`unlock`、`enable_input_event`、`disable_input_event`、`write_clipboard`；文字事件默认不接收；unlock 的 restore_ime 选项默认为 true；仅游戏脚本可用；详见 [ime](api/ime.md) |
 | `timer` | `create`, `list`, `count`, `delete`, `clear`, `exists`, `set`, `get_info`, `start`, `pause`, `reset`, `restart` |
 | `slice` | `create`, `delete`, `clear`, `set`, `draw`, `exists`, `get_info`, `list`, `count` |
 | `serialization` | 常量 `NULL`；`json_encode/decode`, `csv_encode/decode`, `yaml_encode/decode`, `toml_encode/decode`, `ini_encode/decode`, `xml_encode/decode`, `binary_pack`, `binary_unpack`, `binary_packsize` |
@@ -50,7 +50,7 @@
 | `widget.link` | `create`、`delete`、`clear`、`list`、`count`、`draw`、`click`、`set`、`get_info`、`exists`；详见 [link](api/widget/link.md) |
 | `widget.input` | 常量 `SINGLELINE`、`MULTILINE`、`BLOCK`、`UNDERLINE`、`LINE`；方法 `create`、`delete`、`clear`、`list`、`count`、`draw`、`focus`、`blur`、`set`、`get_info`、`exists`；详见 [input](api/widget/input.md) |
 | `widget.hitbox` | `create`、`delete`、`clear`、`list`、`count`、`draw`、`set`、`get_info`、`exists`；详见 [hitbox](api/widget/hitbox.md) |
-| `events` | `skip_action`, `clear_action` |
+| `events` | `skip_actions`, `clear_actions` |
 | `loader` | `require`, `dofile`, `loadfile` |
 | `file` | `read`, `write`, `create_dir`, `exists`, `remove`, `list_dir`；另有编码与换行常量，详见 `api/file.md` |
 

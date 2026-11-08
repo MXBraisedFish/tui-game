@@ -87,18 +87,17 @@ function HandleEvent(event)
       file.write(PROBE_PATH, "probe=" .. probes .. "\n", {
         encoding = file.UTF_8,
         end_of_line = file.LF,
-        event_tip = "probe_written",
       })
       push_log("Requested write #" .. probes .. " inside package assets.")
     elseif action == "read_probe" then
       if file.exists(PROBE_PATH) then
-        file.read(PROBE_PATH, { encoding = file.UTF_8, event_tip = "probe_read" })
+        file.read(PROBE_PATH, { encoding = file.UTF_8 })
         push_log("Requested a read of " .. PROBE_PATH .. ".")
       else
         push_log("Nothing to read yet; write a probe first.")
       end
     elseif action == "list_probe" then
-      file.list_dir("state", { event_tip = "state_listed" })
+      file.list_dir("state")
       push_log("Requested a listing of state/.")
     elseif action == "leave" then
       game.exit_game()

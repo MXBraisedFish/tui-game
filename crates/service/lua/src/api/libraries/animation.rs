@@ -120,11 +120,13 @@ pub(super) fn animation(lua: &Lua, state: SharedApiState) -> mlua::Result<Table>
       let binding = binding_options(lua, original, args.options(), method)?;
       let options = schedule_options(&binding, method)?;
       with_pool_mut(&set_state, method, |pool| {
-        TimeService::new()
+        let changed = TimeService::new()
           .set_scheduled_timer(&mut pool.runtime_mut().time, binding.timer, options)
           .map_err(|error| args::message(method, error.to_string()))?;
-        pool.animations.insert(id, binding);
-        Ok(true)
+        if changed {
+          pool.animations.insert(id, binding);
+        }
+        Ok(changed)
       })
     })?,
   )?;

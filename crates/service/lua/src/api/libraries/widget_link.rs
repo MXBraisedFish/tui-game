@@ -70,7 +70,13 @@ pub(super) fn link(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
           return Ok(false);
         };
         let binding = options(&table, method, binding)?;
-        HyperlinkService::new().set_options(&mut pool.ui, HyperlinkId(id), binding.options.clone());
+        if !HyperlinkService::new().set_options(
+          &mut pool.ui,
+          HyperlinkId(id),
+          binding.options.clone(),
+        ) {
+          return Ok(false);
+        }
         pool.links.insert(id, binding);
         Ok(true)
       })
