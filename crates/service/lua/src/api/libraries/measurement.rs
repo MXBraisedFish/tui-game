@@ -82,7 +82,7 @@ pub(super) fn draw_text_parameters(
       "hidden",
       "dim",
       "parse_mode",
-      "slice_layer",
+      "slice_id",
     ],
   )
 }
@@ -354,11 +354,11 @@ pub(super) fn parse_draw_target(
   method: &str,
   state: &SharedApiState,
 ) -> mlua::Result<LuaDrawTarget> {
-  let layer = args::optional_string(table, method, "slice_layer", Some("base"))?.unwrap();
-  if layer == "base" {
+  let slice_id = args::optional_string(table, method, "slice_id", Some("base"))?.unwrap();
+  if slice_id == "base" {
     return Ok(LuaDrawTarget::Base);
   }
-  if let Some(id) = layer
+  if let Some(id) = slice_id
     .strip_prefix("scrollbox_")
     .and_then(|id| id.parse::<u64>().ok())
   {
@@ -371,7 +371,7 @@ pub(super) fn parse_draw_target(
         .ok_or_else(|| args::message(method, "unknown scrollbox layer"))
     });
   }
-  if let Some(id) = layer
+  if let Some(id) = slice_id
     .strip_prefix("markdown_")
     .and_then(|id| id.parse::<u64>().ok())
   {
@@ -384,7 +384,7 @@ pub(super) fn parse_draw_target(
         .ok_or_else(|| args::message(method, "unknown markdown layer"))
     });
   }
-  let id = slice::parse_id(&layer, method, "slice_layer")?;
+  let id = slice::parse_id(&slice_id, method, "slice_id")?;
   let objects = state
     .borrow()
     .objects
@@ -399,7 +399,7 @@ pub(super) fn parse_draw_target(
   } else {
     Err(args::message(
       method,
-      format!("unknown or inaccessible slice layer '{layer}'"),
+      format!("unknown or inaccessible slice id '{slice_id}'"),
     ))
   }
 }

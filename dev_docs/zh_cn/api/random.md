@@ -237,7 +237,7 @@ random.create
 | `min`  | integer / float | 跟随生成器类型 | 区间下界（含） |
 | `max`  | integer / float | 跟随生成器类型 | 区间上界（含） |
 | `seed` | integer         | 系统随机生成   | 随机种子       |
-| `step` | integer         | `0`            | 初始步进数     |
+| `offset` | integer         | `0`            | 初始序列偏移值     |
 
 ### 返回值
 
@@ -274,7 +274,7 @@ rng_002
     min = -2147483648,
     max = 2147483647,
     seed = 1792762921702497196,
-    step = 1,
+    offset = 1,
     type = "int"
   },
   [2] = {
@@ -282,7 +282,7 @@ rng_002
     min = 1,
     max = 30,
     seed = 520,
-    step = 1,
+    offset = 1,
     type = "int"
   },
   n = 2
@@ -297,7 +297,7 @@ rng_002
 - 选填参数 `min` 取值范围为 $[-9223372036854775808, 9223372036854775807]$，`type` 为 `random.FLOAT` 时为 $(-\infty, +\infty)$ 内的有限数。
 - 选填参数 `max` 取值范围为 $[-9223372036854775808, 9223372036854775807]$，`type` 为 `random.FLOAT` 时为 $(-\infty, +\infty)$ 内的有限数。
 - 选填参数 `seed` 取值范围为 $[-9223372036854775808, 9223372036854775807]$。
-- 选填参数 `step` 取值范围为 $[0, 9223372036854775807]$。
+- 选填参数 `offset` 取值范围为 $[0, 9223372036854775807]$。
 
 ---
 
@@ -430,7 +430,7 @@ debug.print(table.pretty(random.list()))
     min = -2147483648,
     max = 2147483647,
     seed = 1792763149305846276,
-    step = 0,
+    offset = 0,
     type = "int"
   },
   [2] = {
@@ -438,7 +438,7 @@ debug.print(table.pretty(random.list()))
     min = -2147483648,
     max = 2147483647,
     seed = 1792763147158379328,
-    step = 0,
+    offset = 0,
     type = "int"
   },
   n = 2
@@ -457,7 +457,7 @@ debug.print(table.pretty(random.list()))
     min = 1,        -- float / integer（生成器区间下界）
     max = 10,       -- float / integer（生成器区间上界）
     seed = 42,      -- integer（生成器种子）
-    step = 1,       -- integer（生成器步进数）
+    offset = 1,       -- integer（生成器序列偏移值）
   },
   n = 1,            -- integer（生成器数量）
 }
@@ -523,17 +523,11 @@ random.generate
 
 ### 返回值
 
-**生成器存在时**，返回一个值。
+返回一个值。
 
 | 类型            | 说明         |
 | --------------- | ------------ |
 | integer / float | 生成的随机数 |
-
-**生成器不存在时**，返回一个值。
-
-| 类型 | 说明           |
-| ---- | -------------- |
-| nil  | 该生成器不存在 |
 
 ### 示例
 
@@ -585,7 +579,7 @@ random.set
 | `min`  | integer / float | 保持原值 | 区间下界（含） |
 | `max`  | integer / float | 保持原值 | 区间上界（含） |
 | `seed` | integer         | 保持原值 | 随机种子       |
-| `step` | integer         | 保持原值 | 步进数         |
+| `offset` | integer         | 保持原值 | 序列偏移值         |
 
 ### 返回值
 
@@ -615,7 +609,7 @@ debug.print(table.pretty(random.get_info(r)))
   min = -2147483648,
   max = 2147483647,
   seed = 1792763673286755096,
-  step = 0,
+  offset = 0,
   type = "int"
 }
 {
@@ -623,7 +617,7 @@ debug.print(table.pretty(random.get_info(r)))
   min = 3.2,
   max = 5.8,
   seed = 123456,
-  step = 0,
+  offset = 0,
   type = "float"
 }
 ```
@@ -634,7 +628,7 @@ debug.print(table.pretty(random.get_info(r)))
 - 选填参数 `min` 取值范围为 $[-9223372036854775808, 9223372036854775807]$，目标类型为 `random.FLOAT` 时为 $(-\infty, +\infty)$ 内的有限数。
 - 选填参数 `max` 取值范围为 $[-9223372036854775808, 9223372036854775807]$，目标类型为 `random.FLOAT` 时为 $(-\infty, +\infty)$ 内的有限数。
 - 选填参数 `seed` 取值范围为 $[-9223372036854775808, 9223372036854775807]$。
-- 选填参数 `step` 取值范围为 $[0, 9223372036854775807]$。
+- 选填参数 `offset` 取值范围为 $[0, 9223372036854775807]$。
 
 ---
 
@@ -658,17 +652,11 @@ random.get_info
 
 ### 返回值
 
-**生成器存在时**，返回一个值。
+返回一个值。
 
 | 类型  | 说明                 |
 | ----- | -------------------- |
 | table | 生成器配置信息对象表 |
-
-**生成器不存在时**，返回一个值。
-
-| 类型 | 说明           |
-| ---- | -------------- |
-| nil  | 该生成器不存在 |
 
 ### 示例
 
@@ -685,7 +673,7 @@ debug.print(table.pretty(random.get_info(r)))
   min = -2147483648,
   max = 2147483647,  
   seed = 1792763761728867648, 
-  step = 0, 
+  offset = 0,
   type = "int"
 }
 ```
@@ -701,7 +689,7 @@ debug.print(table.pretty(random.get_info(r)))
   min = 1,        -- float / integer（生成器区间下界）
   max = 10,       -- float / integer（生成器区间上界）
   seed = 42,      -- integer（生成器种子）
-  step = 1,       -- integer（生成器步进数）
+  offset = 1,       -- integer（生成器序列偏移值）
 }
 ```
 

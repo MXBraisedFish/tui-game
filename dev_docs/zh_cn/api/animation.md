@@ -487,7 +487,7 @@ animation.create
 | `delay`            | integer / float                    | `0`                  | 首次启动延迟时长（秒） |
 | `loop`             | boolean                            | `false`              | 是否循环               |
 | `interval`         | integer / float                    | `0`                  | 循环之间间隔时长（秒） |
-| `repeat`           | integer / const-math / nil         | `nil`                | 循环次数               |
+| `repeat`           | integer / const-math         | `math.POSITIVE_INFINITE`                | 循环次数               |
 | `direction`   | const-animation                    | `animation.NORMAL`   | 播放方向               |
 | `fill_mode` | const-animation                    | `animation.FORWARDS` | 播放结束后的取值位置   |
 
@@ -680,7 +680,7 @@ debug.print(table.pretty(animation.list()))
     delay = 0,
     loop = false,
     interval = 0,
-    repeat = nil,
+    repeat = math.POSITIVE_INFINITE,
     direction = "normal",
     fill_mode = "forwards",
     state = "idle",
@@ -707,7 +707,7 @@ debug.print(table.pretty(animation.list()))
     delay = 0,                     -- integer（首次启动延迟时长）
     loop = false,                  -- boolean（是否循环）
     interval = 0,                  -- integer（循环之间间隔时长）
-    repeat = nil,                  -- integer / string / nil（循环次数）
+    repeat = math.POSITIVE_INFINITE,                  -- integer / const-math（循环次数）
     direction = "normal",          -- string（播放方向）
     fill_mode = "forwards",        -- string（播放结束后的取值位置）
     state = "idle"                 -- string（当前计时器状态）
@@ -1055,7 +1055,7 @@ animation.set
 | `delay`            | integer / float                    | 保持原值 | 首次启动延迟时长（秒） |
 | `loop`             | boolean                            | 保持原值 | 是否循环               |
 | `interval`         | integer / float                    | 保持原值 | 循环之间间隔时长（秒） |
-| `repeat`           | integer / const-math / nil         | 保持原值 | 循环次数               |
+| `repeat`           | integer / const-math         | 保持原值 | 循环次数               |
 | `direction`   | const-animation                    | 保持原值 | 播放方向               |
 | `fill_mode` | const-animation                    | 保持原值 | 播放结束后的取值位置   |
 
@@ -1090,7 +1090,7 @@ true
   delay = 0,
   loop = false,
   interval = 0,
-  repeat = nil,
+  repeat = math.POSITIVE_INFINITE,
   direction = "normal",
   fill_mode = "forwards",
   state = "idle",
@@ -1156,7 +1156,7 @@ debug.print(table.pretty(animation.get_info(an)))
   delay = 0,
   loop = false,
   interval = 0,
-  repeat = nil,
+  repeat = math.POSITIVE_INFINITE,
   direction = "normal",
   fill_mode = "forwards",
   state = "idle",
@@ -1180,7 +1180,7 @@ debug.print(table.pretty(animation.get_info(an)))
   delay = 0,                     -- integer（首次启动延迟时长）
   loop = false,                  -- boolean（是否循环）
   interval = 0,                  -- integer（循环之间间隔时长）
-  repeat = nil,                  -- integer / string / nil（循环次数）
+  repeat = math.POSITIVE_INFINITE,                  -- integer / const-math（循环次数）
   direction = "normal",          -- string（播放方向）
   fill_mode = "forwards",        -- string（播放结束后的取值位置）
   state = "idle"                 -- string（当前计时器状态）

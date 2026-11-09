@@ -90,6 +90,8 @@ impl RandomService {
   }
 
   /// Generate a value using the identifier's validated configured distribution.
+  ///
+  /// Advance the sequence offset after generation, wrapping from `i64::MAX` to zero.
   pub fn generate_configured(
     &self,
     generators: &mut RandomGeneratorObjects,
@@ -108,7 +110,11 @@ impl RandomService {
       }
     };
     generator.configuration = Some(RandomConfiguration {
-      step: configuration.step.saturating_add(1),
+      step: if configuration.step >= i64::MAX as u64 {
+        0
+      } else {
+        configuration.step + 1
+      },
       ..configuration
     });
     Some(value)
@@ -363,6 +369,62 @@ fn sample_f64_inclusive(rng: &mut impl Rng, min: f64, max: f64) -> f64 {
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn configured_sequence_wraps_to_zero_and_replays_its_first_value() {
+    let service = RandomService::new();
+    let mut generators = RandomGeneratorObjects::new();
+    for range in [
+      RandomConfiguredRange::Integer {
+        min: i64::MIN,
+        max: i64::MAX,
+      },
+      RandomConfiguredRange::Float {
+        min: -1.0,
+        max: 1.0,
+      },
+    ] {
+      let configuration = RandomConfiguration {
+        range,
+        seed: 42,
+        step: i64::MAX as u64 - 1,
+      };
+      let generator = service.create_configured(&mut generators, configuration);
+      let reference = service.create_configured(
+        &mut generators,
+        RandomConfiguration {
+          step: 0,
+          ..configuration
+        },
+      );
+      assert!(
+        service
+          .generate_configured(&mut generators, generator)
+          .is_some()
+      );
+      assert_eq!(
+        service.configuration(&generators, generator).unwrap().step,
+        i64::MAX as u64
+      );
+      assert!(
+        service
+          .generate_configured(&mut generators, generator)
+          .is_some()
+      );
+      assert_eq!(
+        service.configuration(&generators, generator).unwrap().step,
+        0
+      );
+      assert_eq!(
+        service.generate_configured(&mut generators, generator),
+        service.generate_configured(&mut generators, reference)
+      );
+      assert_eq!(
+        service.configuration(&generators, generator).unwrap().step,
+        1
+      );
+    }
+  }
 
   #[test]
   fn create_exists_and_remove_generator() {

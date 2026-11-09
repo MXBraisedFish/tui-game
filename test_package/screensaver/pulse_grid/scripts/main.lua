@@ -22,7 +22,7 @@ local cells = {}
 -- Construct the color sequence used by the pulsing grid.
 local function build_shades()
   local stops = table.deepcopy(PALETTE)
-  table.sort(stops, { comp = function(left, right)
+  table.sort(stops, { comparator = function(left, right)
     return left.r + left.g + left.b < right.r + right.g + right.b
   end })
   shades = {}

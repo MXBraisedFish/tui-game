@@ -20,25 +20,22 @@ pub(crate) use link::LuaLinkBinding;
 pub(crate) use scrollbox::{LuaScrollboxBinding, SurfacePlacement};
 
 use crate::{LuaEventData, LuaTimerEvent, LuaTimerEventKind, LuaTimerKind};
-use mlua::Function;
 use tg_service_time::{ScheduledTimerId, TimeService};
 
-/// Script-facing configuration and optional event callback owned by one timer.
+/// Script-facing configuration owned by one timer.
 ///
 /// # Fields
 ///
 /// * `duration` - The active duration in seconds.
-/// * `delay` - The initial and recurring wait in seconds.
+/// * `delay` - The initial wait in seconds.
 /// * `interval` - The additional wait between executions.
 /// * `looping` - Whether repeated executions are enabled.
 /// * `repetitions` - The optional total execution limit.
-/// * `callback` - The function receiving timer events.
-/// * `tip` - The custom event text.
 #[derive(Clone)]
 pub(crate) struct LuaTimerBinding {
   /// The active duration in seconds.
   pub duration: f64,
-  /// The initial and recurring delay in seconds.
+  /// The initial delay in seconds.
   pub delay: f64,
   /// The additional recurring gap in seconds.
   pub interval: f64,
@@ -46,10 +43,6 @@ pub(crate) struct LuaTimerBinding {
   pub looping: bool,
   /// The optional total number of executions when looping.
   pub repetitions: Option<u32>,
-  /// The callback receiving timer events instead of HandleEvent.
-  pub callback: Option<Function>,
-  /// The custom text attached to timer events.
-  pub tip: Option<String>,
 }
 
 use tg_service_widget::{
@@ -98,7 +91,7 @@ pub(crate) fn shared_lua_object_pool() -> SharedLuaObjectPool {
 pub struct LuaObjectPool {
   pub(crate) ui: UiObjectPool,
   runtime: RuntimeObjectPool,
-  /// The timer parameters and callbacks retained by this session.
+  /// The timer parameters retained by this session.
   pub(crate) timers: BTreeMap<ScheduledTimerId, LuaTimerBinding>,
   /// The parameter animations using schedules separate from the public timer registry.
   pub(crate) animations: BTreeMap<u64, LuaAnimationBinding>,
@@ -319,7 +312,7 @@ impl LuaObjectPool {
       .take_scheduled_timer_events(&mut self.runtime.time)
       .into_iter()
       .filter_map(|event| {
-        let binding = self.timers.get(&event.id)?;
+        self.timers.get(&event.id)?;
         Some(LuaEventData::Timer(LuaTimerEvent {
           id: event.id.0,
           timer_kind: LuaTimerKind::Timer,
@@ -330,7 +323,7 @@ impl LuaObjectPool {
           },
           executed_count: Some(event.executed_count),
           object_id: Some(format!("timer_{:03}", event.id.0)),
-          tip: binding.tip.clone(),
+          tip: None,
           revision: Some(event.revision),
         }))
       })

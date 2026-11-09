@@ -2,7 +2,7 @@
 
 本文档说明游戏和屏保 Lua Session 使用的生命周期回调，包括各回调的职责、调用时机、参数格式、返回值和运行限制。
 
-入口生命周期回调由宿主调用。计时器可以通过 timer.create 或 timer.set 指定 callback；指定后，该计时器事件只交给这个函数，未指定时交给 HandleEvent。回调使用相同的事件表和执行限额。其他服务的独立 callback 注册尚未开放。可用库见⌊[LUA_COMPATIBILITY.md](LUA_COMPATIBILITY.md)⌉。
+入口生命周期回调由宿主调用。计时器事件交给 HandleEvent。回调使用相同的事件表和执行限额。其他服务的独立 callback 注册尚未开放。可用库见⌊[LUA_COMPATIBILITY.md](LUA_COMPATIBILITY.md)⌉。
 
 ## 1. 回调总览
 
@@ -154,7 +154,7 @@ end
 - Runtime 每帧在 `Update` 之前投递事件。
 - 单个 Session 每个宿主帧最多处理 128 个事件，剩余事件保留到后续帧。
 - 没有事件时，本帧不会调用 `HandleEvent`。
-- `timer.create`、`timer.set` 可以指定 callback；该计时器的事件只交给 callback，不再交给 `HandleEvent`。未指定 callback 时交给 `HandleEvent`。回调接收相同的事件表，遵守相同的执行限额；查看⌊[timer 库](api/timer.md)⌉。
+- 计时器事件交给 `HandleEvent`，遵守相同的执行限额；查看⌊[timer 库](api/timer.md)⌉。
 
 #### 参数
 

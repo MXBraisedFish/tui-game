@@ -95,7 +95,7 @@ fn install_lifecycle(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::
         method,
         values,
         &[],
-        &["type", "min", "max", "seed", "step"],
+        &["type", "min", "max", "seed", "offset"],
       )?;
       let configuration = configuration_from_create(&table, method)?;
       with_pool_mut(&create_state, method, |pool| {
@@ -121,7 +121,18 @@ fn install_lifecycle(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::
       let method = "random.delete";
       let id = id_argument(values, method)?;
       with_pool_mut(&delete_state, method, |pool| {
-        Ok(RandomService::new().remove(&mut pool.runtime_mut().random_generators, id))
+        let service = RandomService::new();
+        if service
+          .configuration(&pool.runtime().random_generators, id)
+          .is_none()
+        {
+          return Err(missing_generator(method, id));
+        }
+        if service.remove(&mut pool.runtime_mut().random_generators, id) {
+          Ok(true)
+        } else {
+          Err(missing_generator(method, id))
+        }
       })
     })?,
   )?;
@@ -184,19 +195,13 @@ fn install_lifecycle(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::
       let id = id_argument(values, method)?;
       with_pool_mut(&state, method, |pool| {
         let service = RandomService::new();
-        if service
-          .configuration(&pool.runtime().random_generators, id)
-          .is_some_and(|configuration| configuration.step >= i64::MAX as u64)
-        {
-          return Err(args::message(method, "generator step is exhausted"));
-        }
-        Ok(
-          match service.generate_configured(&mut pool.runtime_mut().random_generators, id) {
-            Some(RandomGeneratedValue::Integer(value)) => Value::Integer(value),
-            Some(RandomGeneratedValue::Float(value)) => Value::Number(value),
-            None => Value::Nil,
-          },
-        )
+        let generated = service
+          .generate_configured(&mut pool.runtime_mut().random_generators, id)
+          .ok_or_else(|| missing_generator(method, id))?;
+        Ok(match generated {
+          RandomGeneratedValue::Integer(value) => Value::Integer(value),
+          RandomGeneratedValue::Float(value) => Value::Number(value),
+        })
       })
     })?,
   )
@@ -212,7 +217,7 @@ fn install_mutations(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::
         method,
         values,
         &["id"],
-        &["type", "min", "max", "seed", "step"],
+        &["type", "min", "max", "seed", "offset"],
       )?;
       let id = parse_id(args::string(
         args::required(&table, method, "id")?,
@@ -222,11 +227,15 @@ fn install_mutations(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::
       .ok_or_else(|| args::message(method, "invalid generator ID"))?;
       with_pool_mut(&state, method, |pool| {
         let service = RandomService::new();
-        let Some(current) = service.configuration(&pool.runtime().random_generators, id) else {
-          return Ok(false);
-        };
+        let current = service
+          .configuration(&pool.runtime().random_generators, id)
+          .ok_or_else(|| missing_generator(method, id))?;
         let updated = update_configuration(current, &table, method)?;
-        Ok(service.set_configuration(&mut pool.runtime_mut().random_generators, id, updated))
+        if service.set_configuration(&mut pool.runtime_mut().random_generators, id, updated) {
+          Ok(true)
+        } else {
+          Err(missing_generator(method, id))
+        }
       })
     })?,
   )
@@ -254,11 +263,9 @@ fn install_queries(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::Re
       let method = "random.get_info";
       let id = id_argument(values, method)?;
       with_pool(&state, method, |pool| {
-        let Some(configuration) =
-          RandomService::new().configuration(&pool.runtime().random_generators, id)
-        else {
-          return Ok(Value::Nil);
-        };
+        let configuration = RandomService::new()
+          .configuration(&pool.runtime().random_generators, id)
+          .ok_or_else(|| missing_generator(method, id))?;
         Ok(Value::Table(configuration_table(lua, id, configuration)?))
       })
     })?,
@@ -272,11 +279,15 @@ fn configuration_from_create(table: &Table, method: &str) -> mlua::Result<Random
     Value::Nil => auto_seed() as i64,
     value => args::integer(value, method, "seed")?,
   };
-  let step = non_negative_step(
-    args::optional_integer(table, method, "step", Some(0))?.unwrap_or(0),
+  let offset = non_negative_offset(
+    args::optional_integer(table, method, "offset", Some(0))?.unwrap_or(0),
     method,
   )?;
-  Ok(RandomConfiguration { range, seed, step })
+  Ok(RandomConfiguration {
+    range,
+    seed,
+    step: offset,
+  })
 }
 
 fn parse_optional_range(
@@ -386,11 +397,15 @@ fn update_configuration(
     Value::Nil => current.seed,
     value => args::integer(value, method, "seed")?,
   };
-  let step = match table.get::<Value>("step")? {
+  let offset = match table.get::<Value>("offset")? {
     Value::Nil => current.step,
-    value => non_negative_step(args::integer(value, method, "step")?, method)?,
+    value => non_negative_offset(args::integer(value, method, "offset")?, method)?,
   };
-  Ok(RandomConfiguration { range, seed, step })
+  Ok(RandomConfiguration {
+    range,
+    seed,
+    step: offset,
+  })
 }
 
 fn integer_bounds(range: RandomConfiguredRange, method: &str) -> mlua::Result<(i64, i64)> {
@@ -459,12 +474,19 @@ fn configuration_table(
     }
   }
   info.raw_set("seed", configuration.seed)?;
-  info.raw_set("step", configuration.step)?;
+  info.raw_set("offset", configuration.step)?;
   Ok(info)
 }
 
-fn non_negative_step(value: i64, method: &str) -> mlua::Result<u64> {
-  u64::try_from(value).map_err(|_| args::message(method, "step must be non-negative"))
+fn non_negative_offset(value: i64, method: &str) -> mlua::Result<u64> {
+  u64::try_from(value).map_err(|_| args::message(method, "offset must be non-negative"))
+}
+
+fn missing_generator(method: &str, id: RandomGeneratorId) -> mlua::Error {
+  args::message(
+    method,
+    format!("unknown random generator '{}'", format_id(id)),
+  )
 }
 
 fn id_argument(values: MultiValue, method: &str) -> mlua::Result<RandomGeneratorId> {

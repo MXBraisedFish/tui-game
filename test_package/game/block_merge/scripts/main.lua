@@ -39,12 +39,12 @@ local status = ""
 local highlight_index = nil
 local highlight_left = 0
 
--- Create deterministic position and tile-value generators at the requested saved steps.
+-- Create deterministic position and tile-value generators at the requested saved sequence offsets.
 local function create_generators(new_seed, position_step, value_step)
   random.clear()
   seed = new_seed
-  position_rng = random.create({ type = random.INT, min = 1, max = board.SIZE * board.SIZE, seed = seed, step = position_step })
-  value_rng = random.create({ type = random.FLOAT, min = 0, max = 1, seed = seed + 1, step = value_step })
+  position_rng = random.create({ type = random.INT, min = 1, max = board.SIZE * board.SIZE, seed = seed, offset = position_step })
+  value_rng = random.create({ type = random.FLOAT, min = 0, max = 1, seed = seed + 1, offset = value_step })
 end
 
 -- Place a randomly selected tile in an empty board cell when one is available.
@@ -210,8 +210,8 @@ function SaveGame()
     score = score,
     moves = moves,
     seed = seed,
-    position_step = random.get_info(position_rng).step,
-    value_step = random.get_info(value_rng).step,
+    position_step = random.get_info(position_rng).offset,
+    value_step = random.get_info(value_rng).offset,
   }
 end
 

@@ -45,8 +45,8 @@ fn slice_targets_passthrough_coordinates_and_hidden_frames_follow_rendered_geome
     function Render()
       if mode ~= 3 then slice.draw(owner, -1, 1) end
       slice.draw(overlay, 1, 2)
-      widget.hitbox.draw(lower, mode == 5 and -2147483648 or -2, -1, {slice_layer = owner})
-      if mode == 2 then widget.hitbox.draw(upper, 0, 0, {slice_layer = overlay}) end
+      widget.hitbox.draw(lower, mode == 5 and -2147483648 or -2, -1, {slice_id = owner})
+      if mode == 2 then widget.hitbox.draw(upper, 0, 0, {slice_id = overlay}) end
     end
     function HandleEvent(event)
       debug.assert(event.type == "hitbox")
@@ -208,8 +208,8 @@ fn hitbox_options_lifecycle_limits_and_sessions_are_independent() {
         function() h.create(1, 2, {[1] = true}) end,
         function() h.create(1, 2, setmetatable({}, {})) end,
         function() h.draw(second, 0, 0, {unknown = true}) end,
-        function() h.draw(second, 0, 0, {slice_layer = "slice_999"}) end,
-        function() h.draw(second, 0, 0, {slice_layer = false}) end,
+        function() h.draw(second, 0, 0, {slice_id = "slice_999"}) end,
+        function() h.draw(second, 0, 0, {slice_id = false}) end,
         function() h.draw(second, 2147483648, 0) end,
         function() h.draw(second, 0, -2147483649) end,
         function() h.draw(id, 0, 0) end,
@@ -228,7 +228,7 @@ fn hitbox_options_lifecycle_limits_and_sessions_are_independent() {
       debug.assert(fails(function() slice.set(surface, {width = 1, event_passthrough = 1}) end))
       debug.assert(slice.get_info(surface).width == 4)
       debug.assert(fails(function() slice.create(1, 1, {event_passthrough = "yes"}) end))
-      h.draw(second, -1, 0, {slice_layer = surface})
+      h.draw(second, -1, 0, {slice_id = surface})
       debug.assert(h.clear() and h.clear() and h.count() == 0 and h.list().n == 0)
       for index = 1, 1024 do h.create(1, 1) end
       debug.assert(fails(function() h.create(1, 1) end) and h.count() == 1024)

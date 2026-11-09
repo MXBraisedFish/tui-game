@@ -128,8 +128,8 @@ fn completed_frame_queries() {
         layer_blank = slice.create(2,1,{bg=color.RED})
         rendered = 0
         debug.assert(effect.cells(0,0,1,1).n == 0)
-        debug.assert(effect.cells(0,0,1,1,{scope=effect.SLICE,slice_layer=layer_a}).n == 0)
-        for _, options in ipairs({{scope="bad"},{include_continuation_cells=1},{include_continuation=true},{scope=effect.SLICE,slice_layer="slice_999"},{unknown=true}}) do
+        debug.assert(effect.cells(0,0,1,1,{scope=effect.SLICE,slice_id=layer_a}).n == 0)
+        for _, options in ipairs({{scope="bad"},{include_continuation_cells=1},{include_continuation=true},{scope=effect.SLICE,slice_id="slice_999"},{unknown=true}}) do
           debug.assert(not debug.pcall(effect.cells,0,0,1,1,options))
         end
         for _, invalid in ipairs({0,-1,65536,1.5,false}) do
@@ -144,8 +144,8 @@ fn completed_frame_queries() {
         slice.draw(layer_blank,8,0)
         if rendered == 2 then draw.text(0,0,"9"); return end
         draw.text(0,0,"888",{fg=color.WHITE})
-        draw.text(0,0,"aaa",{fg=color.WHITE,slice_layer=layer_a})
-        draw.text(0,0,"bbb",{fg=color.WHITE,slice_layer=layer_b})
+        draw.text(0,0,"aaa",{fg=color.WHITE,slice_id=layer_a})
+        draw.text(0,0,"bbb",{fg=color.WHITE,slice_id=layer_b})
         slice.draw(layer_a,1,0)
         slice.draw(layer_b,3,0)
         effect.effect(0,0,6,1,{process=function(cell)
@@ -154,17 +154,17 @@ fn completed_frame_queries() {
         end})
       end
       function Update(dt)
-        local chars = effect.cells(0,0,6,1,{slice_layer="ignored"})
+        local chars = effect.cells(0,0,6,1,{slice_id="ignored"})
         debug.assert(chars.n == 6)
         local blank_canvas = effect.cells(8,0,2,1)
-        local blank_slice = effect.cells(0,0,2,1,{scope=effect.SLICE,slice_layer=layer_blank})
+        local blank_slice = effect.cells(0,0,2,1,{scope=effect.SLICE,slice_id=layer_blank})
         for index=1,2 do
           debug.assert(blank_canvas[index].char == "" and blank_canvas[index].bg == color.RED)
           debug.assert(blank_slice[index].char == "" and blank_slice[index].bg == color.RED)
         end
         if rendered == 2 then
           debug.assert(chars[1].char == "9" and chars[2].char == "")
-          debug.assert(effect.cells(0,0,3,1,{scope=effect.SLICE,slice_layer=layer_a}).n == 0)
+          debug.assert(effect.cells(0,0,3,1,{scope=effect.SLICE,slice_id=layer_a}).n == 0)
           return
         end
         local text = {"8","a","a","b","b","b"}
@@ -178,8 +178,8 @@ fn completed_frame_queries() {
         local base = effect.cells(0,0,6,1,{scope=effect.SLICE})
         debug.assert(base.n == 6 and base[1].char == "8" and base[2].char == "8" and base[3].char == "8" and base[4].char == "")
         debug.assert(base[1].fg == color.GREEN and base[2].fg == color.WHITE and base[3].fg == color.WHITE)
-        local a = effect.cells(0,0,3,1,{scope=effect.SLICE,slice_layer=layer_a})
-        local b = effect.cells(0,0,3,1,{scope=effect.SLICE,slice_layer=layer_b})
+        local a = effect.cells(0,0,3,1,{scope=effect.SLICE,slice_id=layer_a})
+        local b = effect.cells(0,0,3,1,{scope=effect.SLICE,slice_id=layer_b})
         for index=1,3 do
           debug.assert(a[index].char == "a" and a[index].x == index-1)
           debug.assert(a[index].fg == (index <= 2 and color.GREEN or color.WHITE))
@@ -207,20 +207,23 @@ fn completed_frame_queries() {
 fn nested_source_queries() {
   let mut harness = Harness::new(
     r#"
-    function Init(ctx) parent=slice.create(4,2); child=slice.create(3,1) end
+    function Init(ctx) parent=slice.create(4,2); child=widget.scrollbox.create(3,1) end
     function Render()
-      draw.text(0,0,"PPPP",{fg=color.WHITE,slice_layer=parent})
-      draw.text(0,0,"ABC",{fg=color.WHITE,slice_layer=child})
-      slice.draw(child,-1,0,{slice_layer=parent})
+      draw.text(0,0,"PPPP",{fg=color.WHITE,slice_id=parent})
+      draw.text(0,0,"ABC",{fg=color.WHITE,slice_id=child})
+      widget.scrollbox.draw(child,-1,0,{slice_id=parent})
       slice.draw(parent,2,1)
-      effect.effect(0,0,2,1,{scope=effect.SLICE,slice_layer=parent,process=function(cell) return {fg=color.RED} end})
+      effect.effect(0,0,2,1,{scope=effect.SLICE,slice_id=parent,process=function(cell) return {fg=color.RED} end})
       effect.effect(2,1,1,1,{process=function(cell) return {x=3,char="Z",fg=color.GREEN} end})
       effect.effect(3,1,1,1,{process=function(cell) return {fg=color.BLUE,bold=true} end})
     end
     function Update(dt)
-      local parent_chars=effect.cells(0,0,4,1,{scope=effect.SLICE,slice_layer=parent})
-      for index=1,4 do debug.assert(parent_chars[index].char == "P" and parent_chars[index].fg == color.WHITE) end
-      local child_chars=effect.cells(0,0,3,1,{scope=effect.SLICE,slice_layer=child})
+      local parent_chars=effect.cells(0,0,4,1,{scope=effect.SLICE,slice_id=parent})
+      for index=1,4 do
+        debug.assert(parent_chars[index].char == (index<=2 and " " or "P"))
+        debug.assert(parent_chars[index].fg == (index<=2 and color.NONE or color.WHITE))
+      end
+      local child_chars=effect.cells(0,0,3,1,{scope=effect.SLICE,slice_id=child})
       debug.assert(child_chars.n == 2 and child_chars[1].x == 1 and child_chars[1].char == "")
       debug.assert(child_chars[2].x == 2 and child_chars[2].char == "Z" and child_chars[2].fg == color.BLUE and child_chars[2].bold)
       local final=effect.cells(3,1,1,1)
@@ -312,7 +315,7 @@ fn lifecycle_and_identity() {
         debug.assert(effect.set(ef, {process=nil, scope=effect.CANVAS}))
       end
       function Render()
-        effect.apply(ef, 2, 1, {slice_layer="ignored"})
+        effect.apply(ef, 2, 1, {slice_id="ignored"})
         draw.text(2, 1, "abc")
         effect.effect(-2147483648, 2147483647, 65535, 65535)
       end
@@ -359,13 +362,13 @@ fn staged_order() {
         order = order .. "A"
         return {char="D"}
       end})
-      effect.apply(ef,0,0,{slice_layer=layer})
-      effect.effect(0,0,1,1,{scope=effect.SLICE,slice_layer=layer,process=function(cell)
+      effect.apply(ef,0,0,{slice_id=layer})
+      effect.effect(0,0,1,1,{scope=effect.SLICE,slice_id=layer,process=function(cell)
         debug.assert(cell.char == "B")
         order = order .. "C"
         return {char="C"}
       end})
-      draw.text(0,0,"@",{slice_layer=layer})
+      draw.text(0,0,"@",{slice_id=layer})
       slice.draw(layer,2,1)
       effect.effect(2,1,1,1,{process=function(cell)
         debug.assert(cell.char == "D" and cell.relative_x == 0)
@@ -466,19 +469,19 @@ fn nested_containers() {
     r#"
     function Init(ctx)
       layer = slice.create(2,2)
-      child = slice.create(2,1)
+      child = widget.scrollbox.create(2,1)
       box = widget.scrollbox.create(4,2)
     end
     function Render()
-      draw.text(0,0,"abc",{slice_layer=child})
-      effect.effect(0,0,3,1,{scope=effect.SLICE,slice_layer=child,process=function(cell)
+      draw.text(0,0,"ab",{slice_id=child})
+      effect.effect(0,0,3,1,{scope=effect.SLICE,slice_id=child,process=function(cell)
         debug.assert(cell.x == 1 and cell.relative_x == 1)
         return {char="X"}
       end})
-      slice.draw(child,-1,0,{slice_layer=layer})
+      widget.scrollbox.draw(child,-1,0,{slice_id=layer})
       slice.draw(layer,3,2)
-      draw.text(0,0,"B",{slice_layer=box})
-      effect.effect(0,0,1,1,{scope=effect.SLICE,slice_layer=box,process=function(cell) return {char="C"} end})
+      draw.text(0,0,"B",{slice_id=box})
+      effect.effect(0,0,1,1,{scope=effect.SLICE,slice_id=box,process=function(cell) return {char="C"} end})
       widget.scrollbox.draw(box,7,2)
     end
   "#,

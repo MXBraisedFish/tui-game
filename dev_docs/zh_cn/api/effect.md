@@ -56,8 +56,8 @@ function Init(ctx)
 end
 
 function Render()
-  draw.text(0, 1, "@@@@@", { slice_layer = s1 })
-  draw.text(0, 1, "$$$$$", { slice_layer = s2 })
+  draw.text(0, 1, "@@@@@", { slice_id = s1 })
+  draw.text(0, 1, "$$$$$", { slice_id = s2 })
 
   slice.draw(s1, 0, 0)
   slice.draw(s2, 3, 0)
@@ -107,8 +107,8 @@ function Init(ctx)
 end
 
 function Render()
-  draw.text(0, 1, "@@@@@", { slice_layer = s1 })
-  draw.text(0, 1, "$$$$$", { slice_layer = s2 })
+  draw.text(0, 1, "@@@@@", { slice_id = s1 })
+  draw.text(0, 1, "$$$$$", { slice_id = s2 })
 
   slice.draw(s1, 0, 0)
   slice.draw(s2, 3, 0)
@@ -119,7 +119,7 @@ function Render()
       return char
     end,
     scope = effect.SLICE,
-    slice_layer = s1
+    slice_id = s1
   })
 end
 ```
@@ -165,7 +165,7 @@ effect.cells
 | ---------------------- | ------------ | --------------- | -------------------- |
 | `include_continuation_cells` | boolean      | `false`         | 占位符是否命中宽字符 |
 | `scope`                | const-effect | `effect.CANVAS` | 作用层级             |
-| `slice_layer`          | string       | `"base"`        | 作用目标图层切片     |
+| `slice_id`          | string       | `"base"`        | 作用目标图层切片     |
 
 ### 返回值
 
@@ -240,7 +240,7 @@ end
 - 必填参数 `y` 取值范围为 $[-2147483648, 2147483647]$。
 - 必填参数 `width` 取值范围为 $[1, 65535]$。
 - 必填参数 `height` 取值范围为 $[1, 65535]$。
-- 当选填参数 `scope` 为 `effect.CANVAS` 时，选填参数 `slice_layer` 会被忽略。
+- 当选填参数 `scope` 为 `effect.CANVAS` 时，选填参数 `slice_id` 会被忽略。
 - 返回值混合表结构如下：
 
 ```lua
@@ -294,7 +294,7 @@ effect.effect
 | `process`              | function     | `function(char) return char end` | 处理函数             |
 | `scope`                | const-effect | `effect.CANVAS` | 作用层级             |
 | `include_continuation_cells` | boolean      | `false`         | 占位符是否命中宽字符 |
-| `slice_layer`          | string       | `"base"`        | 作用目标图层切片     |
+| `slice_id`          | string       | `"base"`        | 作用目标图层切片     |
 
 ### 返回值
 
@@ -323,7 +323,7 @@ effect.effect(5, 2, 5, 3, {
 - 必填参数 `y` 取值范围为 $[-2147483648, 2147483647]$。
 - 必填参数 `width` 取值范围为 $[1, 65535]$。
 - 必填参数 `height` 取值范围为 $[1, 65535]$。
-- 当选填参数 `scope` 为 `effect.CANVAS` 时，选填参数 `slice_layer` 会被忽略。
+- 当选填参数 `scope` 为 `effect.CANVAS` 时，选填参数 `slice_id` 会被忽略。
 - 选填参数 `process` 处理函数详细用法见⌊[字符着色器](../education/EFFECT.md)⌉。
 
 ---
@@ -605,7 +605,7 @@ effect.apply
 
 | 参数名        | 类型   | 默认值   | 说明             |
 | ------------- | ------ | -------- | ---------------- |
-| `slice_layer` | string | `"base"` | 绘制目标图层切片 |
+| `slice_id` | string | `"base"` | 绘制目标图层切片 |
 
 ### 返回值
 
@@ -638,7 +638,7 @@ end
 
 - 必填参数 `x` 取值范围为 $[-2147483648, 2147483647]$。
 - 必填参数 `y` 取值范围为 $[-2147483648, 2147483647]$。
-- 选填参数 `slice_layer` 仅在当前着色器对象的配置字段 `scope` 为 `effect.SLICE` 时生效。
+- 选填参数 `slice_id` 仅在当前着色器对象的配置字段 `scope` 为 `effect.SLICE` 时生效。
 
 ---
 

@@ -71,8 +71,8 @@ pub(crate) fn main() {
     function Render()
       slice.draw(owner,0,0)
       slice.draw(overlay,0,0)
-      widget.link.draw(first,-1,0,{slice_layer=owner})
-      widget.input.draw(input,0,1,{slice_layer=owner})
+      widget.link.draw(first,-1,0,{slice_id=owner})
+      widget.input.draw(input,0,1,{slice_id=owner})
     end
     function HandleEvent(event)
       if event.type=="link" then

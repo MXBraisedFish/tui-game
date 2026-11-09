@@ -140,22 +140,27 @@ pub(super) fn table_lib(lua: &Lua) -> mlua::Result<Table> {
     (
       "concat",
       "table.concat",
-      &["list"],
+      &["source"],
       &["separator", "start_index", "end_index"],
     ),
-    ("insert", "table.insert", &["list", "value"], &["pos"]),
+    (
+      "insert",
+      "table.insert",
+      &["target", "value"],
+      &["position"],
+    ),
     (
       "move",
       "table.move",
-      &["src", "first", "last", "target_start"],
+      &["source", "start_index", "end_index", "target_start_index"],
       &["target"],
     ),
-    ("remove", "table.remove", &["list"], &["pos"]),
-    ("sort", "table.sort", &["list"], &["comp"]),
+    ("remove", "table.remove", &["target"], &["position"]),
+    ("sort", "table.sort", &["target"], &["comparator"]),
     (
       "unpack",
       "table.unpack",
-      &["list"],
+      &["source"],
       &["start_index", "end_index"],
     ),
   ];
@@ -284,13 +289,13 @@ fn standard_options(
         value
       } else {
         match *field {
-          "pos" | "start_index" | "end_index" => {
+          "position" | "start_index" | "end_index" => {
             Value::Integer(args::integer(value, method, field)?)
           }
           "separator" => Value::String(args::lua_string(value, method, field)?),
-          "comp" if matches!(value, Value::Function(_)) => value,
+          "comparator" if matches!(value, Value::Function(_)) => value,
           "target" if matches!(value, Value::Table(_)) => value,
-          "comp" => return Err(args::invalid(method, field, "function", &value)),
+          "comparator" => return Err(args::invalid(method, field, "function", &value)),
           "target" => return Err(args::invalid(method, field, "table", &value)),
           _ => unreachable!("registered table option has no validator"),
         }
@@ -417,7 +422,7 @@ fn reject_readonly_table(arguments: &MultiValue, index: usize, method: &str) -> 
   if let Some(table) = table_argument_at(arguments, index)
     && readonly::is_proxy(&table)?
   {
-    return Err(args::message(method, "parameter 'table' is read-only"));
+    return Err(args::message(method, "parameter 'target' is read-only"));
   }
   Ok(())
 }
@@ -447,11 +452,12 @@ impl TableShape {
 }
 
 fn table_argument(method: &str, values: MultiValue, writable: bool) -> mlua::Result<Table> {
-  let value = args::one(method, "table", values)?;
+  let name = if writable { "target" } else { "source" };
+  let value = args::one(method, name, values)?;
   if writable {
-    writable_table(value, method, "table")
+    writable_table(value, method, name)
   } else {
-    mutable_or_readonly_table(value, method, "table")
+    mutable_or_readonly_table(value, method, name)
   }
 }
 

@@ -5,10 +5,8 @@ use crate::object_pool::LuaTimerBinding;
 use tg_service_time::{ScheduledTimerId, ScheduledTimerOptions, TimeService, TimerState};
 
 const MAX_TIMERS: usize = 1024;
-const OPTIONS: &[&str] = &["delay", "loop", "interval", "repeat", "callback", "tip"];
-const SET_OPTIONS: &[&str] = &[
-  "duration", "delay", "loop", "interval", "repeat", "callback", "tip",
-];
+const OPTIONS: &[&str] = &["delay", "loop", "interval", "repeat"];
+const SET_OPTIONS: &[&str] = &["duration", "delay", "loop", "interval", "repeat"];
 
 /// Build the timer library in the supplied VM and session context.
 ///
@@ -37,8 +35,6 @@ pub(super) fn timer(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
           interval: 0.0,
           looping: false,
           repetitions: None,
-          callback: None,
-          tip: None,
         },
       )?;
       let options = schedule_options(&binding, method)?;
@@ -68,9 +64,10 @@ pub(super) fn timer(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
         method,
       )?;
       with_pool_mut(&set_state, method, |pool| {
-        let Some(original) = pool.timers.get(&id) else {
-          return Ok(false);
-        };
+        let original = pool
+          .timers
+          .get(&id)
+          .ok_or_else(|| missing_timer(method, id))?;
         let binding = binding_options(parameters.options(), method, original.clone())?;
         let options = schedule_options(&binding, method)?;
         let changed = TimeService::new()
@@ -99,7 +96,11 @@ pub(super) fn timer(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
         let id = id_argument(values, method)?;
         with_pool_mut(&state, method, |pool| {
           if !pool.timers.contains_key(&id) {
-            return Ok(false);
+            return if name == "exists" {
+              Ok(false)
+            } else {
+              Err(missing_timer(method, id))
+            };
           }
           let service = TimeService::new();
           let result = match name {
@@ -130,7 +131,9 @@ pub(super) fn timer(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
       let method = "timer.get_info";
       let id = id_argument(values, method)?;
       with_pool(&info_state, method, |pool| {
-        info_table(lua, pool, id).map(|table| table.map_or(Value::Nil, Value::Table))
+        info_table(lua, pool, id)?
+          .map(Value::Table)
+          .ok_or_else(|| missing_timer(method, id))
       })
     })?,
   )?;
@@ -213,22 +216,6 @@ fn binding_options(
       );
     }
   }
-  match table.raw_get::<Value>("callback")? {
-    Value::Nil => {}
-    Value::Boolean(false) => binding.callback = None,
-    Value::Function(function) => binding.callback = Some(function),
-    _ => {
-      return Err(args::message(
-        method,
-        "callback must be a function or false",
-      ));
-    }
-  }
-  match table.raw_get::<Value>("tip")? {
-    Value::Nil => {}
-    Value::Boolean(false) => binding.tip = None,
-    value => binding.tip = Some(args::string(value, method, "tip")?),
-  }
   Ok(binding)
 }
 
@@ -285,9 +272,14 @@ fn info_table(
   result.raw_set("delay", binding.delay)?;
   result.raw_set("interval", binding.interval)?;
   result.raw_set("loop", binding.looping)?;
-  result.raw_set("repeat", binding.repetitions)?;
-  result.raw_set("callback", binding.callback.clone())?;
-  result.raw_set("tip", binding.tip.as_deref())?;
+  result.raw_set(
+    "repeat",
+    binding
+      .repetitions
+      .map_or(Value::Number(f64::INFINITY), |count| {
+        Value::Integer(i64::from(count))
+      }),
+  )?;
   result.raw_set(
     "state",
     match info.state {
@@ -320,6 +312,10 @@ fn parse_id(value: String, method: &str) -> mlua::Result<ScheduledTimerId> {
     .filter(|value| *value > 0)
     .map(ScheduledTimerId)
     .ok_or_else(|| args::message(method, "invalid timer ID"))
+}
+
+fn missing_timer(method: &str, id: ScheduledTimerId) -> mlua::Error {
+  args::message(method, format!("unknown timer id '{}'", format_id(id)))
 }
 
 fn format_id(id: ScheduledTimerId) -> String {

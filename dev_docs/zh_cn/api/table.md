@@ -44,7 +44,7 @@ table.concat
 
 | 参数名 | 类型  | 说明     |
 | ------ | ----- | -------- |
-| `list` | table | 源数组表 |
+| `source` | table | 源数组表 |
 
 #### 选填参数
 
@@ -52,7 +52,7 @@ table.concat
 | ------------- | ------- | ------- | ------------------ |
 | `separator`   | string  | `""`    | 相邻元素间的分隔符 |
 | `start_index` | integer | `1`     | 起始索引           |
-| `end_index`   | integer | `#list` | 结束索引           |
+| `end_index`   | integer | `#source` | 结束索引           |
 
 ### 返回值
 
@@ -87,8 +87,8 @@ table.concat
 
 ### 额外说明
 
-- 选填参数 `start_index` 取值范围为 $[1, n]$；$n$ 为 `list` 的数组长度，$end_index - start_index + 1$ 不得超过 $16384$。
-- 选填参数 `end_index` 取值范围为 $[1, n]$；$n$ 为 `list` 的数组长度。
+- 选填参数 `start_index` 取值范围为 $[1, n]$；$n$ 为 `source` 的数组长度，$end_index - start_index + 1$ 不得超过 $16384$。
+- 选填参数 `end_index` 取值范围为 $[1, n]$；$n$ 为 `source` 的数组长度。
 
 ---
 
@@ -108,14 +108,14 @@ table.insert
 
 | 参数名  | 类型  | 说明       |
 | ------- | ----- | ---------- |
-| `list`  | table | 目标表     |
+| `target`  | table | 目标表     |
 | `value` | any   | 要插入的值 |
 
 #### 选填参数
 
 | 参数名 | 类型    | 默认值      | 说明     |
 | ------ | ------- | ----------- | -------- |
-| `pos`  | integer | `#list + 1` | 插入位置 |
+| `position`  | integer | `#target + 1` | 插入位置 |
 
 ### 返回值
 
@@ -129,7 +129,7 @@ table.insert(t1, "z")
 debug.print(table.pretty(t1))
 
 local t2 = { "a", "c" }
-table.insert(t2, "b", { pos = 2 })
+table.insert(t2, "b", { position = 2 })
 debug.print(table.pretty(t2))
 ```
 
@@ -156,7 +156,7 @@ table.insert
 
 ### 额外说明
 
-- 选填参数 `pos` 取值范围为 $[1, n + 1]$；$n$ 为 `list` 的数组长度。
+- 选填参数 `position` 取值范围为 $[1, n + 1]$；$n$ 为 `target` 的数组长度。
 
 ---
 
@@ -176,16 +176,16 @@ table.move
 
 | 参数名         | 类型    | 说明                 |
 | -------------- | ------- | -------------------- |
-| `src`          | table   | 源表                 |
-| `first`        | integer | 要复制范围的起始索引 |
-| `last`         | integer | 要复制范围的结束索引 |
-| `target_start` | integer | 目标表中的起始索引   |
+| `source`          | table   | 源表                 |
+| `start_index`        | integer | 要复制范围的起始索引 |
+| `end_index`         | integer | 要复制范围的结束索引 |
+| `target_start_index` | integer | 目标表中的起始索引   |
 
 #### 选填参数
 
 | 参数名   | 类型  | 默认值         | 说明             |
 | -------- | ----- | -------------- | ---------------- |
-| `target` | table | 必填参数 `src` | 接收复制内容的表 |
+| `target` | table | 必填参数 `source` | 接收复制内容的表 |
 
 ### 返回值
 
@@ -246,8 +246,8 @@ table.move
 ### 额外说明
 
 - 方法实际操作为复制元素并覆盖目标位置的元素，而非剪切并移动。
-- 必填参数 `first` 与 `last` 的跨度 $last - first + 1$ 不得超过 $16384$。
-- 必填参数 `target_start` 加上跨度 $last - first + 1$ 后不得超过 $9223372036854775807$。
+- 必填参数 `start_index` 与 `end_index` 的跨度 $end_index - start_index + 1$ 不得超过 $16384$。
+- 必填参数 `target_start_index` 加上跨度 $end_index - start_index + 1$ 后不得超过 $9223372036854775807$。
 
 ---
 
@@ -260,6 +260,14 @@ table.move
 ```lua
 table.pack
 ```
+
+### 参数
+
+#### 必填参数
+
+| 参数名 | 类型 | 说明         |
+| ------ | ---- | ------------ |
+| `...`  | any...  | 需打包的参数 |
 
 ### 返回值
 
@@ -335,14 +343,14 @@ table.unpack
 
 | 参数名 | 类型  | 说明     |
 | ------ | ----- | -------- |
-| `list` | table | 源数组表 |
+| `source` | table | 源数组表 |
 
 #### 选填参数
 
 | 参数名        | 类型    | 默认值  | 说明     |
 | ------------- | ------- | ------- | -------- |
 | `start_index` | integer | `1`     | 起始索引 |
-| `end_index`   | integer | `#list` | 结束索引 |
+| `end_index`   | integer | `#source` | 结束索引 |
 
 ### 返回值
 
@@ -399,13 +407,13 @@ table.remove
 
 | 参数名 | 类型  | 说明   |
 | ------ | ----- | ------ |
-| `list` | table | 目标表 |
+| `target` | table | 目标表 |
 
 #### 选填参数
 
 | 参数名 | 类型    | 默认值  | 说明     |
 | ------ | ------- | ------- | -------- |
-| `pos`  | integer | `#list` | 删除位置 |
+| `position`  | integer | `#target` | 删除位置 |
 
 ### 返回值
 
@@ -424,7 +432,7 @@ debug.print(removed1)
 debug.print(table.pretty(t1) .. "\n")
 
 local t2 = { 10, 20, 30, 40 }
-local removed2 = table.remove(t2, { pos = 2 })
+local removed2 = table.remove(t2, { position = 2 })
 debug.print(removed2)
 debug.print(table.pretty(t2))
 ```
@@ -455,7 +463,7 @@ table.remove
 
 ### 额外说明
 
-- 选填参数 `pos` 取值范围为 $[1, n + 1]$；$n$ 为 `list` 的数组长度。
+- 选填参数 `position` 取值范围为 $[1, n + 1]$；$n$ 为 `target` 的数组长度。
 
 ---
 
@@ -475,13 +483,13 @@ table.sort
 
 | 参数名 | 类型  | 说明       |
 | ------ | ----- | ---------- |
-| `list` | table | 目标数组表 |
+| `target` | table | 目标数组表 |
 
 #### 选填参数
 
-| 参数名 | 类型           | 默认值 | 说明     |
-| ------ | -------------- | ------ | -------- |
-| `comp` | function / nil | `nil`  | 比较函数 |
+| 参数名 | 类型     | 默认值   | 说明     |
+| ------ | -------- | -------- | -------- |
+| `comparator` | function | 默认比较函数 | 比较函数 |
 
 ### 返回值
 
@@ -499,13 +507,13 @@ table.sort(t2)
 debug.print(table.pretty(t2) .. "\n")
 
 local t3 = { 5, 2, 8, 1 }
-table.sort(t3, { comp = function(left, right)
+table.sort(t3, { comparator = function(left, right)
   return left > right
 end })
 debug.print(table.pretty(t3) .. "\n")
 
 local t4 = { "abc", "a", "abcdef", "ab" }
-table.sort(t4, { comp = function(left, right)
+table.sort(t4, { comparator = function(left, right)
   return #left < #right
 end })
 debug.print(table.pretty(t4))
@@ -552,7 +560,7 @@ table.sort
 ### 额外说明
 
 - 目标数组表最多 4096 个元素。
-- 参数 `comp` 函数返回值为 `true` 时，表示 `left` 排在 `right` 之前；返回值为 `false` 时，表示 `right` 排在 `left` 之前。
+- 参数 `comparator` 函数返回值为 `true` 时，表示 `left` 排在 `right` 之前；返回值为 `false` 时，表示 `right` 排在 `left` 之前。
 
 ---
 
@@ -572,7 +580,7 @@ table.deepcopy
 
 | 参数名  | 类型  | 说明   |
 | ------- | ----- | ------ |
-| `table` | table | 目标表 |
+| `source` | table | 目标表 |
 
 ### 返回值
 
@@ -618,7 +626,7 @@ table.pretty
 
 | 参数名  | 类型  | 说明   |
 | ------- | ----- | ------ |
-| `table` | table | 目标表 |
+| `source` | table | 目标表 |
 
 ### 返回值
 
@@ -663,7 +671,7 @@ table.count
 
 | 参数名  | 类型  | 说明   |
 | ------- | ----- | ------ |
-| `table` | table | 目标表 |
+| `source` | table | 目标表 |
 
 ### 返回值
 
@@ -713,7 +721,7 @@ table.count_array
 
 | 参数名  | 类型  | 说明   |
 | ------- | ----- | ------ |
-| `table` | table | 目标表 |
+| `source` | table | 目标表 |
 
 ### 返回值
 
@@ -769,7 +777,7 @@ table.count_hash
 
 | 参数名  | 类型  | 说明   |
 | ------- | ----- | ------ |
-| `table` | table | 目标表 |
+| `source` | table | 目标表 |
 
 ### 返回值
 
@@ -812,7 +820,7 @@ table.compact
 
 | 参数名  | 类型  | 说明       |
 | ------- | ----- | ---------- |
-| `table` | table | 要压实的表 |
+| `target` | table | 要压实的表 |
 
 ### 返回值
 

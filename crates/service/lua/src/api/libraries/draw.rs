@@ -45,7 +45,7 @@ pub(super) fn draw(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
         method,
         values,
         &["x", "y", "width", "height"],
-        &["char", "fg", "bg", "slice_layer"],
+        &["char", "fg", "bg", "slice_id"],
       )?;
       let target = parse_draw_target(&table, method, &fill_state)?;
       let fill_char = fill_character(&table, method, "char")?;
@@ -72,7 +72,7 @@ pub(super) fn draw(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
         method,
         values,
         &["x", "y", "width", "height"],
-        &["fg", "bg", "border_chars", "slice_layer"],
+        &["fg", "bg", "border_chars", "slice_id"],
       )?;
       let target = parse_draw_target(&table, method, &stroke_state)?;
       let command = LuaDrawCommand::StrokeRect {
@@ -98,7 +98,7 @@ pub(super) fn draw(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
         method,
         values,
         &["x", "y", "width", "height"],
-        &["slice_layer"],
+        &["slice_id"],
       )?;
       let target = parse_draw_target(&table, method, &erase_state)?;
       let command = LuaDrawCommand::EraseRect {

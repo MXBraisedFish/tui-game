@@ -812,7 +812,7 @@ packed 8 bytes
 ```lua
 bytes = serialization.binary_pack("<I4 I4", table.unpack({ 100, 200 }))
 
-values, next_pos = serialization.binary_unpack("<I4 I4", bytes)
+values, next_position = serialization.binary_unpack("<I4 I4", bytes)
 
 debug.print(values[1] .. ", " .. values[2])
 ```
@@ -838,7 +838,7 @@ debug.print(tostring(size))
 
 **错误示例**
 
-> 必填参数 `fmt` 和必填参数 `values` 数量不匹配
+> 必填参数 `format` 和必填参数 `values` 数量不匹配
 
 ```lua
 serialization.binary_pack("<I4 I4", table.unpack({ 100 }))
@@ -850,8 +850,8 @@ serialization.binary_pack("<I4 I4", table.unpack({ 100 }))
 serialization.binary_unpack("<I4", "\x01") -- 需要 4 字节数据
 ```
 
-> 必填参数 `pos` 超出数据范围
+> 必填参数 `position` 超出数据范围
 
 ```lua
-serialization.binary_unpack("<I2", "\1\2\3\4", {pos = 6}) -- 数据长 4 字节时最大位置为 5
+serialization.binary_unpack("<I2", "\1\2\3\4", {position = 6}) -- 数据长 4 字节时最大位置为 5
 ```

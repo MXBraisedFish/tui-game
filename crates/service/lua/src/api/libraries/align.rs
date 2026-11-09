@@ -45,7 +45,7 @@ pub(super) fn align(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
           method,
           values,
           &[dimension, align_name],
-          &[offset_name, anchor_name, "slice_layer"],
+          &[offset_name, anchor_name, "slice_id"],
         )?;
         let options = parameters.options();
         let target = parse_draw_target(options, method, &state)?;
@@ -80,13 +80,7 @@ pub(super) fn align(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
         method,
         values,
         &["width", "height", "horizontal_align", "vertical_align"],
-        &[
-          "offset_x",
-          "offset_y",
-          "anchor_x",
-          "anchor_y",
-          "slice_layer",
-        ],
+        &["offset_x", "offset_y", "anchor_x", "anchor_y", "slice_id"],
       )?;
       let options = parameters.options();
       let target = parse_draw_target(options, method, &state)?;

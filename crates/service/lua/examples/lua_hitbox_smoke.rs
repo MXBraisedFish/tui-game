@@ -45,7 +45,7 @@ fn main() {
     end
     function Render()
       slice.draw(surface, 4, 1)
-      widget.hitbox.draw(sliced, -1, 0, {slice_layer = surface})
+      widget.hitbox.draw(sliced, -1, 0, {slice_id = surface})
       widget.hitbox.draw(first, -2, -1)
       widget.hitbox.draw(top, 0, 0)
     end

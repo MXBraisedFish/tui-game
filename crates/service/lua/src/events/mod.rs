@@ -891,7 +891,8 @@ impl LuaEventData {
         data.set("timer_kind", event.timer_kind.as_str())?;
         data.set("kind", event.kind.as_str())?;
         data.set("executed_count", event.executed_count)?;
-        data.set("tip", event.tip.as_deref())?;
+        data.set("tip", "")?;
+        data.set("callback", "")?;
       }
       Self::Animation(event) => {
         data.set("id", event.id.to_string())?;
@@ -1626,6 +1627,8 @@ mod tests {
     .to_lua_table(&lua)
     .unwrap();
     assert_eq!(timer.get::<Value>("executed_count").unwrap(), Value::Nil);
+    assert_eq!(timer.get::<String>("tip").unwrap(), "");
+    assert_eq!(timer.get::<String>("callback").unwrap(), "");
 
     let audio = LuaEventData::Audio(LuaAudioEvent {
       id: 9,

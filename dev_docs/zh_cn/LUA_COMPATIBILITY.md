@@ -58,7 +58,7 @@
 
 ### 尚未开放
 
-`image.load` 已开放，通过请求编号关联异步结果。`widget.hitbox` 已开放，提供 `create`、`delete`、`clear`、`list`、`count`、`draw`、`set`、`get_info`、`exists`，事件类型为 `hitbox`。命中区域只在本帧调用 `draw` 后生效；`slice_layer` 指定绘制目标，默认 `"base"`。事件 `x/y` 为目标切片坐标，`relative_x/relative_y` 为相对于 hitbox 原始左上角的坐标，`dx/dy` 仍为拖动位移。切片 `create/set` 的 `event_passthrough` 默认 `false`，控制没有本层控件命中时是否允许穿透到下层；屏保可管理和提交对象，但沿用屏保不接收交互事件的规则。`widget.input` 已开放，事件类型为 `input`，通过 `data.id/kind` 与原始终端文字区分；聚焦输入框暂停普通游戏按键及原始文字投递。`widget.link` 已开放，使用 `link` 点击事件，支持包内 assets 文件/目录与 http/https 网页的系统默认应用打开及可选复制；失败静默。`widget.input.create` 的 `mouse` 默认 `true`。`audio`、`animation`、`http`、`effect` 及其他 `widget` 子库未由当前 `install` 注册。存在相应服务、事件类型或文档页不等于 Lua 脚本可以调用。
+`image.load` 已开放，通过请求编号关联异步结果。`widget.hitbox` 已开放，提供 `create`、`delete`、`clear`、`list`、`count`、`draw`、`set`、`get_info`、`exists`，事件类型为 `hitbox`。命中区域只在本帧调用 `draw` 后生效；`slice_id` 指定绘制目标，默认 `"base"`。事件 `x/y` 为目标切片坐标，`relative_x/relative_y` 为相对于 hitbox 原始左上角的坐标，`dx/dy` 仍为拖动位移。切片 `create/set` 的 `event_passthrough` 默认 `false`，控制没有本层控件命中时是否允许穿透到下层；屏保可管理和提交对象，但沿用屏保不接收交互事件的规则。`widget.input` 已开放，事件类型为 `input`，通过 `data.id/kind` 与原始终端文字区分；聚焦输入框暂停普通游戏按键及原始文字投递。`widget.link` 已开放，使用 `link` 点击事件，支持包内 assets 文件/目录与 http/https 网页的系统默认应用打开及可选复制；失败静默。`widget.input.create` 的 `mouse` 默认 `true`。`audio`、`animation`、`http`、`effect` 及其他 `widget` 子库未由当前 `install` 注册。存在相应服务、事件类型或文档页不等于 Lua 脚本可以调用。
 
 ## 调用差异
 
@@ -69,7 +69,7 @@
 - 使用 Lua 5.4，不把 Lua 5.5 新增能力视为已提供。
 - `base` 方法也能直接使用全局名称，例如 `pairs(t)`。`debug.pcall` 和 `debug.xpcall` 使用变参；全局 `pcall`、`xpcall`、`assert`、`print` 不开放。
 - 所有选填参数使用末尾严格选项表，例如 `next(t, {key = previous_key})`、`tonumber("ff", {base = 16})`、`table.concat(t, {sep = ","})`；旧的位置选填参数写法不再接受。
-- `table.insert(list, value, {pos = 2})` 先传入要插入的值；`pairs`、`ipairs` 的内部迭代协议保持不变，遍历表使用 `pairs(t)`。
+- `table.insert(target, value, {position = 2})` 先传入要插入的值；`pairs`、`ipairs` 的内部迭代协议保持不变，遍历表使用 `pairs(t)`。
 - `select`、`table.pack`、格式化与受保护调用的变参属于业务数据，仍依次传入，表和 nil 原样保留。
 - `string.find` 返回起点、终点、捕获表；`string.match` 和 `string.gmatch` 返回捕获表。字符位置按 Unicode 字符计数，不能直接套用标准 Lua 的字节位置和捕获多返回值写法。
 - `math.max/min` 接收一个数值数组，`math.log` 要求显式给出底数，`math.fmod` 只接受整数。其余限制查看各方法说明。

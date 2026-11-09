@@ -352,7 +352,7 @@ align.resolve_x
 | ------------- | ------- | ------------ | ---------------- |
 | `offset_x`    | integer | `0`          | 锚点上的水平偏移 |
 | `anchor_x`    | integer | 图层切片锚点 | 自定义水平锚点   |
-| `slice_layer` | string  | `"base"`     | 目标图层切片     |
+| `slice_id` | string  | `"base"`     | 目标图层切片     |
 
 ### 返回值
 
@@ -410,7 +410,7 @@ align.resolve_y
 | ------------- | ------- | ------------ | ---------------- |
 | `offset_y`    | integer | `0`          | 锚点上的垂直偏移 |
 | `anchor_y`    | integer | 图层切片锚点 | 自定义垂直锚点   |
-| `slice_layer` | string  | `"base"`     | 目标图层切片     |
+| `slice_id` | string  | `"base"`     | 目标图层切片     |
 
 ### 返回值
 
@@ -472,7 +472,7 @@ align.resolve_rect
 | `offset_y`    | integer | `0`          | 锚点上的垂直偏移 |
 | `anchor_x`    | integer | 图层切片锚点 | 自定义水平锚点   |
 | `anchor_y`    | integer | 图层切片锚点 | 自定义垂直锚点   |
-| `slice_layer` | string  | `"base"`     | 目标图层切片     |
+| `slice_id` | string  | `"base"`     | 目标图层切片     |
 
 ### 返回值
 

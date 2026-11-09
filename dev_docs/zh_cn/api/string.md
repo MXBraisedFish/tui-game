@@ -646,7 +646,12 @@ debug.print(tostring(match2.n))
 **输出：**
 
 ```lua
+123
+1
 
+Apple
+5.99
+2
 ```
 
 ### 重定向
@@ -935,7 +940,16 @@ debug.print(tostring(captures2.n))
 **输出：**
 
 ```lua
+7
+9
+123
+1
 
+1
+20
+Alice
+30
+2
 ```
 
 ### 额外说明
@@ -1165,7 +1179,13 @@ debug.print(result4 .. " " .. count4)
 **输出：**
 
 ```lua
+X X X 3
 
+[2023]-[2024]-2025 2
+
+fruit berry fruit 3
+
+ax bxx cxxx 3
 ```
 
 ### 额外说明
@@ -1292,9 +1312,10 @@ string.format
 
 #### 必填参数
 
-| 参数名          | 类型   | 说明   |
-| --------------- | ------ | ------ |
-| `format_string` | string | 格式串 |
+| 参数名     | 类型   | 说明     |
+| ---------- | ------ | -------- |
+| `template` | string | 格式串   |
+| `values`   | any... | 格式数据 |
 
 ### 返回值
 
@@ -1357,11 +1378,11 @@ string.rich_text_to_plain_text
 
 #### 选填参数
 
-| 参数名         | 类型        | 默认值 | 说明             |
-| -------------- | ----------- | ------ | ---------------- |
-| `rich_params`  | table / nil | `nil`  | 富文本参数表     |
-| `key_params`   | boolean     | `true` | 是否解析按键参数 |
-| `strip_header` | boolean     | `true` | 是否剥离 `f%` 头 |
+| 参数名         | 类型    | 默认值 | 说明             |
+| -------------- | ------- | ------ | ---------------- |
+| `rich_params`  | table   | `{}`   | 富文本参数表     |
+| `key_params`   | boolean | `true` | 是否解析按键参数 |
+| `strip_header` | boolean | `true` | 是否剥离 `f%` 头 |
 
 ### 返回值
 

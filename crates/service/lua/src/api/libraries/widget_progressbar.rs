@@ -84,7 +84,7 @@ pub(super) fn progressbar(lua: &Lua, state: SharedApiState) -> mlua::Result<Tabl
     "draw",
     lua.create_function(move |lua, values: MultiValue| {
       let method = "widget.progressbar.draw";
-      let table = positional_table(lua, method, values, &["id", "x", "y"], &["slice_layer"])?;
+      let table = positional_table(lua, method, values, &["id", "x", "y"], &["slice_id"])?;
       let id = table_id(&table, method)?;
       let coordinate = |name| {
         i32::try_from(args::integer(

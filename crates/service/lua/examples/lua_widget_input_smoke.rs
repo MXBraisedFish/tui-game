@@ -68,7 +68,7 @@ pub(crate) fn main() {
       debug.assert(input.delete(second) and not input.exists(second) and input.get_info(second) == nil)
       debug.assert(not input.delete(second) and not input.focus(second) and not input.set(second, {text="x"}))
       debug.assert(not debug.pcall(input.draw, first, 2147483648, 0))
-      debug.assert(not debug.pcall(input.draw, first, 0, 0, {slice_layer="slice_999"}))
+      debug.assert(not debug.pcall(input.draw, first, 0, 0, {slice_id="slice_999"}))
       owner = slice.create(5, 3)
       overlay = slice.create(1, 1)
       phase, seen, changes = 0, {}, {}
@@ -76,7 +76,7 @@ pub(crate) fn main() {
     function Render()
       slice.draw(owner, 0, 0)
       slice.draw(overlay, 0, 0)
-      widget.input.draw(first, -1, 0, {slice_layer=owner})
+      widget.input.draw(first, -1, 0, {slice_id=owner})
     end
     function HandleEvent(event)
       debug.assert(event.type == "input" and event.data.id == first)

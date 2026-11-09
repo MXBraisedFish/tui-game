@@ -601,21 +601,19 @@ impl LuaSession {
     if let super::LuaEventData::Timer(event) = &delivery.event.data
       && let Some(revision) = event.revision
     {
-      let callback = self
+      let current = self
         .with_objects(|objects| {
           let id = tg_service_time::ScheduledTimerId(event.id);
-          let info = tg_service_time::TimeService::new()
-            .scheduled_timer_info(&objects.runtime().time, id)?;
-          if info.revision != revision {
-            return None;
-          }
-          Some(objects.timers.get(&id)?.callback.clone())
+          objects.timers.contains_key(&id)
+            && tg_service_time::TimeService::new()
+              .scheduled_timer_info(&objects.runtime().time, id)
+              .is_some_and(|info| info.revision == revision)
         })
-        .flatten();
-      return match callback {
-        None => Ok(()),
-        Some(None) => self.handle_event(&delivery.event),
-        Some(Some(function)) => self.invoke_event_function(function, &delivery.event),
+        .unwrap_or(false);
+      return if current {
+        self.handle_event(&delivery.event)
+      } else {
+        Ok(())
       };
     }
     if let super::LuaEventData::File(event) = &delivery.event.data {
@@ -2408,11 +2406,11 @@ mod tests {
     let host_source = source
       .replace(
         r#"table.insert(sequence, 2, "b")"#,
-        r#"table.insert(sequence, "b", { pos = 2 })"#,
+        r#"table.insert(sequence, "b", { position = 2 })"#,
       )
       .replace(
         r#"table.remove(sequence, 2)"#,
-        r#"table.remove(sequence, { pos = 2 })"#,
+        r#"table.remove(sequence, { position = 2 })"#,
       )
       .replace(
         r#"table.move(moved, 2, 3, 1, target)"#,
@@ -3633,11 +3631,11 @@ mod tests {
             { anchor_x = 60, anchor_y = 20, offset_x = -2, offset_y = 3 })
           debug.assert(anchored_x == 53 and anchored_y == 19)
           local panel = slice.create(31, 13)
-          local panel_x, panel_y = align.resolve_rect(10, 4, align.AUTO, align.AUTO, { slice_layer = panel })
+          local panel_x, panel_y = align.resolve_rect(10, 4, align.AUTO, align.AUTO, { slice_id = panel })
           debug.assert(panel_x == 10 and panel_y == 4)
           debug.assert(slice.set(panel, { width = 41, height = 17 }))
-          debug.assert(align.resolve_x(10, align.RIGHT, { slice_layer = panel }) == 31)
-          debug.assert(align.resolve_y(4, align.BOTTOM, { slice_layer = panel }) == 13)
+          debug.assert(align.resolve_x(10, align.RIGHT, { slice_id = panel }) == 31)
+          debug.assert(align.resolve_y(4, align.BOTTOM, { slice_id = panel }) == 13)
           debug.assert(fails(function() align.resolve_x(10, align.RIGHT, { relative_x = 60 }) end))
           debug.assert(fails(function() align.resolve_y(4, align.BOTTOM, { relative_y = 20 }) end))
           debug.assert(fails(function() align.resolve_rect(10, 4, align.LEFT, align.TOP, { relative_x = 0 }) end))
@@ -3760,7 +3758,7 @@ mod tests {
             measurement.get_text_width("text", { fg = color.RED })
           end))
           debug.assert(fails(function()
-            measurement.get_text_width("text", { slice_layer = "base" })
+            measurement.get_text_width("text", { slice_id = "base" })
           end))
           debug.assert(fails(function()
             measurement.get_text_width("text", { max_width = 0 })
@@ -3897,7 +3895,7 @@ mod tests {
         end
 
         function Render()
-          draw.fill_rect(-2, 1, 5, 2, { char = "#", slice_layer = slice_id })
+          draw.fill_rect(-2, 1, 5, 2, { char = "#", slice_id = slice_id })
         end
       "##,
     );
@@ -3938,47 +3936,46 @@ mod tests {
           debug.assert(initial.type == random.INT
               and initial.min == -2147483648
               and initial.max == 2147483647
-              and initial.step == 0)
+              and initial.offset == 0)
           debug.assert(random.count() == 1 and random.list().n == 1)
           debug.assert(fails(function() random.generate() end)
               and fails(function() random.count(true) end)
               and fails(function() slice.exists() end)
               and fails(function() slice.count(true) end))
-          debug.assert(random.set(generator, { type = random.FLOAT, min = -2.5, max = 3.5, seed = 42, step = 5 }))
+          debug.assert(random.set(generator, { type = random.FLOAT, min = -2.5, max = 3.5, seed = 42, offset = 5 }))
           local info = random.get_info(generator)
           debug.assert(info.id == generator and info.type == random.FLOAT
               and info.min == -2.5 and info.max == 3.5
-              and info.seed == 42 and info.step == 5
-              and select('#', random.get_info(generator)) == 1
-              and random.get_info("rng_999") == nil
-              and select('#', random.get_info("rng_999")) == 1)
+              and info.seed == 42 and info.offset == 5
+              and select('#', random.get_info(generator)) == 1)
+          debug.assert(fails(function() random.get_info("rng_999") end))
           local value = random.generate(generator)
           debug.assert(value >= -2.5 and value <= 3.5
-              and random.get_info(generator).step == 6)
+              and random.get_info(generator).offset == 6)
           debug.assert(random.set(generator, {type = random.FLOAT}))
           debug.assert(random.set(generator, {seed = 42}))
           debug.assert(random.set(generator, {min = 1, max = 9}))
-          debug.assert(random.set(generator, {step = 3}))
+          debug.assert(random.set(generator, {offset = 3}))
           debug.assert(random.set(generator))
           info = random.get_info(generator)
           debug.assert(info.type == random.FLOAT and info.min == 1 and info.max == 9
-              and info.seed == 42 and info.step == 3)
+              and info.seed == 42 and info.offset == 3)
           info.seed = 999
           debug.assert(random.get_info(generator).seed == 42)
           for _, name in ipairs({"set_type", "set_range", "set_seed", "set_step",
                                  "get_type", "get_range", "get_seed", "get_step"}) do
             debug.assert(random[name] == nil)
           end
-          for _, options in ipairs({{step=-1}, {seed=true}, {type="invalid"},
+          for _, options in ipairs({{offset=-1}, {seed=true}, {type="invalid"},
                                     {min=10, max=1}, {unknown=1}}) do
             debug.assert(fails(function() random.set(generator, options) end))
             local unchanged = random.get_info(generator)
             debug.assert(unchanged.min == 1 and unchanged.max == 9
-                and unchanged.seed == 42 and unchanged.step == 3)
+                and unchanged.seed == 42 and unchanged.offset == 3)
           end
           debug.assert(fails(function() random.set() end)
               and fails(function() random.get_info() end)
-              and not random.set("rng_999", {seed=1})
+              and fails(function() random.set("rng_999", {seed=1}) end)
               and not random.exists("rng_999"))
 
           debug.assert(slice.exists("base"))
@@ -3992,8 +3989,7 @@ mod tests {
           local first_info = slice.get_info(first)
           debug.assert(first_info.width == 10 and first_info.height == 4
               and select('#', slice.get_info(first)) == 1
-              and slice.get_info("slice_999") == nil
-              and select('#', slice.get_info("slice_999")) == 1)
+              and fails(function() slice.get_info("slice_999") end))
           first_info.width = 999
           debug.assert(slice.get_info(first).width == 10)
           for _, name in ipairs({"set_size", "set_width", "set_height", "set_layer",
@@ -4019,8 +4015,8 @@ mod tests {
           debug.assert(slice.get_info(first).bg == color.NONE)
           debug.assert(fails(function() slice.set() end))
           debug.assert(slice.get_info(first).bg == color.NONE)
-          debug.assert(not slice.set("base", {bg = color.BLUE}))
-          debug.assert(not slice.set("slice_999", {bg = color.BLUE}))
+          debug.assert(fails(function() slice.set("base", {bg = color.BLUE}) end))
+          debug.assert(fails(function() slice.set("slice_999", {bg = color.BLUE}) end))
           local invalid_background = debug.pcall(function()
               slice.set(first, {bg = "not-a-color"})
             end)
@@ -4083,11 +4079,11 @@ mod tests {
       r##"
       function Init(ctx)
         local function fails(f) return not select(1, debug.pcall(f)) end
-        local id = timer.create(0.25, {delay = 0.1, interval = 0.05, loop = true, ["repeat"] = 2, tip = "cycle"})
+        local id = timer.create(0.25, {delay = 0.1, interval = 0.05, loop = true, ["repeat"] = 2})
         debug.assert(type(id) == "string" and timer.count() == 1 and timer.exists(id))
         local info = timer.get_info(id)
         debug.assert(info.duration == 0.25 and info.delay == 0.1 and info.interval == 0.05)
-        debug.assert(info.loop and info["repeat"] == 2 and info.tip == "cycle" and info.state == "idle")
+        debug.assert(info.loop and info["repeat"] == 2 and info.tip == nil and info.callback == nil and info.state == "idle")
         debug.assert(info.executed_count == 0 and info.elapsed == 0)
         debug.assert(timer.list().n == 1 and timer.list()[1].id == id)
         debug.assert(select("#", timer.create(1)) == 1)
@@ -4099,15 +4095,15 @@ mod tests {
         debug.assert(fails(function() timer.set(id, {duration = 0.5, loop = false, ["repeat"] = false}) end))
         info = timer.get_info(id)
         debug.assert(info.state == "delay" and info.duration == 0.25 and info.loop and info["repeat"] == 2)
-        debug.assert(timer.set(id, {duration = 0.5, ["repeat"] = math.INFINITE, tip = false, callback = false}))
+        debug.assert(timer.set(id, {duration = 0.5, ["repeat"] = math.INFINITE}))
         info = timer.get_info(id)
-        debug.assert(info.state == "idle" and info.duration == 0.5 and info["repeat"] == nil and info.tip == nil)
-        debug.assert(timer.get_info("timer_999") == nil and not timer.exists("timer_999"))
+        debug.assert(info.state == "idle" and info.duration == 0.5 and info["repeat"] == math.POSITIVE_INFINITE and info.tip == nil)
+        debug.assert(fails(function() timer.get_info("timer_999") end) and not timer.exists("timer_999"))
         for _, method in ipairs({"start", "pause", "reset", "restart", "delete"}) do
-          debug.assert(not timer[method]("timer_999"))
+          debug.assert(fails(function() timer[method]("timer_999") end))
           debug.assert(fails(function() timer[method](id, {}) end))
         end
-        debug.assert(not timer.set("timer_999", {}))
+        debug.assert(fails(function() timer.set("timer_999", {}) end))
         for _, method in ipairs({"get_duration", "get_delay", "get_loop", "get_interval", "get_callback", "get_tip", "get_state",
           "set_duration", "set_delay", "set_loop", "set_interval", "set_callback", "set_tip"}) do
           debug.assert(timer[method] == nil)
@@ -4143,7 +4139,7 @@ mod tests {
         }) do debug.assert(fails(f)) end
         debug.assert(timer.pause(id) == false and timer.restart(id) and timer.pause(id))
         debug.assert(timer.start(id) and timer.reset(id))
-        debug.assert(timer.delete(id) and not timer.delete(id))
+        debug.assert(timer.delete(id) and fails(function() timer.delete(id) end))
         debug.assert(timer.clear() and timer.clear() and timer.count() == 0)
         local first = timer.create(1)
         timer.clear()
@@ -4161,14 +4157,8 @@ mod tests {
         let source = valid_script(&r#"
           function Init(ctx)
             created_count, changed_count, single_count, finished_count = 0, 0, 0, 0
-            created = timer.create(1, {loop=true, ["repeat"]=UNLIMITED, callback=function(event)
-              created_count = created_count + 1
-              if event.data.kind == "finished" then finished_count = finished_count + 1 end
-            end})
-            changed = timer.create(1, {loop=true, ["repeat"]=2, callback=function(event)
-              debug.assert(event.data.kind == "ticked")
-              changed_count = changed_count + 1
-            end})
+            created = timer.create(1, {loop=true, ["repeat"]=UNLIMITED})
+            changed = timer.create(1, {loop=true, ["repeat"]=2})
             for _, invalid in ipairs({math.NEGATIVE_INFINITE, 0/0, 0, -1, 2.5, 4294967296, true, false, "infinite"}) do
               debug.assert(not debug.pcall(timer.create, 1, {["repeat"]=invalid}))
               debug.assert(not debug.pcall(timer.set, changed, {duration=2, ["repeat"]=invalid}))
@@ -4176,14 +4166,24 @@ mod tests {
               debug.assert(info.duration == 1 and info["repeat"] == 2)
             end
             debug.assert(timer.set(changed, {["repeat"]=UNLIMITED}))
-            debug.assert(timer.get_info(created)["repeat"] == nil)
-            debug.assert(timer.get_info(changed)["repeat"] == nil)
-            debug.assert(timer.list()[1]["repeat"] == nil and timer.list()[2]["repeat"] == nil)
-            single = timer.create(1, {["repeat"]=UNLIMITED, callback=function(event)
+            debug.assert(timer.get_info(created)["repeat"] == math.POSITIVE_INFINITE)
+            debug.assert(timer.get_info(changed)["repeat"] == math.POSITIVE_INFINITE)
+            debug.assert(timer.list()[1]["repeat"] == math.POSITIVE_INFINITE and timer.list()[2]["repeat"] == math.POSITIVE_INFINITE)
+            single = timer.create(1, {["repeat"]=UNLIMITED})
+            debug.assert(timer.start(created) and timer.start(changed) and timer.start(single))
+          end
+          function HandleEvent(event)
+            debug.assert(event.type == "timer" and event.data.tip == "" and event.data.callback == "")
+            if event.data.id == created then
+              created_count = created_count + 1
+              if event.data.kind == "finished" then finished_count = finished_count + 1 end
+            elseif event.data.id == changed then
+              debug.assert(event.data.kind == "ticked")
+              changed_count = changed_count + 1
+            elseif event.data.id == single then
               debug.assert(event.data.kind == "finished")
               single_count = single_count + 1
-            end})
-            debug.assert(timer.start(created) and timer.start(changed) and timer.start(single))
+            end
           end
           function Update(dt)
             debug.assert(created_count == 5 and changed_count == 5 and single_count == 1 and finished_count == 0)
@@ -4228,10 +4228,10 @@ mod tests {
           &r#"
           function Init(ctx)
             completions = 0
-            id = timer.create(1, {delay = DELAY, interval = INTERVAL, loop = true, ["repeat"] = 3,
-              callback = function(event) completions = completions + 1 end})
+            id = timer.create(1, {delay = DELAY, interval = INTERVAL, loop = true, ["repeat"] = 3})
             debug.assert(timer.start(id))
           end
+          function HandleEvent(event) completions = completions + 1 end
           function Update(dt) debug.assert(timer.restart(id)) end
           "#
           .replace("DELAY", &delay.to_string())
@@ -4271,25 +4271,26 @@ mod tests {
   }
 
   #[test]
-  fn timer_callbacks_and_handle_event_use_the_same_envelope_without_double_delivery() {
+  fn timer_events_use_handle_event_without_double_delivery() {
     let source = valid_script(
       r##"
       function Init(ctx)
-        callback_count, handled = 0, 0
-        repeating = timer.create(0.1, {delay = 0.2, interval = 0.05, loop = true, ["repeat"] = 2,
-          tip = "hello", callback = function(event)
-            debug.assert(event.type == "timer" and event.data.id == repeating and event.data.tip == "hello")
-            debug.assert(event.data.executed_count == callback_count + 1)
-            callback_count = callback_count + 1
-            debug.assert(event.data.kind == (callback_count == 2 and "finished" or "ticked"))
-          end})
+        repeating_count, handled = 0, 0
+        repeating = timer.create(0.1, {delay = 0.2, interval = 0.05, loop = true, ["repeat"] = 2})
         single = timer.create(0)
         timer.start(repeating)
         timer.start(single)
       end
       function HandleEvent(event)
-        debug.assert(event.type == "timer" and event.data.id == single and event.data.kind == "finished")
-        handled = handled + 1
+        debug.assert(event.type == "timer" and event.data.tip == "" and event.data.callback == "")
+        if event.data.id == repeating then
+          debug.assert(event.data.executed_count == repeating_count + 1)
+          repeating_count = repeating_count + 1
+          debug.assert(event.data.kind == (repeating_count == 2 and "finished" or "ticked"))
+        else
+          debug.assert(event.data.id == single and event.data.kind == "finished")
+          handled = handled + 1
+        end
       end
     "##,
     );
@@ -4297,45 +4298,49 @@ mod tests {
       LuaSession::load(spec(&source, LuaSessionKind::Game), LuaPolicy::default()).unwrap();
     advance_test_timers(&mut session, Duration::from_millis(299)).unwrap();
     assert_eq!(
-      session.environment_value("callback_count"),
+      session.environment_value("repeating_count"),
       Value::Integer(0)
     );
     assert_eq!(session.environment_value("handled"), Value::Integer(1));
     advance_test_timers(&mut session, Duration::from_millis(1)).unwrap();
     advance_test_timers(&mut session, Duration::from_millis(149)).unwrap();
     assert_eq!(
-      session.environment_value("callback_count"),
+      session.environment_value("repeating_count"),
       Value::Integer(1)
     );
     advance_test_timers(&mut session, Duration::from_millis(1)).unwrap();
     assert_eq!(
-      session.environment_value("callback_count"),
+      session.environment_value("repeating_count"),
       Value::Integer(2)
     );
     advance_test_timers(&mut session, Duration::from_secs(10)).unwrap();
     assert_eq!(
-      session.environment_value("callback_count"),
+      session.environment_value("repeating_count"),
       Value::Integer(2)
     );
     assert_eq!(session.environment_value("handled"), Value::Integer(1));
   }
 
   #[test]
-  fn timer_callbacks_can_mutate_objects_and_invalidate_queued_events() {
+  fn timer_event_handlers_can_mutate_objects_and_invalidate_queued_events() {
     let source = valid_script(
       r##"
       function Init(ctx)
         calls, stale, created = 0, 0, 0
-        first = timer.create(0, {loop = true, callback = function(event)
+        first = timer.create(0, {loop = true})
+        second = timer.create(0)
+        timer.start(first)
+        timer.start(second)
+      end
+      function HandleEvent(event)
+        if event.data.id == first then
           calls = calls + 1
           timer.reset(second)
           debug.assert(timer.delete(first))
-          local id = timer.create(0, {callback = function(e) created = created + 1 end})
-          timer.start(id)
-        end})
-        second = timer.create(0, {callback = function(event) stale = stale + 1 end})
-        timer.start(first)
-        timer.start(second)
+          fresh = timer.create(0)
+          timer.start(fresh)
+        elseif event.data.id == second then stale = stale + 1
+        elseif event.data.id == fresh then created = created + 1 end
       end
     "##,
     );
@@ -4361,9 +4366,10 @@ mod tests {
         r##"
         function Init(ctx)
           calls = 0
-          id = timer.create(0, {{loop = true, callback = function(e) calls = calls + 1 end}})
+          id = timer.create(0, {{loop = true}})
           timer.start(id)
         end
+        function HandleEvent(event) calls = calls + 1 end
         function Update(dt) {mutation} end
       "##
       ));
@@ -4396,14 +4402,15 @@ mod tests {
   }
 
   #[test]
-  fn timer_callbacks_cannot_escape_the_execution_budget_and_release_their_pool() {
+  fn timer_event_handlers_cannot_escape_the_execution_budget_and_release_their_pool() {
     let source = valid_script(
       r##"
       function Init(ctx)
-        local id = timer.create(0, {callback = function(event)
-          debug.pcall(function() while true do end end)
-        end})
+        local id = timer.create(0)
         timer.start(id)
+      end
+      function HandleEvent(event)
+        debug.pcall(function() while true do end end)
       end
     "##,
     );
@@ -4416,14 +4423,15 @@ mod tests {
   }
 
   #[test]
-  fn timer_objects_are_session_local_and_stop_releases_callbacks() {
+  fn timer_objects_are_session_local_and_stop_releases_them() {
     let source = valid_script(
       r##"
       function Init(ctx)
         calls = 0
-        id = timer.create(0, {callback = function(e) calls = calls + 1 end})
+        id = timer.create(0)
         timer.start(id)
       end
+      function HandleEvent(event) calls = calls + 1 end
     "##,
     );
     let mut game =
@@ -4443,39 +4451,18 @@ mod tests {
   }
 
   #[test]
-  fn timer_creation_is_bounded_and_callbacks_are_released_when_cleared() {
+  fn timer_creation_is_bounded_and_clearing_releases_the_objects() {
     let source = valid_script(
       r##"
       function Init(ctx)
-        retained = setmetatable({}, {__mode = "v"})
-        local f = function(event) end
-        retained[1] = f
-        id = timer.create(1, {callback = f})
-      end
-      function Update(dt) timer.clear() end
-    "##,
-    );
-    let mut session =
-      LuaSession::load(spec(&source, LuaSessionKind::Game), LuaPolicy::default()).unwrap();
-    session.lua.gc_collect().unwrap();
-    let retained = match session.environment_value("retained") {
-      Value::Table(table) => table,
-      _ => panic!("weak table"),
-    };
-    assert!(matches!(
-      retained.get::<Value>(1).unwrap(),
-      Value::Function(_)
-    ));
-    session.update().unwrap();
-    session.lua.gc_collect().unwrap();
-    assert_eq!(retained.get::<Value>(1).unwrap(), Value::Nil);
-    let source = valid_script(
-      r##"
-      function Init(ctx)
-        for i = 1, 1024 do timer.create(1) end
+        local first = timer.create(1)
+        for i = 2, 1024 do timer.create(1) end
         debug.assert(timer.count() == 1024)
         debug.assert(timer.create(1) == nil)
         debug.assert(timer.count() == 1024)
+        debug.assert(timer.clear() and timer.count() == 0 and timer.list().n == 0)
+        debug.assert(not timer.exists(first) and not debug.pcall(timer.get_info,first))
+        debug.assert(timer.create(1) ~= first)
       end
     "##,
     );
@@ -4683,8 +4670,8 @@ mod tests {
 
           local first = serialization.binary_pack("<I2z", 513, "ok")
           local all = first .. first
-          local unpacked_first, next_pos = serialization.binary_unpack("<I2z", all)
-          local unpacked_second = serialization.binary_unpack("<I2z", all, { pos = next_pos })
+          local unpacked_first, next_position = serialization.binary_unpack("<I2z", all)
+          local unpacked_second = serialization.binary_unpack("<I2z", all, { position = next_position })
           debug.assert(unpacked_first[1] == 513
               and unpacked_first[2] == "ok"
               and unpacked_second[1] == 513
@@ -4707,7 +4694,7 @@ mod tests {
           local unknown_draw_option = debug.pcall(function() draw.text(1, 1, "x", { boid = true }) end)
           local unknown_rect_option = debug.pcall(function() draw.fill_rect(2, 1, 10, 4, { color = color.BLUE }) end)
           local unknown_slice = debug.pcall(function()
-              draw.text(1, 1, "x", { slice_layer = "slice_999" })
+              draw.text(1, 1, "x", { slice_id = "slice_999" })
             end)
           debug.assert(not missing_text and not unknown_draw_option and not unknown_rect_option
               and not unknown_slice)
@@ -5324,10 +5311,10 @@ mod tests {
           local payload = { pos = "this is data" }
           local list = {}
           table.insert(list, payload)
-          table.insert(list, false, { pos = 1 })
+          table.insert(list, false, { position = 1 })
           debug.assert(list[1] == false and list[2] == payload)
-          debug.assert(table.remove(list, { pos = 1 }) == false)
-          table.insert(list, nil, { pos = 1 })
+          debug.assert(table.remove(list, { position = 1 }) == false)
+          table.insert(list, nil, { position = 1 })
           debug.assert(list[1] == nil and list[2] == payload)
           local target = {}
           debug.assert(table.move(list, 1, 2, 1, { target = target }) == target
@@ -5351,7 +5338,7 @@ mod tests {
               and table.concat({"a", "b"}, {}) == "ab"
               and table.concat({"a", "b"}, nil) == "ab")
           local sorted = { 1, 3, 2 }
-          table.sort(sorted, { comp = function(left, right) return left > right end })
+          table.sort(sorted, { comparator = function(left, right) return left > right end })
           debug.assert(sorted[1] == 3 and sorted[3] == 1)
           table.sort(sorted, {})
           debug.assert(sorted[1] == 1 and sorted[3] == 3)
@@ -5383,9 +5370,9 @@ mod tests {
               and fails(function() table.concat({}, { sep = "-" }) end)
               and fails(function() table.concat({}, { i = 1 }) end)
               and fails(function() table.concat({}, { j = 1 }) end)
-              and fails(function() table.remove({}, { pos = 1.5 }) end)
+              and fails(function() table.remove({}, { position = 1.5 }) end)
               and fails(function() table.move({}, 1, 0, 1, { target = false }) end)
-              and fails(function() table.sort({}, { comp = false }) end)
+              and fails(function() table.sort({}, { comparator = false }) end)
               and fails(function() table.unpack({}, { end_index = "2" }) end)
               and fails(function() table.unpack({}, { start_index = 1.5 }) end)
               and fails(function() table.unpack({}, { i = 1 }) end)
@@ -5418,11 +5405,11 @@ mod tests {
             end))
 
           local inserted = { "a", "c" }
-          table.insert(inserted, "b", { pos = 2 })
+          table.insert(inserted, "b", { position = 2 })
           table.insert(inserted, "d")
           debug.assert(inserted[1] == "a" and inserted[2] == "b"
               and inserted[3] == "c" and inserted[4] == "d")
-          local removed = table.remove(inserted, { pos = 2 })
+          local removed = table.remove(inserted, { position = 2 })
           debug.assert(removed == "b" and #inserted == 3 and inserted[2] == "c")
 
           local moved = { 1, 2, 3, 4 }
@@ -5478,7 +5465,7 @@ mod tests {
           local sortable = { 3, 1, 2 }
           table.sort(sortable)
           debug.assert(sortable[1] == 1 and sortable[2] == 2 and sortable[3] == 3)
-          table.sort(sortable, { comp = function(left, right) return left > right end })
+          table.sort(sortable, { comparator = function(left, right) return left > right end })
           debug.assert(sortable[1] == 3 and sortable[2] == 2 and sortable[3] == 1)
           local oversized = {}
           for index = 1, 4097 do oversized[index] = index end

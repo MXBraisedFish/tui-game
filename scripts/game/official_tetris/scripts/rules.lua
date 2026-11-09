@@ -83,7 +83,7 @@ function rules.normal_colors()
   for group = 1, 3 do
     -- The randomly chosen position in the remaining color list.
     local index = random.randint { min = 1, max = #available }
-    colors[group] = table.remove(available, { pos = index })
+    colors[group] = table.remove(available, { position = index })
   end
   return colors
 end

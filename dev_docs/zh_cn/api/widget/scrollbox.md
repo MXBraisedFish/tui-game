@@ -68,7 +68,7 @@ end
 
 function Render()
   draw.stroke_rect(4, 1, 7, 5)
-  draw.fill_rect(0, 0, 20, 8, { char = "&", slice_layer = scrollbox })
+  draw.fill_rect(0, 0, 20, 8, { char = "&", slice_id = scrollbox })
   widget.scrollbox.draw(scrollbox, 5, 2)
 
   scrollbox_draw = true
@@ -119,7 +119,7 @@ end
 
 function Render()
   draw.stroke_rect(4, 1, 7, 5)
-  draw.fill_rect(0, 0, 20, 8, { char = "&", slice_layer = scrollbox })
+  draw.fill_rect(0, 0, 20, 8, { char = "&", slice_id = scrollbox })
   widget.scrollbox.draw(scrollbox, 5, 2)
 
   scrollbox_draw = true
@@ -170,7 +170,7 @@ end
 
 function Render()
   draw.stroke_rect(4, 1, 7, 5)
-  draw.fill_rect(0, 0, 20, 8, { char = "&", slice_layer = scrollbox })
+  draw.fill_rect(0, 0, 20, 8, { char = "&", slice_id = scrollbox })
   widget.scrollbox.draw(scrollbox, 5, 2)
 
   scrollbox_draw = true
@@ -222,7 +222,7 @@ end
 
 function Render()
   draw.stroke_rect(4, 1, 7, 5)
-  draw.fill_rect(0, 0, 20, 8, { char = "&", slice_layer = scrollbox })
+  draw.fill_rect(0, 0, 20, 8, { char = "&", slice_id = scrollbox })
   widget.scrollbox.draw(scrollbox, 5, 2)
 
   scrollbox_draw = true
@@ -563,7 +563,7 @@ widget.scrollbox.draw
 
 | 参数名        | 类型   | 默认值   | 说明             |
 | ------------- | ------ | -------- | ---------------- |
-| `slice_layer` | string | `"base"` | 绘制目标图层切片 |
+| `slice_id` | string | `"base"` | 绘制目标图层切片 |
 
 ### 返回值
 
@@ -641,7 +641,7 @@ end
 
 function Render()
   draw.stroke_rect(4, 1, 7, 8)
-  draw.fill_rect(0, 0, 20, 8, { char = "&", slice_layer = scrollbox })
+  draw.fill_rect(0, 0, 20, 8, { char = "&", slice_id = scrollbox })
   widget.scrollbox.draw(scrollbox, 5, 2)
 
   scrollbox_draw = true

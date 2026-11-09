@@ -81,6 +81,6 @@ function Render()
     draw.text(star.x // 1, star.y, layer.glyph, { fg = layer.fg })
   end
   local info = random.get_info(row_rng)
-  local footer = string.upper("star drift") .. "  seed " .. info.seed .. "  draws " .. info.step
+  local footer = string.upper("star drift") .. "  seed " .. info.seed .. "  draws " .. info.offset
   draw.text(1, height - 1, footer, { fg = color.GRAY, max_width = width - 2, max_height = 1 })
 end

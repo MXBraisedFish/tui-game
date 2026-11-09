@@ -313,7 +313,7 @@ widget.progressbar.draw
 
 | 参数名        | 类型   | 默认值   | 说明             |
 | ------------- | ------ | -------- | ---------------- |
-| `slice_layer` | string | `"base"` | 绘制目标图层切片 |
+| `slice_id` | string | `"base"` | 绘制目标图层切片 |
 
 ### 返回值
 

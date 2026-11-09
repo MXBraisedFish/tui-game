@@ -106,7 +106,7 @@ pub(super) fn markdown(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> 
     "draw",
     lua.create_function(move |lua, values: MultiValue| {
       let method = "widget.markdown.draw";
-      let table = positional_table(lua, method, values, &["id", "x", "y"], &["slice_layer"])?;
+      let table = positional_table(lua, method, values, &["id", "x", "y"], &["slice_id"])?;
       let id = table_id(&table, method)?;
       let target = parse_draw_target(&table, method, &draw_state)?;
       let x = scrolling::coordinate(&table, method, "x")?;

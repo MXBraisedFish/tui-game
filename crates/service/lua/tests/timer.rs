@@ -4,6 +4,6 @@
 mod scenario;
 
 #[test]
-fn timer_wait_states_callbacks_and_session_ownership() {
+fn timer_wait_states_events_and_session_ownership() {
   scenario::main();
 }

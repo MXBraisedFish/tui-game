@@ -23,13 +23,13 @@ end
 
 -- Fill and outline one slice, then draw its animated wave positions.
 local function draw_waves(panel, panel_width, panel_height, speed, fg)
-  draw.fill_rect(0, 0, panel_width, panel_height, { char = " ", slice_layer = panel })
-  draw.stroke_rect(0, 0, panel_width, panel_height, { fg = fg, border_chars = char.ROUNDED_LINE, slice_layer = panel })
+  draw.fill_rect(0, 0, panel_width, panel_height, { char = " ", slice_id = panel })
+  draw.stroke_rect(0, 0, panel_width, panel_height, { fg = fg, border_chars = char.ROUNDED_LINE, slice_id = panel })
   for row = 1, panel_height - 2 do
     local wave = math.sin(phase * speed + row * 0.6)
     local x = math.floor((wave + 1) * (panel_width - 4) / 2) + 1
     local glyph = WAVE_GLYPHS[(row % #WAVE_GLYPHS) + 1]
-    draw.text(x, row, glyph .. glyph, { fg = fg, slice_layer = panel })
+    draw.text(x, row, glyph .. glyph, { fg = fg, slice_id = panel })
   end
 end
 

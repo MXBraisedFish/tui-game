@@ -41,8 +41,8 @@ pub(super) fn install(lua: &Lua, source: &Table) -> mlua::Result<()> {
     "binary_pack",
     lua.create_function(|lua, values: MultiValue| {
       let method = "serialization.binary_pack";
-      let values = args::variadic(method, values, &["fmt"])?;
-      let format = args::string(values[0].clone(), method, "fmt")?;
+      let values = args::variadic(method, values, &["format"])?;
+      let format = args::string(values[0].clone(), method, "format")?;
       let operations = parse_format(&format, method)?;
       let mut output = Vec::new();
       let mut value_index = 0;
@@ -70,8 +70,8 @@ pub(super) fn install(lua: &Lua, source: &Table) -> mlua::Result<()> {
     "binary_unpack",
     lua.create_function(|lua, values: MultiValue| {
       let method = "serialization.binary_unpack";
-      let parameters = args::positional(lua, method, values, &["fmt", "data"], &["pos"])?;
-      let format = args::string(parameters.get(0), method, "fmt")?;
+      let parameters = args::positional(lua, method, values, &["format", "data"], &["position"])?;
+      let format = args::string(parameters.get(0), method, "format")?;
       let data_value = parameters.get(1);
       let Value::String(data) = data_value else {
         return Err(args::invalid(method, "data", "string", &data_value));
@@ -79,11 +79,15 @@ pub(super) fn install(lua: &Lua, source: &Table) -> mlua::Result<()> {
       if data.as_bytes().len() > args::MAX_API_STRING_BYTES {
         return Err(args::message(method, "input exceeds 1 MiB"));
       }
-      let pos = args::optional_integer(parameters.options(), method, "pos", Some(1))?.unwrap();
-      let mut offset = usize::try_from(pos.saturating_sub(1))
-        .map_err(|_| args::message(method, "pos must be at least 1"))?;
-      if pos < 1 || offset > data.as_bytes().len() {
-        return Err(args::message(method, "pos is outside the input string"));
+      let position =
+        args::optional_integer(parameters.options(), method, "position", Some(1))?.unwrap();
+      let mut offset = usize::try_from(position.saturating_sub(1))
+        .map_err(|_| args::message(method, "position must be at least 1"))?;
+      if position < 1 || offset > data.as_bytes().len() {
+        return Err(args::message(
+          method,
+          "position is outside the input string",
+        ));
       }
       let operations = parse_format(&format, method)?;
       let results = lua.create_table()?;
@@ -108,7 +112,7 @@ pub(super) fn install(lua: &Lua, source: &Table) -> mlua::Result<()> {
     "binary_packsize",
     lua.create_function(|_, values: MultiValue| {
       let method = "serialization.binary_packsize";
-      let format = args::string(args::one(method, "fmt", values)?, method, "fmt")?;
+      let format = args::string(args::one(method, "format", values)?, method, "format")?;
       let mut size = 0_usize;
       for operation in parse_format(&format, method)? {
         size = aligned_offset(size, operation)?;

@@ -52,9 +52,7 @@ timer.create
 | `delay`    | integer / float            | `0`     | 首次启动延迟时长（秒） |
 | `loop`     | boolean                    | `false` | 是否循环               |
 | `interval` | integer / float            | `0`     | 循环之间间隔时长（秒） |
-| `repeat`   | integer / const-math / nil | `nil`   | 循环次数               |
-| `callback` | function / nil / `false`   | `nil`   | 接收事件的回调函数     |
-| `tip`      | string / nil / `false`     | `nil`   | 随事件返回的自定义信息 |
+| `repeat`   | integer / const-math | `math.POSITIVE_INFINITE`   | 循环次数               |
 
 ### 返回值
 
@@ -246,9 +244,7 @@ debug.print(table.pretty(timers))
     elapsed = 0,        -- integer（当轮计时已过时长）
     executed_count = 0, -- integer（当前计时器已循环次数）
     remaining = 1,      -- integer / float（距离下次触发还剩多久）
-    repeat = nil,       -- integer / nil / false（循环次数）
-    callback = nil,     -- function / nil / false（接收事件的回调函数）
-    tip = nil,          -- string / nil / false（随事件返回的自定义信息）
+    repeat = math.POSITIVE_INFINITE,       -- integer / const-math（循环次数）
   },
   n = 1                 -- integer（计时器数量）
 }
@@ -324,7 +320,7 @@ timer.start
 
 ```lua
 function Init(ctx)
-  local id = timer.create(1, { tip = "Get!" })
+  local id = timer.create(1)
   debug.print(timer.start(id))
   local info = timer.get_info(id)
   debug.print(info.state)
@@ -351,7 +347,6 @@ running
     kind = "finished",
     timer_kind = "timer",
     executed_count = 1,
-    tip = "Get!"
   }
 }
 ```
@@ -390,7 +385,7 @@ timer.pause
 local id = timer.create(1)
 timer.start(id)
 debug.print(timer.pause(id))
-local info = animation.get_info(id)
+local info = timer.get_info(id)
 debug.print(info.state)
 ```
 
@@ -398,7 +393,7 @@ debug.print(info.state)
 
 ```lua
 true
-pause
+paused
 ```
 
 ---
@@ -435,7 +430,7 @@ timer.reset
 local id = timer.create(1)
 timer.start(id)
 debug.print(timer.reset(id))
-local info = animation.get_info(id)
+local info = timer.get_info(id)
 debug.print(info.state)
 ```
 
@@ -480,7 +475,7 @@ timer.restart
 local id = timer.create(1)
 timer.start(id)
 debug.print(timer.restart(id))
-local info = animation.get_info(id)
+local info = timer.get_info(id)
 debug.print(info.state)
 ```
 
@@ -519,9 +514,7 @@ timer.set
 | `delay`    | integer / float            | 保持原值 | 首次启动延迟时长（秒） |
 | `loop`     | boolean                    | 保持原值 | 是否循环               |
 | `interval` | integer / float            | 保持原值 | 循环之间间隔时长（秒） |
-| `repeat`   | integer / const-math / nil | 保持原值 | 循环次数               |
-| `callback` | function / nil / `false`   | 保持原值 | 接收事件的回调函数     |
-| `tip`      | string / nil / `false`     | 保持原值 | 随事件返回的自定义信息 |
+| `repeat`   | integer / const-math | 保持原值 | 循环次数               |
 
 ### 返回值
 
@@ -534,11 +527,11 @@ timer.set
 ### 示例
 
 ```lua
-local id = timer.create(5, { tip = "tip", loop = true, ["repeat"] = 3 })
+local id = timer.create(5, { loop = true, ["repeat"] = 3 })
 
 debug.print(table.pretty(timer.get_info(id)))
 
-timer.set(id, { duration = 2, tip = nil, ["repeat"] = nil })
+timer.set(id, { duration = 2, ["repeat"] = math.POSITIVE_INFINITE })
 
 debug.print(table.pretty(timer.get_info(id)))
 ```
@@ -556,8 +549,7 @@ debug.print(table.pretty(timer.get_info(id)))
   elapsed = 0,
   executed_count = 0,
   remaining = 5,
-  repeat = 3,
-  tip = "tip"
+  repeat = 3
 }
 {
   id = "timer_001",
@@ -602,17 +594,11 @@ timer.get_info
 
 ### 返回值
 
-**计时器存在时**，返回一个值。
+返回一个值。
 
 | 类型  | 说明                 |
 | ----- | -------------------- |
 | table | 计时器配置信息对象表 |
-
-**计时器不存在时**，返回一个值。
-
-| 类型 | 说明           |
-| ---- | -------------- |
-| nil  | 该计时器不存在 |
 
 ### 示例
 
@@ -652,9 +638,7 @@ debug.print(table.pretty(timer.get_info(id)))
   elapsed = 0,        -- integer（当轮计时已过时长）
   executed_count = 0, -- integer（当前计时器已循环次数）
   remaining = 1,      -- integer / float（距离下次触发还剩多久）
-  repeat = nil,       -- integer / nil / false（循环次数）
-  callback = nil,     -- function / nil / false（接收事件的回调函数）
-  tip = nil,          -- string / nil / false（随事件返回的自定义信息）
+  repeat = math.POSITIVE_INFINITE,       -- integer / const-math（循环次数）
 }
 ```
 

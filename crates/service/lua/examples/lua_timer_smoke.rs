@@ -1,4 +1,4 @@
-//! Exercise timer bindings, ownership, callbacks, and broker limits without the application.
+//! Exercise timer bindings, ownership, event delivery, and broker limits without the application.
 //!
 //! Run `cargo run -p tg-service-lua --example lua_timer_smoke --locked`.
 //! The entry creates temporary deployment roots; no terminal or wall-clock waits are required.
@@ -33,14 +33,40 @@ pub(crate) fn main() {
   let entry = root.0.join("scripts/main.lua");
   fs::write(&entry, r#"
     function Init(ctx)
+      local function check_missing(id)
+        debug.assert(not timer.exists(id))
+        local count = timer.count()
+        for name, method in pairs({get_info=timer.get_info,delete=timer.delete,start=timer.start,pause=timer.pause,
+          reset=timer.reset,restart=timer.restart,
+          set=function(id) return timer.set(id,{duration=2}) end}) do
+          local ok, message = debug.pcall(method,id)
+          debug.assert(not ok and string.find(message,"timer."..name,{plain=true}) ~= nil
+            and string.find(message,id,{plain=true}) ~= nil)
+          debug.assert(timer.count()==count)
+        end
+      end
+      check_missing("timer_999")
+      local probe = timer.create(1)
+      debug.assert(timer.get_info(probe)["repeat"]==math.POSITIVE_INFINITE)
+      debug.assert(type(timer.get_info(probe)["repeat"])==type(math.POSITIVE_INFINITE))
+      for _, options in ipairs({{tip="removed"},{tip=false},{callback=function() end},{callback=false}}) do
+        debug.assert(not debug.pcall(timer.create,1,options))
+        debug.assert(not debug.pcall(timer.set,probe,options))
+        debug.assert(timer.count()==1 and timer.get_info(probe).state=="idle")
+      end
+      debug.assert(timer.set(probe,{["repeat"]=3}))
+      debug.assert(timer.get_info(probe)["repeat"]==3 and math.type(timer.get_info(probe)["repeat"])=="integer")
+      debug.assert(timer.set(probe,{["repeat"]=nil}) and timer.get_info(probe)["repeat"]==3)
+      debug.assert(timer.delete(probe))
+      check_missing(probe)
+      local cleared = timer.create(1)
+      debug.assert(timer.clear())
+      check_missing(cleared)
       count, handled, frame = 0, 0, 0
+      burst = {}
       for i = 1, 130 do
-        local id = timer.create(0, {tip = "burst", callback = function(event)
-          debug.assert(event.type == "timer" and type(event.data.id) == "string")
-          debug.assert(event.data.kind == "finished" and event.data.tip == "burst")
-          debug.assert(event.sequence > 0 and event.frame > 0)
-          count = count + 1
-        end})
+        local id = timer.create(0)
+        burst[id] = true
         timer.start(id)
       end
       regular = timer.create(0.1, {delay = 0.05, interval = 0, loop = true, ["repeat"] = 2})
@@ -49,17 +75,28 @@ pub(crate) fn main() {
       local unchanged = timer.get_info(regular)
       debug.assert(unchanged.duration == 0.1 and unchanged.loop and unchanged["repeat"] == 2)
       timer.start(regular)
-      phased = timer.create(0.05, {delay = 0.05, interval = 0.05, loop = true, ["repeat"] = 2,
-        callback = function(event) end})
+      phased = timer.create(0.05, {delay = 0.05, interval = 0.05, loop = true, ["repeat"] = 2})
       debug.assert(timer.start(phased) and timer.get_info(phased).state == "delay")
       debug.assert(not timer.start(phased))
       debug.assert(timer.pause(phased) and timer.get_info(phased).state == "paused")
       debug.assert(timer.start(phased) and timer.get_info(phased).state == "delay")
     end
     function HandleEvent(event)
-      debug.assert(event.data.id == regular and event.data.executed_count == handled + 1)
-      handled = handled + 1
-      debug.assert(event.data.kind == (handled == 2 and "finished" or "ticked"))
+      debug.assert(event.type == "timer" and event.data.tip == "" and event.data.callback == "")
+      debug.assert(event.sequence > 0 and event.frame > 0)
+      if burst[event.data.id] then
+        debug.assert(event.data.kind == "finished")
+        count = count + 1
+      elseif event.data.id == regular then
+        debug.assert(event.data.executed_count == handled + 1)
+        handled = handled + 1
+        debug.assert(event.data.kind == (handled == 2 and "finished" or "ticked"))
+      elseif infinite_ids and infinite_ids[event.data.id] then
+        local index = infinite_ids[event.data.id]
+        debug.assert(event.data.kind == "ticked")
+        infinite_count[index] = infinite_count[index] + 1
+        debug.assert(event.data.executed_count == infinite_count[index])
+      else debug.assert(event.data.id == phased) end
     end
     function Update(dt) end
     function UpdateFrame(dt, alpha)
@@ -81,25 +118,20 @@ pub(crate) fn main() {
       if frame == 3 or frame == 4 then debug.assert(count == 130 and handled == 1) end
       if frame == 5 then
         debug.assert(count == 130 and handled == 2 and timer.get_info(regular).state == "finished")
-        debug.assert(timer.set(regular, {loop = false, tip = "new"}))
+        debug.assert(timer.set(regular, {loop = false}))
         debug.assert(timer.get_info(regular).state == "idle" and timer.get_info(regular).executed_count == 0)
         debug.assert(timer.clear() and timer.count() == 0)
         infinite_count = {0, 0}
-        local function callback(index)
-          return function(event)
-            debug.assert(event.data.kind == "ticked")
-            infinite_count[index] = infinite_count[index] + 1
-            debug.assert(event.data.executed_count == infinite_count[index])
-          end
-        end
-        local created = timer.create(0, {loop = true, ["repeat"] = math.POSITIVE_INFINITE, callback = callback(1)})
-        local changed = timer.create(0, {loop = true, ["repeat"] = 1, callback = callback(2)})
+        infinite_ids = {}
+        local created = timer.create(0, {loop = true})
+        local changed = timer.create(0, {loop = true, ["repeat"] = 1})
+        infinite_ids[created], infinite_ids[changed] = 1, 2
         debug.assert(timer.set(changed, {["repeat"] = math.INFINITE}))
         debug.assert(timer.start(created) and timer.start(changed))
       end
       if frame >= 6 then
         debug.assert(infinite_count[1] == frame - 5 and infinite_count[2] == frame - 5)
-        for _, info in ipairs(timer.list()) do debug.assert(info.state == "running") end
+        for _, info in ipairs(timer.list()) do debug.assert(info.state == "running" and info["repeat"] == math.POSITIVE_INFINITE) end
       end
     end
     function Render() end
@@ -160,6 +192,6 @@ pub(crate) fn main() {
   }
   assert!(broker.take_overflowed_sessions().is_empty());
   println!(
-    "timer Lua ok: game/screensaver ownership, strict options, unlimited repetitions, callback delivery, 128-event frame budget and cleanup"
+    "timer Lua ok: game/screensaver ownership, strict options, unlimited repetitions, HandleEvent delivery, 128-event frame budget and cleanup"
   );
 }

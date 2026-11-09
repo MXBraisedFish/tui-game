@@ -115,7 +115,14 @@ impl Harness {
       .unwrap()
   }
   fn cell(&self, x: u16, y: u16) -> String {
-    self.canvas.cell_at(x, y - 2).unwrap().text.clone()
+    match tg_service_render_pipeline::FrameCompositor::new()
+      .compose(&self.canvas)
+      .get(x, y)
+      .unwrap()
+    {
+      tg_core_style::ComposedCell::Text(cell) => cell.text.clone(),
+      tg_core_style::ComposedCell::Empty => " ".into(),
+    }
   }
   fn deliver(&mut self, events: Vec<LuaEventData>) {
     let token = LuaSessionToken {
@@ -222,7 +229,7 @@ fn nested_clipping() {
       id=widget.markdown.create(5,5,"[Open](https://example.com)\n\n# Heading")
     end
     function Render()
-      if phase==0 then widget.markdown.draw(id,0,0,{slice_layer=owner});slice.draw(owner,0,0,{slice_layer=outer});widget.scrollbox.draw(outer,1,0)
+      if phase==0 then widget.markdown.draw(id,0,0,{slice_id=outer});widget.scrollbox.draw(outer,0,0,{slice_id=owner});slice.draw(owner,1,0)
       else widget.markdown.draw(id,0,0) end
     end
     function Update(dt) phase=phase+1;slice.delete(owner) end

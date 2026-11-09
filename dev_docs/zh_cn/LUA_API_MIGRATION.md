@@ -17,7 +17,7 @@ local encoded = encoding.base64_encode("Hello")
 local rows = serialization.csv_encode({{"name", "score"}, {"Ada", 10}})
 local id = file.read("notes.txt", {encoding = file.UTF_8})
 local number = tonumber("ff", {base = 16})
-table.insert(rows, {"Grace", 20}, {pos = 1})
+table.insert(rows, {"Grace", 20}, {position = 1})
 local text = table.concat({"a", "b"}, {sep = ","})
 ```
 
@@ -33,7 +33,7 @@ local text = table.concat({"a", "b"}, {sep = ","})
 local start_pos, end_pos, captures = string.find("item-42", "(%a+)%-(%d+)")
 local width, height = measurement.get_text_size("Hello")
 local bytes = serialization.binary_pack("<I2", 42)
-local values, next_pos = serialization.binary_unpack("<I2", bytes)
+local values, next_position = serialization.binary_unpack("<I2", bytes)
 ```
 
 ## 异步方法

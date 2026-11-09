@@ -147,9 +147,16 @@ pub(crate) fn main() {
       debug.assert(timer.count() == 1 and animation.count() == 9)
       timer.clear()
       debug.assert(animation.count() == 9)
-      unused = animation.create(0, {}, {loop=true,["repeat"]=math.POSITIVE_INFINITE})
+      unused = animation.create(0, {}, {loop=true})
+      debug.assert(animation.get_info(unused)["repeat"] == math.POSITIVE_INFINITE)
+      debug.assert(animation.set(unused, {["repeat"]=2}))
+      debug.assert(math.type(animation.get_info(unused)["repeat"]) == "integer")
+      debug.assert(animation.set(unused, {["repeat"]=nil}) and animation.get_info(unused)["repeat"] == 2)
       debug.assert(animation.set(unused, {["repeat"]=math.INFINITE}))
-      debug.assert(animation.get_info(unused)["repeat"] == nil)
+      debug.assert(animation.get_info(unused)["repeat"] == math.POSITIVE_INFINITE)
+      for _, info in ipairs(animation.list()) do
+        if info.id==unused then debug.assert(info["repeat"] == math.POSITIVE_INFINITE) end
+      end
       animation.delete(unused)
     end
     function HandleEvent(event) debug.assert(false, "animations must not emit public timer events") end

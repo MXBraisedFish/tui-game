@@ -44,6 +44,158 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     &entry,
     r##"
     function Init(ctx)
+      for name, methods in pairs({source={table.concat,table.unpack},
+        target={table.insert,table.remove,table.sort}}) do
+        for _, method in ipairs(methods) do
+          local ok, message = debug.pcall(method)
+          debug.assert(not ok and string.find(message,name,{plain=true}) ~= nil)
+        end
+      end
+      for _, method in ipairs({function() return table.insert(char.ASCII_LETTER,"!") end,
+        function() return table.remove(char.ASCII_LETTER) end,
+        function() return table.sort(char.ASCII_LETTER) end}) do
+        local ok, message = debug.pcall(method)
+        debug.assert(not ok and string.find(message,"target",{plain=true}) ~= nil)
+      end
+      for _, method in ipairs({table.deepcopy,table.pretty,table.count,table.count_array,table.count_hash}) do
+        local ok, message = debug.pcall(method)
+        debug.assert(not ok and string.find(message,"source",{plain=true}) ~= nil)
+      end
+      local ok, message = debug.pcall(table.compact)
+      debug.assert(not ok and string.find(message,"target",{plain=true}) ~= nil)
+      for index, name in ipairs({"source","start_index","end_index","target_start_index"}) do
+        local arguments = table.pack({},1,2)
+        arguments.n = index-1
+        local ok, message = debug.pcall(table.move,table.unpack(arguments,{end_index=arguments.n}))
+        debug.assert(not ok and string.find(message,name,{plain=true}) ~= nil)
+      end
+      local ordered = {3,1,2}
+      for _, options in ipairs({{},{comparator=nil}}) do
+        table.sort(ordered,options)
+        debug.assert(ordered[1]==1 and ordered[2]==2 and ordered[3]==3)
+        table.sort(ordered,{comparator=function(left,right) return left>right end})
+        debug.assert(ordered[1]==3 and ordered[2]==2 and ordered[3]==1)
+      end
+      debug.assert(not debug.pcall(table.sort,ordered,{comp=function(left,right) return left<right end}))
+      debug.assert(not debug.pcall(table.sort,ordered,{comparator=false}))
+      local entries = {"a","c"}
+      table.insert(entries,"b",{position=2})
+      debug.assert(table.remove(entries,{position=2})=="b")
+      debug.assert(not debug.pcall(table.insert,entries,"b",{pos=2}))
+      debug.assert(not debug.pcall(table.remove,entries,{pos=1}))
+      for _, call in ipairs({function() return string.format() end,
+        function() return string.format(123) end}) do
+        local ok, message = debug.pcall(call)
+        debug.assert(not ok and string.find(message,"template",{plain=true}) ~= nil)
+      end
+      debug.assert(string.format("%s:%04d", "value", 7) == "value:0007")
+      debug.assert(string.format("literal") == "literal")
+      local rich_text = "f%<fg:red>Hello</fg> {value:missing} {key:missing}"
+      local default_plain = string.rich_text_to_plain_text(rich_text)
+      debug.assert(default_plain == string.rich_text_to_plain_text(rich_text,{rich_params={}}))
+      debug.assert(default_plain == string.rich_text_to_plain_text(rich_text,{rich_params=nil}))
+      debug.assert(default_plain == "Hello {value:missing} {key:missing}")
+      debug.assert(string.rich_text_to_plain_text("f%{value:name}",{rich_params={name="TUI"}}) == "TUI")
+      debug.assert(string.rich_text_to_plain_text("f%<fg:red>TUI</fg>",
+        {rich_params={},strip_header=false}) == "f%TUI")
+      debug.assert(not debug.pcall(string.rich_text_to_plain_text,"text",{rich_params=false}))
+      local function check_missing_slice(id)
+        debug.assert(not slice.exists(id))
+        local count = slice.count()
+        for name, method in pairs({delete=slice.delete, get_info=slice.get_info,
+          set=function(id) return slice.set(id, {width=2}) end,
+          draw=function(id) return slice.draw(id, 0, 0) end}) do
+          local ok, message = debug.pcall(method, id)
+          debug.assert(not ok and string.find(message,"slice."..name,{plain=true}) ~= nil
+            and string.find(message,id,{plain=true}) ~= nil)
+          debug.assert(slice.count() == count)
+        end
+      end
+      check_missing_slice("slice_999")
+      local first_slice = slice.create(2,2)
+      local second_slice = slice.create(3,3)
+      debug.assert(slice.exists("base") and slice.get_info("base").layer == 0)
+      for name, method in pairs({delete=slice.delete, set=slice.set,
+        set_options=function(id) return slice.set(id,{width=1}) end}) do
+        local ok, message = debug.pcall(method,"base")
+        local expected = name=="delete" and "slice.delete" or "slice.set"
+        debug.assert(not ok and string.find(message,expected,{plain=true}) ~= nil
+          and string.find(message,"base",{plain=true}) ~= nil)
+        debug.assert(slice.count()==2 and slice.get_info("base").width==ctx.base.width)
+      end
+      debug.assert(not debug.pcall(slice.draw,"base",0,0))
+      debug.assert(not debug.pcall(slice.draw,first_slice,0,0,{slice_id="base"}))
+      debug.assert(not debug.pcall(slice.draw,first_slice,0,0,{slice_layer="base"}))
+      debug.assert(not debug.pcall(draw.text,0,0,"x",{slice_layer=first_slice}))
+      debug.assert(not debug.pcall(align.resolve_rect,1,1,align.LEFT,align.TOP,{slice_layer=first_slice}))
+      debug.assert(not debug.pcall(effect.cells,0,0,1,1,{slice_layer=first_slice}))
+      debug.assert(slice.delete(first_slice))
+      check_missing_slice(first_slice)
+      debug.assert(slice.exists(second_slice) and slice.get_info(second_slice).layer == 1)
+      debug.assert(slice.clear())
+      check_missing_slice(second_slice)
+      for _, dimensions in ipairs({{0,1},{1,0},{65536,1},{1,65536},{-1,1}}) do
+        debug.assert(not debug.pcall(slice.create,dimensions[1],dimensions[2]))
+      end
+      local packed = serialization.binary_pack("<I2z", 513, "ok")
+      local unpacked, next_position = serialization.binary_unpack("<I2z", packed..packed)
+      debug.assert(unpacked[1] == 513 and unpacked[2] == "ok" and next_position == #packed+1)
+      local second, end_position = serialization.binary_unpack("<I2z", packed..packed, {position=next_position})
+      debug.assert(second[1] == 513 and second[2] == "ok" and end_position == #packed*2+1)
+      debug.assert(serialization.binary_packsize("<I2c2x") == 5)
+      debug.assert(not debug.pcall(serialization.binary_packsize,"<I2z"))
+      debug.assert(not debug.pcall(serialization.binary_unpack,"<I2z",packed,{pos=1}))
+      for _, position in ipairs({0, #packed+2}) do
+        local ok, message = debug.pcall(serialization.binary_unpack,"<I2z",packed,{position=position})
+        debug.assert(not ok and string.find(message,"position",{plain=true}) ~= nil)
+      end
+      for _, method in ipairs({serialization.binary_pack, serialization.binary_unpack, serialization.binary_packsize}) do
+        local ok, message = debug.pcall(method)
+        debug.assert(not ok and string.find(message,"format",{plain=true}) ~= nil)
+      end
+      local function check_missing_random(id)
+        debug.assert(not random.exists(id))
+        local count = random.count()
+        for name, method in pairs({delete=random.delete, generate=random.generate, get_info=random.get_info,
+          set=function(id) return random.set(id, {offset=0}) end}) do
+          local ok, message = debug.pcall(method, id)
+          debug.assert(not ok and string.find(message,"random."..name,{plain=true}) ~= nil
+            and string.find(message,id,{plain=true}) ~= nil)
+          debug.assert(random.count() == count)
+        end
+      end
+      check_missing_random("rng_999")
+      local random_options = {seed=42, offset=7, min=-10, max=10}
+      local first_random = random.create(random_options)
+      local second_random = random.create(random_options)
+      debug.assert(random.generate(first_random) == random.generate(second_random))
+      debug.assert(random.get_info(first_random).offset == 8 and random.get_info(first_random).step == nil)
+      local random_list = random.list()
+      debug.assert(random_list.n == 2 and random_list[1].offset == 8 and random_list[1].step == nil)
+      debug.assert(random.set(first_random, {offset=7}))
+      debug.assert(random.set(second_random, {offset=7}))
+      debug.assert(random.generate(first_random) == random.generate(second_random))
+      for _, options in ipairs({{step=0}, {offset=-1}, {offset=math.INFINITE}}) do
+        debug.assert(not debug.pcall(random.create, options))
+        debug.assert(not debug.pcall(random.set, first_random, options))
+        debug.assert(random.get_info(first_random).offset == 8)
+      end
+      for _, kind in ipairs({random.INT, random.FLOAT}) do
+        debug.assert(random.set(first_random, {type=kind, offset=math.MAX_INTEGER-1}))
+        debug.assert(type(random.generate(first_random)) == "number")
+        debug.assert(random.get_info(first_random).offset == math.MAX_INTEGER)
+        debug.assert(type(random.generate(first_random)) == "number")
+        debug.assert(random.get_info(first_random).offset == 0)
+        debug.assert(random.set(second_random, {type=kind, offset=0}))
+        debug.assert(random.generate(first_random) == random.generate(second_random))
+        debug.assert(random.get_info(first_random).offset == 1)
+        for _, info in ipairs(random.list()) do debug.assert(info.offset == 1) end
+      end
+      debug.assert(random.delete(first_random))
+      check_missing_random(first_random)
+      debug.assert(random.exists(second_random) and random.get_info(second_random).offset == 1)
+      debug.assert(random.clear())
+      check_missing_random(second_random)
       for _, measure in ipairs({measurement.get_text_size, measurement.get_text_width, measurement.get_text_height}) do
         local text = "f%<fg:green>Hello</fg>\nTUI"
         local defaults = table.pack(measure(text))
@@ -103,14 +255,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
       debug.assert(tonumber("ff", {base = 16}) == 255)
       local payload = {pos = "data"}
       local list = {"a", "c"}
-      table.insert(list, "b", {pos = 2})
+      table.insert(list, "b", {position = 2})
       debug.assert(table.concat(list, {separator = "-"}) == "a-b-c")
       debug.assert(table.concat(list, {separator = "-", start_index = 2, end_index = 3}) == "b-c")
       debug.assert(table.concat(list, {end_index = 2}) == "ab")
       for _, options in ipairs({{sep = "-"}, {i = 1}, {j = 3}}) do
         debug.assert(not select(1, debug.pcall(function() table.concat(list, options) end)))
       end
-      debug.assert(table.remove(list, {pos = 2}) == "b")
+      debug.assert(table.remove(list, {position = 2}) == "b")
       table.insert(list, payload)
       debug.assert(list[3] == payload)
       local target = {}
@@ -126,7 +278,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         debug.assert(not select(1, debug.pcall(function() table.unpack(packed, options) end)))
       end
       local numbers = {1, 3, 2}
-      table.sort(numbers, {comp = function(left, right) return left > right end})
+      table.sort(numbers, {comparator = function(left, right) return left > right end})
       debug.assert(numbers[1] == 3 and numbers[3] == 1)
       local seen = 0
       local key, value = next(numbers)

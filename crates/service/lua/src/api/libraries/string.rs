@@ -192,9 +192,9 @@ pub(super) fn string_lib(lua: &Lua, state: SharedApiState) -> mlua::Result<Table
   source.raw_set(
     "format",
     lua.create_function(|_, values: MultiValue| {
-      let parameters = args::variadic("string.format", values, &["format_string"])?;
-      let format_string = args::string(parameters[0].clone(), "string.format", "format_string")?;
-      safe_format(&format_string, &parameters[1..])
+      let parameters = args::variadic("string.format", values, &["template"])?;
+      let template = args::string(parameters[0].clone(), "string.format", "template")?;
+      safe_format(&template, &parameters[1..])
     })?,
   )?;
   let rich_text_state = state;
@@ -229,10 +229,10 @@ pub(super) fn string_lib(lua: &Lua, state: SharedApiState) -> mlua::Result<Table
       let mut params = rich_text_params(
         options.get::<Value>("rich_params")?,
         "string.rich_text_to_plain_text",
-      )?;
+      )?
+      .unwrap_or_default();
       if key_params && (text.contains("{key:") || text.contains("{key_default:")) {
         let context = &rich_text_state.borrow().context;
-        let params = params.get_or_insert_with(Default::default);
         if text.contains("{key:") {
           params.key_actions.clone_from(&context.key_actions);
         }
@@ -248,7 +248,7 @@ pub(super) fn string_lib(lua: &Lua, state: SharedApiState) -> mlua::Result<Table
         &text
       };
       let output = tg_service_rich_text::RichTextService::new()
-        .visible_text(&format!("f%{input}"), params.as_ref());
+        .visible_text(&format!("f%{input}"), Some(&params));
       ensure_output_size("string.rich_text_to_plain_text", &output)?;
       Ok(output)
     })?,
@@ -931,9 +931,9 @@ fn lua_value_to_replacement(method: &str, value: Value) -> mlua::Result<Option<S
   }
 }
 
-fn safe_format(format_string: &str, values: &[Value]) -> mlua::Result<String> {
+fn safe_format(template: &str, values: &[Value]) -> mlua::Result<String> {
   let mut output = String::new();
-  let mut chars = format_string.chars().peekable();
+  let mut chars = template.chars().peekable();
   let mut index = 0_usize;
   while let Some(ch) = chars.next() {
     if ch != '%' {

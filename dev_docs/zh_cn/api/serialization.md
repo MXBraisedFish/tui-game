@@ -303,7 +303,7 @@ serialization.yaml_encode
 
 | 参数名  | 类型             | 说明            |
 | ------- | ---------------- | --------------- |
-| `value` | table / 基本类型 | 要编码的 Lua 值 |
+| `value` | any | 要编码的 Lua 值 |
 
 ### 返回值
 
@@ -700,7 +700,8 @@ serialization.binary_pack
 
 | 参数名 | 类型   | 说明       |
 | ------ | ------ | ---------- |
-| `fmt`  | string | 打包格式串 |
+| `format`  | string | 打包格式串 |
+| `data`  | any...| 打包的数据 |
 
 ### 返回值
 
@@ -741,14 +742,14 @@ serialization.binary_unpack
 
 | 参数名 | 类型   | 说明                       |
 | ------ | ------ | -------------------------- |
-| `fmt`  | string | 解包格式串                 |
+| `format`  | string | 解包格式串                 |
 | `data` | string | 二进制数据，可包含任意字节 |
 
 #### 选填参数
 
 | 参数名 | 类型    | 默认值 | 说明                    |
 | ------ | ------- | ------ | ----------------------- |
-| `pos`  | integer | `1`    | 从 1 开始的起始字节位置 |
+| `position`  | integer | `1`    | 从 1 开始的起始字节位置 |
 
 ### 返回值
 
@@ -757,14 +758,14 @@ serialization.binary_unpack
 | 值名       | 类型    | 说明                       |
 | ---------- | ------- | -------------------------- |
 | `values`   | table   | 按格式顺序解出的数据数组表 |
-| `next_pos` | integer | 下一次解包的起始字节位置   |
+| `next_position` | integer | 下一次解包的起始字节位置   |
 
 ### 示例
 
 ```lua
 local bytes = serialization.binary_pack("<I4 I4", table.unpack({ 100, 200 }))
-local values, next_pos = serialization.binary_unpack("<I4 I4", bytes)
-debug.print(tostring(values[1]) .. ", " .. tostring(values[2]) .. "; next=" .. next_pos)
+local values, next_position = serialization.binary_unpack("<I4 I4", bytes)
+debug.print(tostring(values[1]) .. ", " .. tostring(values[2]) .. "; next=" .. next_position)
 ```
 
 **输出：**
@@ -775,7 +776,7 @@ debug.print(tostring(values[1]) .. ", " .. tostring(values[2]) .. "; next=" .. n
 
 ### 额外说明
 
-- 选填参数 `pos` 取值范围为 $[1, x]$，$x$ 为 `data` 的字节数加 $1$。
+- 选填参数 `position` 取值范围为 $[1, x]$，$x$ 为 `data` 的字节数加 $1$。
 
 ---
 
@@ -795,7 +796,7 @@ serialization.binary_packsize
 
 | 参数名 | 类型   | 说明       |
 | ------ | ------ | ---------- |
-| `fmt`  | string | 打包格式串 |
+| `format`  | string | 打包格式串 |
 
 ### 返回值
 
@@ -820,4 +821,4 @@ debug.print(tostring(size))
 
 ### 额外说明
 
-- 参数 `fmt` 只能包含定长项，含变长项时会抛出错误。
+- 参数 `format` 只能包含定长项，含变长项时会抛出错误。

@@ -115,7 +115,14 @@ impl Harness {
       .unwrap()
   }
   fn cell(&self, x: u16, y: u16) -> String {
-    self.canvas.cell_at(x, y - 2).unwrap().text.clone()
+    match tg_service_render_pipeline::FrameCompositor::new()
+      .compose(&self.canvas)
+      .get(x, y)
+      .unwrap()
+    {
+      tg_core_style::ComposedCell::Text(cell) => cell.text.clone(),
+      tg_core_style::ComposedCell::Empty => " ".into(),
+    }
   }
   fn deliver(&mut self, events: Vec<LuaEventData>) {
     let token = LuaSessionToken {
@@ -150,9 +157,63 @@ fn hit(events: &[LuaEventData], id: u64) -> bool {
 }
 
 pub(crate) fn main() {
+  fixed_slice_order();
   lifecycle_and_order();
   nested_and_occlusion();
   content_shrink_and_limits();
+}
+fn fixed_slice_order() {
+  let mut harness = Harness::new(
+    r#"
+    function Init(ctx)
+      lower=slice.create(4,2)
+      upper=slice.create(2,1)
+      inside=widget.hitbox.create(4,2)
+      top=widget.hitbox.create(1,1)
+      phase=0
+    end
+    function Render()
+      draw.text(0,0,"AAAA",{slice_id=lower})
+      widget.hitbox.draw(inside,0,0,{slice_id=lower})
+      if phase<3 then
+        draw.text(0,0,"BB",{slice_id=upper})
+        widget.hitbox.draw(top,0,0,{slice_id=upper})
+        slice.draw(upper,1,0)
+      end
+      slice.draw(lower,0,0)
+      draw.text(1,0,"base")
+    end
+    function Update(dt)
+      phase=phase+1
+      if phase==1 then slice.set(lower,{layer=2})
+      elseif phase==2 then slice.set(lower,{layer=1});slice.set(upper,{event_passthrough=true})
+      elseif phase==3 then slice.delete(upper) end
+    end
+    function UpdateFrame(dt,alpha) end
+    function HandleEvent(event) end
+  "#,
+  );
+  harness.render();
+  assert_eq!(harness.cell(1, 2), "B");
+  assert!(hit(&harness.mouse(1, 2, MouseEventKind::Press, None), 2));
+  harness.mouse(1, 2, MouseEventKind::Release, None);
+  // The upper slice blocks even positions without an interactive widget.
+  assert!(!hit(&harness.mouse(2, 2, MouseEventKind::Press, None), 1));
+  harness.mouse(2, 2, MouseEventKind::Release, None);
+  harness.update();
+  harness.render();
+  assert_eq!(harness.cell(1, 2), "A");
+  assert!(hit(&harness.mouse(1, 2, MouseEventKind::Press, None), 1));
+  harness.mouse(1, 2, MouseEventKind::Release, None);
+  harness.update();
+  harness.render();
+  assert_eq!(harness.cell(2, 2), "B");
+  assert!(hit(&harness.mouse(2, 2, MouseEventKind::Press, None), 1));
+  harness.mouse(2, 2, MouseEventKind::Release, None);
+  harness.update();
+  harness.render();
+  assert_eq!(harness.cell(1, 2), "A");
+  assert!(hit(&harness.mouse(1, 2, MouseEventKind::Press, None), 1));
 }
 pub(crate) fn lifecycle_and_order() {
   let mut harness = Harness::new(
@@ -172,9 +233,9 @@ pub(crate) fn lifecycle_and_order() {
     end
     function Render()
       widget.hitbox.draw(before,0,0)
-      draw.fill_rect(0,0,20,10,{char="C",slice_layer=box})
-      if phase>=2 then draw.erase_rect(0,0,20,10,{slice_layer=box}) end
-      widget.hitbox.draw(inside,-1,-1,{slice_layer=box})
+      draw.fill_rect(0,0,20,10,{char="C",slice_id=box})
+      if phase>=2 then draw.erase_rect(0,0,20,10,{slice_id=box}) end
+      widget.hitbox.draw(inside,-1,-1,{slice_id=box})
       widget.scrollbox.draw(box,1,0)
       draw.text(1,0,"B")
       widget.hitbox.draw(after,1,0)
@@ -249,22 +310,22 @@ pub(crate) fn nested_and_occlusion() {
     r#"
     function Init(ctx)
       outer=widget.scrollbox.create(8,5)
-      inner=widget.scrollbox.create(3,2,{include_scrollbar=false,mouse=false})
-      owner=slice.create(4,2,{event_passthrough=true})
+      inner=widget.scrollbox.create(4,2,{mouse=false})
+      owner=slice.create(8,5,{event_passthrough=true})
       cover=slice.create(1,1,{layer=10})
       child=widget.hitbox.create(10,10)
       phase=0
     end
     function Render()
-      draw.fill_rect(0,0,20,12,{char="o",slice_layer=outer})
-      draw.fill_rect(0,0,8,8,{char="i",slice_layer=inner})
-      widget.hitbox.draw(child,-1,-1,{slice_layer=inner})
-      widget.scrollbox.draw(inner,1,0,{slice_layer=owner})
-      slice.draw(owner,1,1,{slice_layer=outer})
-      widget.scrollbox.draw(outer,0,0)
+      draw.fill_rect(0,0,20,12,{char="o",slice_id=outer})
+      draw.fill_rect(0,0,8,8,{char="i",slice_id=inner})
+      widget.hitbox.draw(child,-1,-1,{slice_id=inner})
+      widget.scrollbox.draw(inner,2,1,{slice_id=outer})
+      widget.scrollbox.draw(outer,0,0,{slice_id=owner})
+      slice.draw(owner,0,0)
       slice.draw(cover,2,1)
-      debug.assert(not debug.pcall(widget.scrollbox.draw,outer,0,0,{slice_layer=inner}))
-      debug.assert(not debug.pcall(slice.draw,owner,0,0,{slice_layer=owner}))
+      debug.assert(not debug.pcall(widget.scrollbox.draw,outer,0,0,{slice_id=inner}))
+      debug.assert(not debug.pcall(slice.draw,owner,0,0,{slice_id=owner}))
     end
     function Update(dt)
       phase=phase+1
@@ -316,10 +377,10 @@ pub(crate) fn content_shrink_and_limits() {
     end
     function Render()
       if phase==0 then
-        draw.text(0,9,"text",{slice_layer=box})
-        widget.link.draw(link,7,0,{slice_layer=box})
-        widget.input.draw(child,0,12,{slice_layer=box})
-      else draw.text(0,0,"x",{slice_layer=box}) end
+        draw.text(0,9,"text",{slice_id=box})
+        widget.link.draw(link,7,0,{slice_id=box})
+        widget.input.draw(child,0,12,{slice_id=box})
+      else draw.text(0,0,"x",{slice_id=box}) end
       widget.scrollbox.draw(box,-1,-1)
     end
     function Update(dt)

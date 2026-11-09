@@ -34,7 +34,7 @@ pub(super) fn effect(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
         method,
         values,
         &["x", "y", "width", "height"],
-        &["include_continuation_cells", "scope", "slice_layer"],
+        &["include_continuation_cells", "scope", "slice_id"],
       )?;
       let region = tg_service_canvas::CellEffectRegion {
         x: coordinate(&table, method, "x")?,
@@ -97,12 +97,7 @@ pub(super) fn effect(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
         method,
         values,
         &["x", "y", "width", "height"],
-        &[
-          "process",
-          "scope",
-          "include_continuation_cells",
-          "slice_layer",
-        ],
+        &["process", "scope", "include_continuation_cells", "slice_id"],
       )?;
       let binding = configuration(lua, &table, method, None)?;
       enqueue(&immediate_state, &table, method, binding)
@@ -113,7 +108,7 @@ pub(super) fn effect(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
     "apply",
     lua.create_function(move |lua, values: MultiValue| {
       let method = "effect.apply";
-      let table = positional_table(lua, method, values, &["id", "x", "y"], &["slice_layer"])?;
+      let table = positional_table(lua, method, values, &["id", "x", "y"], &["slice_id"])?;
       let id = table_id(&table, method)?;
       let binding = with_pool(&apply_state, method, |pool| {
         pool

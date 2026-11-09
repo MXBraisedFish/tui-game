@@ -93,8 +93,11 @@ fn install_lifecycle(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::
     lua.create_function(move |_, values: MultiValue| {
       let method = "slice.delete";
       match id_argument(values, method)? {
-        SliceHandle::Base => Ok(false),
+        SliceHandle::Base => Err(args::message(method, "base layer cannot be deleted")),
         SliceHandle::Object(id) => with_pool_mut(&delete_state, method, |objects| {
+          if !SliceService::new().exists(objects.ui(), id) {
+            return Err(missing_slice(method, id));
+          }
           objects.invalidate_surface(id);
           objects.surface_placements.remove(&id);
           Ok(SliceService::new().remove(objects.ui_mut(), id))
@@ -149,13 +152,13 @@ fn install_mutations(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::
         )?),
       };
       let SliceHandle::Object(id) = handle else {
-        return Ok(false);
+        return Err(args::message(method, "base layer cannot be modified"));
       };
       with_pool_mut(&set_state, method, |objects| {
         let service = SliceService::new();
-        let Some(mut rect) = service.configured_rect(objects.ui(), id) else {
-          return Ok(false);
-        };
+        let mut rect = service
+          .configured_rect(objects.ui(), id)
+          .ok_or_else(|| missing_slice(method, id))?;
         if let Some(width) = width {
           rect.width = width;
         }
@@ -189,7 +192,7 @@ fn install_mutations(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::
     "draw",
     lua.create_function(move |lua, values: MultiValue| {
       let method = "slice.draw";
-      let table = positional_table(lua, method, values, &["id", "x", "y"], &["slice_layer"])?;
+      let table = positional_table(lua, method, values, &["id", "x", "y"], &[])?;
       let SliceHandle::Object(id) = table_id(&table, method)? else {
         return Err(args::message(method, "base layer cannot be positioned"));
       };
@@ -203,10 +206,10 @@ fn install_mutations(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::
         method,
         "y",
       )?;
-      let target = parse_draw_target(&table, method, &state)?;
+      let target = LuaDrawTarget::Base;
       let sequence = with_pool_mut(&state, method, |objects| {
         if !SliceService::new().exists(objects.ui(), id) {
-          return Err(args::message(method, "unknown slice id"));
+          return Err(missing_slice(method, id));
         }
         let sequence = objects
           .place_surface(id, target, (x, y))
@@ -306,7 +309,7 @@ fn info_value(
     }
     SliceHandle::Object(id) => with_pool(state, method, |objects| {
       if !SliceService::new().exists(objects.ui(), id) {
-        return Ok(Value::Nil);
+        return Err(missing_slice(method, id));
       }
       Ok(Value::Table(object_info(lua, objects, id, size)?))
     }),
@@ -410,6 +413,10 @@ pub(super) fn parse_id(value: &str, method: &str, name: &str) -> mlua::Result<Sl
     .filter(|value| *value > 0)
     .ok_or_else(|| args::message(method, format!("invalid {name} slice id")))?;
   Ok(SliceId(raw))
+}
+
+fn missing_slice(method: &str, id: SliceId) -> mlua::Error {
+  args::message(method, format!("unknown slice id '{}'", format_id(id)))
 }
 
 fn format_id(id: SliceId) -> String {

@@ -149,8 +149,8 @@ pub(crate) fn main() {
     function Render()
       widget.progressbar.draw(id,-2,0)
       slice.draw(slice_id,0,1)
-      widget.progressbar.draw(id,-2,0,{slice_layer=slice_id})
-      widget.progressbar.draw(id,0,0,{slice_layer=scroll})
+      widget.progressbar.draw(id,-2,0,{slice_id=slice_id})
+      widget.progressbar.draw(id,0,0,{slice_id=scroll})
       widget.scrollbox.draw(scroll,0,2)
       widget.progressbar.draw(id,2147483647,2147483647)
       widget.progressbar.draw(id,-2147483648,-2147483648)
@@ -349,7 +349,7 @@ fn markdown_container() {
       widget.markdown.scroll(owner,widget.scrollbox.TO_BOTTOM,widget.scrollbox.TO_RIGHT)
     end
     function Render()
-      widget.progressbar.draw(id,0,2,{slice_layer=owner})
+      widget.progressbar.draw(id,0,2,{slice_id=owner})
       widget.markdown.draw(owner,0,0)
     end
     function Update(dt) end

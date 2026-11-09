@@ -13,7 +13,7 @@ local log_lines = {}
 local function push_log(line)
   table.insert(log_lines, line)
   while #log_lines > MAX_LOG_LINES do
-    table.remove(log_lines, { pos = 1 })
+    table.remove(log_lines, { position = 1 })
   end
 end
 

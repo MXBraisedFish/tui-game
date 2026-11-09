@@ -454,7 +454,14 @@ fn info_table(
   output.raw_set("delay", binding.delay)?;
   output.raw_set("interval", binding.interval)?;
   output.raw_set("loop", binding.looping)?;
-  output.raw_set("repeat", binding.repetitions)?;
+  output.raw_set(
+    "repeat",
+    binding
+      .repetitions
+      .map_or(Value::Number(f64::INFINITY), |count| {
+        Value::Integer(i64::from(count))
+      }),
+  )?;
   output.raw_set("keyframes", keyframes_table(lua, &binding.keyframes)?)?;
   output.raw_set(
     "easing",
