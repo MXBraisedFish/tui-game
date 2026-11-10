@@ -49,8 +49,8 @@ widget.hitbox.create
 
 | 参数         | 类型 | 默认值  | 含义                                          |
 | ------------ | ---- | ------- | --------------------------------------------- |
-| `hover_move` | bool | `false` | 鼠标在区域内移动时，是否产生 `HoverMove` 事件 |
-| `drag`       | bool | `false` | 按住鼠标拖动时，是否产生 `Drag` 事件          |
+| `hover_move` | boolean | `false` | 鼠标在区域内移动时，是否产生 `HoverMove` 事件 |
+| `drag`       | boolean | `false` | 按住鼠标拖动时，是否产生 `Drag` 事件          |
 
 ### 返回值
 
@@ -396,8 +396,8 @@ widget.hitbox.set
 | ------------ | ------- | -------- | --------------------------------------------- |
 | `width`      | integer | 保持原值 | 鼠标响应区域宽度                              |
 | `height`     | integer | 保持原值 | 鼠标响应区域高度                              |
-| `hover_move` | bool    | 保持原值 | 鼠标在区域内移动时，是否产生 `HoverMove` 事件 |
-| `drag`       | bool    | 保持原值 | 按住鼠标拖动时，是否产生 `Drag` 事件          |
+| `hover_move` | boolean    | 保持原值 | 鼠标在区域内移动时，是否产生 `HoverMove` 事件 |
+| `drag`       | boolean    | 保持原值 | 按住鼠标拖动时，是否产生 `Drag` 事件          |
 
 ### 返回值
 
@@ -457,17 +457,11 @@ widget.hitbox.get_info
 
 ### 返回值
 
-**该鼠标响应区域存在时**，返回一个值。
+返回一个值。
 
 | 类型  | 说明                     |
 | ----- | ------------------------ |
 | table | 该鼠标响应区域信息对象表 |
-
-**该鼠标响应区域不存在时**，返回一个值。
-
-| 类型 | 说明                 |
-| ---- | -------------------- |
-| nil  | 不存在该鼠标响应区域 |
 
 ### 示例
 
@@ -547,3 +541,9 @@ debug.print(widget.hitbox.exists(hitbox))
 true
 false
 ```
+
+
+hitbox库
+1. hover_move和drag参数命名修正为hover_move_event和drag_event
+2. 给hitbox新增event_passthrough选填参数，boolean，在此处的含义为事件是否穿透到下方，不会在此控件消费事件，默认为false
+3. 除了检查事件外，传入不存在的id直接抛出异常

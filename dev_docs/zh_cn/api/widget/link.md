@@ -55,7 +55,7 @@ widget.link.create
 | `hover_fg`  | string / const-color | `color.BRIGHT_BLUE` | 指针悬浮前景色         |
 | `hover_bg`  | string / const-color | `color.NONE`        | 指针悬浮背景色         |
 | `mouse`     | boolean              | `true`              | 是否允许鼠标操作       |
-| `copy`      | boolean              | `false`             | 执行后是否复制到剪切板 |
+| `copy`      | boolean              | `false`             | 执行后是否复制到剪贴板 |
 | `bold`      | boolean              | `false`             | 粗体                   |
 | `italic`    | boolean              | `false`             | 斜体                   |
 | `underline` | boolean              | `true`              | 下划线                 |
@@ -254,7 +254,7 @@ debug.print(table.pretty(widget.link.list()))
     hover_fg = "bright_blue", -- string（指针悬浮前景色）
     hover_bg = "none",        -- string（指针悬浮背景色）
     mouse = true,             -- boolean（是否允许鼠标操作）
-    copy = false,             -- boolean（执行后是否复制到剪切板）
+    copy = false,             -- boolean（执行后是否复制到剪贴板）
     bold = false,             -- boolean（粗体）
     italic = false,           -- boolean（斜体）
     underline = true,        -- boolean（下划线）
@@ -422,7 +422,7 @@ widget.link.set
 | `hover_fg`  | string / const-color | 保持原值 | 指针悬浮前景色         |
 | `hover_bg`  | string / const-color | 保持原值 | 指针悬浮背景色         |
 | `mouse`     | boolean              | 保持原值 | 是否允许鼠标操作       |
-| `copy`      | boolean              | 保持原值 | 执行后是否复制到剪切板 |
+| `copy`      | boolean              | 保持原值 | 执行后是否复制到剪贴板 |
 | `bold`      | boolean              | 保持原值 | 粗体                   |
 | `italic`    | boolean              | 保持原值 | 斜体                   |
 | `underline` | boolean              | 保持原值 | 下划线                 |
@@ -497,17 +497,11 @@ widget.link.get_info
 
 ### 返回值
 
-**该链接内容存在时**，返回一个值。
+返回一个值。
 
 | 类型  | 说明                 |
 | ----- | -------------------- |
 | table | 该链接内容信息对象表 |
-
-**该链接内容不存在时**，返回一个值。
-
-| 类型 | 说明             |
-| ---- | ---------------- |
-| nil  | 不存在该链接内容 |
 
 ### 示例
 
@@ -555,7 +549,7 @@ debug.print(table.pretty(widget.link.get_info(link)))
   hover_fg = "bright_blue", -- string（指针悬浮前景色）
   hover_bg = "none",        -- string（指针悬浮背景色）
   mouse = true,             -- boolean（是否允许鼠标操作）
-  copy = false,             -- boolean（执行后是否复制到剪切板）
+  copy = false,             -- boolean（执行后是否复制到剪贴板）
   bold = false,             -- boolean（粗体）
   italic = false,           -- boolean（斜体）
   underline = true,         -- boolean（下划线）
@@ -613,3 +607,9 @@ false
 ```
 
 `mouse` 默认为 `true`。设置为 `false` 后，链接继续绘制，但不参与鼠标命中、不应用悬浮样式，也不响应鼠标点击；关闭时会取消尚未完成的鼠标按下状态。`widget.link.click(id)` 不受此开关影响。`set` 省略 `mouse` 时保留原值。
+
+link库
+
+1. copy参数命名修正为copy_to_clipboard
+2. 给link新增event_passthrough选填参数，boolean，在此处的含义为事件是否穿透到下方，不会在此控件消费事件，默认为false
+3. 除了检查事件外，传入不存在的id直接抛出异常

@@ -644,3 +644,5 @@ end
 ### 额外说明
 
 - 选填参数 `pos` 取值范围为 $[1, +\infty)$；必须为有限正数。
+
+utf-8库，char_position方法index命名修正为offset，char_position命名修正为char_byte_position，pos改为position

@@ -17,6 +17,7 @@
 | `BLOCK`      | 方形光标样式   | [BLOCK](#block)           |
 | `UNDERLINE`  | 下划线光标样式 | [UNDERLINE](#underline)   |
 | `LINE`       | 竖线光标样式   | [LINE](#line)             |
+| `EMPTY`      | 无光标样式     | [EMPTY](#empty)           |
 
 ## 方法
 
@@ -138,6 +139,57 @@ end
 
 ---
 
+## `EMPTY`
+
+无光标样式。
+
+### 调用
+
+```lua
+widget.input.EMPTY
+```
+
+### 可用于
+
+- 参数 `cursor_shape`
+
+### 示例
+
+```lua
+function Init(ctx)
+  input = widget.input.create(5, 1, { cursor_shape = widget.input.EMPTY, text = "Hi" })
+end
+
+function HandleEvent(event)
+  if event.type == "input" then
+    debug.print(table.pretty(event))
+    if event.data.kind == "submitted" then
+      widget.input.blur()
+    elseif event.data.kind == "focus_requested" then
+      widget.input.focus(input)
+    end
+  end
+end
+
+function Render()
+  draw.stroke_rect(4, 1, 8, 3)
+  widget.input.draw(input, 5, 2)
+end
+```
+
+**输出：**
+
+![widget_input_EMPTY_example](../../image/widget_input_EMPTY_example.png)
+
+### 等值
+
+```text
+" "
+```
+
+
+---
+
 ## `BLOCK`
 
 方形光标样式。
@@ -206,7 +258,7 @@ widget.input.UNDERLINE
 
 ```lua
 function Init(ctx)
-  input = widget.input.create(5, 1, { cursor_shape = widget.input.LINE, text = "Hi" })
+  input = widget.input.create(5, 1, { cursor_shape = widget.input.UNDERLINE, text = "Hi" })
 end
 
 function HandleEvent(event)
@@ -256,7 +308,7 @@ widget.input.LINE
 
 ```lua
 function Init(ctx)
-  input = widget.input.create(5, 1, { cursor_shape = widget.input.UNDERLINE, text = "Hi" })
+  input = widget.input.create(5, 1, { cursor_shape = widget.input.LINE, text = "Hi" })
 end
 
 function HandleEvent(event)
@@ -311,29 +363,29 @@ widget.input.create
 
 #### 选填参数
 
-| 参数               | 类型                                 | 默认值                    | 含义                               |
-| ------------------ | ------------------------------------ | ------------------------- | ---------------------------------- |
-| `fg`               | string / const-color                 | `color.NONE`              | 前景色                             |
-| `bg`               | string / const-color                 | `color.NONE`              | 背景色                             |
-| `vertical_align`   | const-align                          | `align.AUTO`              | 文本内容垂直对齐方式               |
-| `horizontal_align` | const-align                          | `align.AUTO`              | 各行相对于最长显示行的水平对齐方式 |
-| `text`             | string                               | `""`                      | 已输入的文本                       |
-| `max_chars`        | integer / nil / `false`              | `nil`                     | 最大字符数                         |
-| `line_mode`        | const-input                          | `widget.input.SINGLELINE` | 输入模式                           |
-| `mouse`            | boolean                              | `true`                   | 是否允许鼠标操作                   |
-| `enter_submit`     | boolean                              | 跟随选填参数 `line_mode`  | \[Enter] 提交                      |
-| `placeholder`      | string                               | `""`                      | 空内容提示文本                     |
-| `placeholder_fg`   | string / const-color                 | `color.NONE`              | 空内容提示文本前景色               |
-| `cursor_shape`     | string / const-input / nil / `false` | `widget.input.BLOCK`      | 光标样式                           |
-| `cursor_blink`     | boolean                              | `true`                    | 光标是否闪烁                       |
-| `bold`             | boolean                              | `false`                   | 粗体                               |
-| `italic`           | boolean                              | `false`                   | 斜体                               |
-| `underline`        | boolean                              | `false`                   | 下划线                             |
-| `strike`           | boolean                              | `false`                   | 删除线                             |
-| `blink`            | boolean                              | `false`                   | 闪烁                               |
-| `reverse`          | boolean                              | `false`                   | 反显                               |
-| `hidden`           | boolean                              | `false`                   | 隐藏                               |
-| `dim`              | boolean                              | `false`                   | 暗淡                               |
+| 参数               | 类型                 | 默认值                    | 含义                               |
+| ------------------ | -------------------- | ------------------------- | ---------------------------------- |
+| `fg`               | string / const-color | `color.NONE`              | 前景色                             |
+| `bg`               | string / const-color | `color.NONE`              | 背景色                             |
+| `vertical_align`   | const-align          | `align.AUTO`              | 文本内容垂直对齐方式               |
+| `horizontal_align` | const-align          | `align.AUTO`              | 各行相对于最长显示行的水平对齐方式 |
+| `text`             | string               | `""`                      | 已输入的文本                       |
+| `max_chars`        | integer / const-math | `math.POSITIVE_INFINITE`  | 最大字符数                         |
+| `line_mode`        | const-input          | `widget.input.SINGLELINE` | 输入模式                           |
+| `mouse`            | boolean              | `true`                    | 是否允许鼠标操作                   |
+| `enter_submit`     | boolean              | 跟随选填参数 `line_mode`  | \[Enter] 提交                      |
+| `placeholder`      | string               | `""`                      | 空内容提示文本                     |
+| `placeholder_fg`   | string / const-color | `color.NONE`              | 空内容提示文本前景色               |
+| `cursor_shape`     | string / const-input | `widget.input.BLOCK`      | 光标样式                           |
+| `cursor_blink`     | boolean              | `true`                    | 光标是否闪烁                       |
+| `bold`             | boolean              | `false`                   | 粗体                               |
+| `italic`           | boolean              | `false`                   | 斜体                               |
+| `underline`        | boolean              | `false`                   | 下划线                             |
+| `strike`           | boolean              | `false`                   | 删除线                             |
+| `blink`            | boolean              | `false`                   | 闪烁                               |
+| `reverse`          | boolean              | `false`                   | 反显                               |
+| `hidden`           | boolean              | `false`                   | 隐藏                               |
+| `dim`              | boolean              | `false`                   | 暗淡                               |
 
 ### 返回值
 
@@ -628,8 +680,8 @@ widget.input.draw
 
 #### 选填参数
 
-| 参数名        | 类型   | 默认值   | 说明             |
-| ------------- | ------ | -------- | ---------------- |
+| 参数名     | 类型   | 默认值   | 说明             |
+| ---------- | ------ | -------- | ---------------- |
 | `slice_id` | string | `"base"` | 绘制目标图层切片 |
 
 ### 返回值
@@ -1003,3 +1055,12 @@ debug.print(widget.input.exists(input))
 true
 false
 ```
+
+input库
+
+1. line_mode参数命名修正为input_mode
+2. 给input新增event_passthrough选填参数，boolean，在此处的含义为事件是否穿透到下方，不会在此控件消费事件，默认为false
+3. 除了检查事件外，传入不存在的id直接抛出异常
+4. max_chars不再接收nil为默认值，接受math常量正无穷作为默认值
+5. cursor_shape不再接收false和nil，如果想要关闭光标可以使用widget.input.EMPTY
+6. 新增常量EMPTY用于cursor_shape，其实本质就是传递了一个" "空格作为光标，就相当于没有光标

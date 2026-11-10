@@ -307,6 +307,7 @@ math.POSITIVE_INFINITE
 - 参数 `repeat`
 - 参数 `max_width`
 - 参数 `max_height`
+- 参数 `max_chars`
 - 数学比较
 
 ### 示例

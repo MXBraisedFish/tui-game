@@ -556,7 +556,7 @@ true
 - 选填参数 `wheel_step_vertical` 取值范围为 $[1, 65535]$。
 - 选填参数 `wheel_step_horizontal` 取值范围为 $[1, 65535]$。
 - 选填参数 `scroll_offset_vertical` 取值范围为 $[0, n]$；`n` 为滚动框内的内容总高度，超出范围会修正回正常区域。
-- 选填参数 `scroll_offset_horizontal` 取值范围为 $[0, n]$；`n` 为滚动框内的内容总高度，超出范围会修正回正常区域。
+- 选填参数 `scroll_offset_horizontal` 取值范围为 $[0, n]$；`n` 为滚动框内的内容总宽度，超出范围会修正回正常区域。
 - 选填参数 `wheel_step_horizontal`、选填参数 `scroll_offset_horizontal` 仅在选填参数 `allow_overflow` 为 `true` 时生效。
 
 ---
@@ -679,3 +679,9 @@ debug.print(widget.markdown.exists(markdown))
 true
 false
 ```
+
+markdown库
+
+1. wheel_step_\*的参数命名均修改为scroll_step_\*的方式
+2. 给markdown新增event_passthrough选填参数，boolean，在此处的含义为事件是否穿透到下方，不会在此控件消费事件，默认为false
+3. 除了检查事件外，传入不存在的id直接抛出异常
